@@ -15,7 +15,7 @@ const MIME = {
 };
 
 export function createServer(rootDir) {
-  const root = normalize(rootDir);
+  const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer((req, res) => {
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
@@ -25,7 +25,9 @@ export function createServer(rootDir) {
     if (rel === '' || rel.endsWith('/')) rel += 'site/index.html';
     const full = normalize(join(root, rel));
 
-    // traversal guard: resolved path must stay within root
+    // traversal guard: resolved path must stay within root.
+    // (full === root is unreachable today — empty paths get site/index.html appended —
+    //  but kept as defense-in-depth.)
     if (full !== root && !full.startsWith(root + sep)) {
       res.writeHead(403); return res.end('forbidden');
     }
@@ -33,8 +35,13 @@ export function createServer(rootDir) {
     try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
     if (st.isDirectory()) { res.writeHead(404); return res.end('not found'); }
 
+    const stream = createReadStream(full);
+    stream.on('error', () => {
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
     res.writeHead(200, { 'content-type': MIME[extname(full)] ?? 'application/octet-stream' });
-    createReadStream(full).pipe(res);
+    stream.pipe(res);
   });
 }
 

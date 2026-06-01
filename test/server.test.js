@@ -51,3 +51,30 @@ test('rejects path traversal with 403', async () => {
     server.close(); rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('rejects backslash-encoded traversal with 403 (Windows %5c vector)', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  writeFileSync(join(root, 'inside.txt'), 'in');
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/..%5c..%5cwindows%5chosts`);
+    assert.equal(r.status, 403);
+  } finally {
+    server.close(); rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('serves correctly when rootDir has a trailing slash', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  writeFileSync(join(base, 'a.txt'), 'hello');
+  const server = createServer(base + '/');     // trailing slash
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/a.txt`);
+    assert.equal(r.status, 200);
+    assert.equal(await r.text(), 'hello');
+  } finally {
+    server.close(); rmSync(base, { recursive: true, force: true });
+  }
+});

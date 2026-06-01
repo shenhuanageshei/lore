@@ -71,3 +71,81 @@ test('deriveAxes puts INDEX first and unknown axes last in given order', () => {
   assert.equal(axes[0].label, 'INDEX');
   assert.equal(axes[2].label, 'Custom');
 });
+
+// append to test/manifest.test.js
+import { emitManifest } from '../lib/manifest.js';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+function makeWiki() {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-wiki-'));
+  mkdirSync(join(dir, 'component'), { recursive: true });
+  mkdirSync(join(dir, 'theme'), { recursive: true });
+  writeFileSync(join(dir, 'INDEX.md'),
+    '---\ntitle: Index\nsummary: toc\nlast_updated: 2026-05-31\ncode_sha: abc1234\natoms: 33\ncommits: 21\n---\n# Index');
+  writeFileSync(join(dir, 'component', 'm3_nlp.md'),
+    '---\ntitle: M3 NLP\nsummary: extraction\nlast_updated: 2026-05-28\ncode_sha: def5678\natoms: 8\ncommits: 5\n---\n# M3 NLP');
+  writeFileSync(join(dir, 'theme', 'quality.md'),
+    '---\ntitle: Quality\nsummary: qa evolution\nlast_updated: 2026-05-31\ncode_sha: abc1234\natoms: 14\ncommits: 9\n---\n# Quality');
+  return dir;
+}
+
+test('emitManifest builds axes->pages with stale + provenance', () => {
+  const dir = makeWiki();
+  try {
+    const m = emitManifest({
+      wikiDir: dir,
+      currentSha: 'abc1234',
+      countCommitsSince: (sha) => (sha === 'abc1234' ? 0 : 3),
+      now: '2026-05-31T08:14:00Z',
+    });
+    assert.equal(m.generated, '2026-05-31T08:14:00Z');
+    assert.equal(m.current_code_sha, 'abc1234');
+    const comp = m.axes.find(a => a.id === 'component');
+    const page = comp.pages.find(p => p.id === 'm3_nlp');
+    assert.equal(page.title, 'M3 NLP');
+    assert.equal(page.summary, 'extraction');
+    assert.equal(page.path, 'component/m3_nlp.md');
+    assert.equal(page.stale, 3);                  // def5678 != HEAD
+    assert.equal(page.code_sha, 'def5678');
+    assert.deepEqual(page.synthesized_from, { atoms: 8, commits: 5 });
+    const theme = m.axes.find(a => a.id === 'theme');
+    assert.equal(theme.pages[0].stale, 0);        // abc1234 == HEAD
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('emitManifest is deterministic for identical inputs (byte-identical)', () => {
+  const dir = makeWiki();
+  try {
+    const args = {
+      wikiDir: dir, currentSha: 'abc1234',
+      countCommitsSince: () => 0, now: '2026-05-31T08:14:00Z',
+    };
+    const a = JSON.stringify(emitManifest(args));
+    const b = JSON.stringify(emitManifest(args));
+    assert.equal(a, b);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('emitManifest tolerates a page missing summary', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-wiki-'));
+  try {
+    mkdirSync(join(dir, 'component'), { recursive: true });
+    writeFileSync(join(dir, 'component', 'bare.md'),
+      '---\ntitle: Bare\ncode_sha: aaa\n---\n# Bare');
+    const m = emitManifest({
+      wikiDir: dir, currentSha: 'aaa',
+      countCommitsSince: () => 0, now: 't',
+    });
+    const page = m.axes.find(a => a.id === 'component').pages[0];
+    assert.equal(page.summary, '');               // graceful default
+    assert.equal(page.title, 'Bare');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -67,3 +67,39 @@ export function renderMarkdown(src) {
   }
   return html;
 }
+
+export function buildPageIndex(manifest) {
+  const idx = {};
+  for (const ax of manifest.axes) for (const p of ax.pages) idx[p.id] = `${ax.id}/${p.id}`;
+  return idx;
+}
+
+export function preprocessWikilinks(html, pageIndex) {
+  return html.replace(/\[\[([a-zA-Z0-9_\-]+)\]\]/g, (_, id) => {
+    const target = pageIndex[id] ?? `component/${id}`;
+    return `<a class="wikilink" href="#${target}">${id}</a>`;
+  });
+}
+
+export function buildNavModel(manifest) {
+  return manifest.axes.map(ax => ({ id: ax.id, label: ax.label, pages: ax.pages }));
+}
+
+export function matchesSearch(page, term) {
+  if (!term) return true;
+  const t = term.toLowerCase();
+  return (page.title + ' ' + (page.summary ?? '')).toLowerCase().includes(t);
+}
+
+export function buildMeta(page) {
+  const f = page.synthesized_from ?? { atoms: 0, commits: 0 };
+  const chips = [
+    { icon: '📅', text: `last-updated ${page.last_updated ?? '—'}`, kind: 'plain' },
+    { icon: '🔗', text: `${f.atoms} atoms · ${f.commits} commits`, kind: 'plain' },
+    { icon: '⎇', text: `code_sha ${page.code_sha ?? '—'}`, kind: 'plain' },
+  ];
+  chips.push(page.stale > 0
+    ? { icon: '⚠', text: `落后 ${page.stale} commits · 跑 /lore:sync`, kind: 'stale' }
+    : { icon: '✓', text: '最新', kind: 'fresh' });
+  return { chips };
+}

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { probeRuntime, readPid, writePid, isAlive, killPid, findPort, start, stop } from '../lib/serve.js';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync as exec } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync as mkd, writeFileSync as wf } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
@@ -151,4 +151,35 @@ test('start throws if the server never binds within timeout', async () => {
     if (spawned) { try { spawned.kill('SIGKILL'); } catch {} }
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('CLI: serve start prints URL, serve stop tears down', async () => {
+  const root = mkdtempSync(pjoin(tmpdir(), 'lore-cli2-'));
+  try {
+    const wiki = pjoin(root, '.lore', 'wiki');
+    mkd(wiki, { recursive: true });
+    wf(pjoin(wiki, '.manifest.json'), '{"axes":[]}');
+    mkd(pjoin(root, '.lore', 'site'), { recursive: true });
+    wf(pjoin(root, '.lore', 'site', 'index.html'), 'ok');
+
+    const out = exec('node',
+      ['lib/serve.js', 'start', '--lore', pjoin(root, '.lore'), '--port', '0'],
+      { cwd: process.cwd() }).toString();
+    assert.match(out, /http:\/\/127\.0\.0\.1:\d+\/site\//);
+
+    const stopOut = exec('node',
+      ['lib/serve.js', 'stop', '--lore', pjoin(root, '.lore')],
+      { cwd: process.cwd() }).toString();
+    assert.match(stopOut, /stopped|no running/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI: serve start without manifest exits non-zero with hint', () => {
+  const root = mkdtempSync(pjoin(tmpdir(), 'lore-cli3-'));
+  try {
+    mkd(pjoin(root, '.lore'), { recursive: true });
+    assert.throws(() => exec('node',
+      ['lib/serve.js', 'start', '--lore', pjoin(root, '.lore')],
+      { cwd: process.cwd(), stdio: 'pipe' }));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

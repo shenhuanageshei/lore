@@ -8,6 +8,11 @@ export function stripFrontmatter(md) {
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// NOTE: inline() escapes ONLY code spans, not surrounding text. renderMarkdown
+// intentionally passes raw HTML through (the synthesis emits <div> timeline markup
+// that must render). Safe here: content is machine-generated and served on
+// 127.0.0.1 only. If this renderer is ever reused for UNTRUSTED input, add an
+// HTML-escape pass over the non-construct text in inline() and drop raw-div passthrough.
 function inline(t) {
   return t
     .replace(/`([^`]+)`/g, (_, c) => `<code>${esc(c)}</code>`)
@@ -51,7 +56,7 @@ export function renderMarkdown(src) {
       const body = rows
         .filter(r => !/^\|[\s\-:|]+\|?\s*$/.test(r))
         .map((r, ri) => {
-          const cells = r.split('|').slice(1, -1).map(c => c.trim());
+          const cells = r.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
           const tag = ri === 0 ? 'th' : 'td';
           return '<tr>' + cells.map(c => `<${tag}>${inline(c)}</${tag}>`).join('') + '</tr>';
         }).join('');

@@ -31,3 +31,9 @@ test('renderMarkdown escapes html in code blocks', () => {
   const html = renderMarkdown('```\n<script>\n```');
   assert.match(html, /&lt;script&gt;/);
 });
+
+test('renderMarkdown handles tables without a trailing pipe', () => {
+  const html = renderMarkdown('| A | B |\n|---|---|\n| 1 | 2');
+  assert.match(html, /<th>A<\/th><th>B<\/th>/);
+  assert.match(html, /<td>1<\/td><td>2<\/td>/);   // last cell '2' must survive
+});

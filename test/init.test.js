@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scaffold } from '../lib/init.js';
-import { copyShell } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
 
@@ -35,4 +34,30 @@ test('copyShell copies index.html + shell.mjs, overwriting stale', () => {
     assert.equal(readFileSync(join(lore, 'site', 'index.html'), 'utf8'), '<!doctype html>NEW');
     assert.equal(readFileSync(join(lore, 'site', 'shell.mjs'), 'utf8'), 'export const v = 2;');
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('ensureGitignore: created / appended / present', () => {
+  const root = tmpRepo();
+  const root2 = tmpRepo();
+  try {
+    // created: no .gitignore yet
+    assert.equal(ensureGitignore(root), 'created');
+    assert.match(readFileSync(join(root, '.gitignore'), 'utf8'), /^\.lore\/\.state\/$/m);
+
+    // appended: preexisting file missing the line, original content kept
+    writeFileSync(join(root2, '.gitignore'), 'node_modules/\n');
+    assert.equal(ensureGitignore(root2), 'appended');
+    const txt = readFileSync(join(root2, '.gitignore'), 'utf8');
+    assert.match(txt, /node_modules\//);
+    assert.match(txt, /\.lore\/\.state\//);
+
+    // present: already has the line → no duplicate
+    assert.equal(ensureGitignore(root2), 'present');
+    const dupes = readFileSync(join(root2, '.gitignore'), 'utf8')
+      .split(/\r?\n/).filter(l => l.trim() === '.lore/.state/');
+    assert.equal(dupes.length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(root2, { recursive: true, force: true });
+  }
 });

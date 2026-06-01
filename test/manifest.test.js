@@ -40,3 +40,18 @@ test('parseFrontmatter ignores malformed lines without throwing', () => {
   assert.equal(data.title, 'ok');
   assert.equal('garbage-no-colon' in data, false);
 });
+
+test('parseFrontmatter handles CRLF line endings', () => {
+  const md = '---\r\ntitle: Hello\r\nsummary: world\r\natoms: 8\r\n---\r\nbody';
+  const { data, body } = parseFrontmatter(md);
+  assert.equal(data.title, 'Hello');
+  assert.equal(data.summary, 'world');
+  assert.equal(data.atoms, 8);
+  assert.equal(body.trim(), 'body');
+});
+
+test('parseFrontmatter coerces a non-numeric numeric-key to 0', () => {
+  const md = '---\ntitle: X\nstale: broken\n---\nbody';
+  const { data } = parseFrontmatter(md);
+  assert.equal(data.stale, 0);
+});

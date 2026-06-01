@@ -73,7 +73,8 @@ test('deriveAxes puts INDEX first and unknown axes last in given order', () => {
 });
 
 import { emitManifest } from '../lib/manifest.js';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -151,5 +152,32 @@ test('emitManifest tolerates a page missing summary', () => {
     assert.equal(page.title, 'Bare');
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('manifest CLI writes .manifest.json into wiki dir', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-cli-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    const wiki = join(root, '.lore', 'wiki', 'component');
+    mkdirSync(wiki, { recursive: true });
+    writeFileSync(join(root, '.lore', 'wiki', 'component', 'x.md'),
+      '---\ntitle: X\nsummary: s\ncode_sha: deadbee\n---\n# X');
+    writeFileSync(join(root, 'f.txt'), 'hi');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+
+    execFileSync('node', ['lib/manifest.js', join(root, '.lore')],
+      { cwd: process.cwd() });
+
+    const out = join(root, '.lore', 'wiki', '.manifest.json');
+    assert.equal(existsSync(out), true);
+    const m = JSON.parse(readFileSync(out, 'utf8'));
+    assert.equal(m.axes.find(a => a.id === 'component').pages[0].title, 'X');
+    assert.equal(typeof m.current_code_sha, 'string');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

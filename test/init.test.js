@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scaffold, copyShell, ensureGitignore } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
 
@@ -60,4 +60,31 @@ test('ensureGitignore: created / appended / present', () => {
     rmSync(root, { recursive: true, force: true });
     rmSync(root2, { recursive: true, force: true });
   }
+});
+
+test('discoverComponents: fallback picks top-level code dirs, skips excludes/assets', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'lib'));    writeFileSync(join(root, 'lib', 'a.js'), 'x');
+    mkdirSync(join(root, 'docs'));   writeFileSync(join(root, 'docs', 'a.md'), 'x');     // excluded name
+    mkdirSync(join(root, 'tests'));  writeFileSync(join(root, 'tests', 't.js'), 'x');    // excluded name
+    mkdirSync(join(root, 'assets')); writeFileSync(join(root, 'assets', 'logo.png'), 'x'); // no code ext
+    mkdirSync(join(root, '.git'));   writeFileSync(join(root, '.git', 'x.js'), 'x');      // dot-excluded
+    assert.deepEqual(discoverComponents(root), ['lib']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverComponents: finds code in a depth-2 subdir', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'pkg', 'sub'), { recursive: true });
+    writeFileSync(join(root, 'pkg', 'sub', 'mod.py'), 'x');   // depth-2 file
+    assert.deepEqual(discoverComponents(root), ['pkg']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverComponents: empty repo yields []', () => {
+  const root = tmpRepo();
+  try { assert.deepEqual(discoverComponents(root), []); }
+  finally { rmSync(root, { recursive: true, force: true }); }
 });

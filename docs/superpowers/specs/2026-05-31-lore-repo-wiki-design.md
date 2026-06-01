@@ -356,12 +356,15 @@ manifest = **sync 已持有信息的机器可读投影**（零额外 LLM/扫描�
 - **语言无关**：hook 的 component 映射 = 纯路径前缀匹配（path → code_root），任何语言都行（只是目录映射）。
 - **LLM 无关**：synthesis / mine / lint 走 CC 会话当前模型，不硬编码 provider。
 - **一切 keyed on config**：axes / code_roots / match / mine / hook。引擎从不假设 M1-M5。
+- **目标 repo 源码只读（核心不变量）**：lore **永不改目标 repo 的业务源码 / 配置**。所有捕获（hook / mine / scan）= 纯读。lore 只写自己的地盘：`.lore/` 目录 + 一个 post-commit hook（`.git/hooks/post-commit` 或 `core.hooksPath` —— git 机制非业务源码，唯一例外，且仅追加捕获骨架不碰源码）。→ 装 lore 对目标项目零侵入，卸载 = 删 `.lore/` + 摘 hook，源码丝毫不动。
 
 → 全局装插件 → `cd 任意 repo && /lore:init` → 扫描 + 提议 config + 你微调 → 跑。本 repo 和下个 repo 共享同一引擎，只 config 不同。
 
 ---
 
-## 7. Bootstrap 计划（本 repo 当试验田，守规则 #21 小批验证 / #24 落代码非一次性运维）
+## 7. Bootstrap 计划（threat-intel 当试验田，守规则 #21 小批验证 / #24 落代码非一次性运维）
+
+> **试验田访问约束**：threat-intel repo 作试验田时，lore **只读其源码**（永不改业务代码/配置，见 §6 核心不变量）。允许写入仅限 lore 自有产物：`.lore/` 目录 + post-commit hook。bootstrap 全流程（含 hook 捕获）据此可在真 threat-intel 上跑。**lore 引擎代码本身在 `D:\workspace\lore`（独立 repo），与 threat-intel 物理隔离。**
 
 1. `/lore:init` → 脚手架 + 自动发现 → 提议 `code_roots:[m1..m5,shared]`，种子 `theme:[timeliness,quality]`、`flow:[article-pipeline,dedup,...]`，人改 config
 2. `/lore:mine` → 195 踩坑 → incident 原子（最富）+ CHANGELOG 版本段 → decision 原子 + git log → commit 原子，按 hash / 内容去重
@@ -424,6 +427,7 @@ v1 视为完成当且仅当：
 7. **内容验证（规则 #21）**：`theme/quality.md`、`theme/timeliness.md`、`component/m3_nlp.md` 经用户核为基本准确。
 8. **消费习惯**（定性）：agent 回答"X 怎么工作"时优先读 wiki 而非重 grep 代码。
 9. **本地浏览冒烟**：`/lore:sync` 后 `/lore:serve` 起服务、返回 `127.0.0.1` URL；浏览器开壳 → 侧栏列全 facet 页、点页渲染 md、`[[链接]]` 壳内跳转、元数据条显鲜度、≥3 主题可切；`--stop` 杀干净无僵尸。`.manifest.json` 经 `nuke wiki/` 重 sync 后字节一致。
+10. **目标 repo 源码零改动**：在 threat-intel 跑完整 `init→mine→sync→serve` 后，`git -C threat-intel status` 对**业务源码 0 改动**；唯一写入 = `.lore/` 目录 + post-commit hook。卸载（删 `.lore/` + 摘 hook）后 repo 回到原状。
 
 ---
 

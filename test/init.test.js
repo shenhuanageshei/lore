@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
@@ -194,4 +195,16 @@ test('init re-run keeps user-edited config.yml, still refreshes shell', () => {
     rmSync(root, { recursive: true, force: true });
     rmSync(src, { recursive: true, force: true });
   }
+});
+
+test('CLI: node lib/init.js <repo> initializes and prints summary', () => {
+  const root = tmpRepo();
+  try {
+    const out = execFileSync('node', ['lib/init.js', root], { cwd: process.cwd() }).toString();
+    assert.match(out, /lore initialized/);
+    assert.match(out, /shell copied: index\.html, shell\.mjs/);
+    // uses the REAL plugin site/ (self-located) — both shell files land in the temp repo
+    assert.equal(existsSync(join(root, '.lore', 'site', 'index.html')), true);
+    assert.equal(existsSync(join(root, '.lore', 'site', 'shell.mjs')), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

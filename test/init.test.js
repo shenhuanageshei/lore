@@ -141,3 +141,9 @@ test('renderConfigYaml injects roots and declares hook:false', () => {
 test('renderConfigYaml handles empty roots', () => {
   assert.match(renderConfigYaml([]), /code_roots: \[\]/);
 });
+
+test('renderConfigYaml quotes only roots with YAML-special chars', () => {
+  const yaml = renderConfigYaml(['m1', 'a b', 'src/pkg']);
+  // normal names stay bare; the one with a space is single-quoted
+  assert.match(yaml, /code_roots: \[m1, 'a b', src\/pkg\]/);
+});

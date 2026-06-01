@@ -38,7 +38,6 @@ test('renderMarkdown handles tables without a trailing pipe', () => {
   assert.match(html, /<td>1<\/td><td>2<\/td>/);   // last cell '2' must survive
 });
 
-// append to test/shell.test.js
 import {
   buildPageIndex, preprocessWikilinks, buildNavModel, matchesSearch, buildMeta,
 } from '../site/shell.mjs';

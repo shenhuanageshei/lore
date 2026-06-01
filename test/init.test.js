@@ -88,3 +88,23 @@ test('discoverComponents: empty repo yields []', () => {
   try { assert.deepEqual(discoverComponents(root), []); }
   finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('discoverComponents: Python top-level packages via __init__.py', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'm1')); writeFileSync(join(root, 'm1', '__init__.py'), '');
+    mkdirSync(join(root, 'm2')); writeFileSync(join(root, 'm2', '__init__.py'), '');
+    mkdirSync(join(root, 'shared')); writeFileSync(join(root, 'shared', 'util.py'), 'x'); // fallback path
+    assert.deepEqual(discoverComponents(root), ['m1', 'm2', 'shared']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverComponents: src/ layout reports src/<pkg> and drops bare src (ancestor dedup)', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'src', 'pkg'), { recursive: true });
+    writeFileSync(join(root, 'src', 'pkg', '__init__.py'), '');
+    writeFileSync(join(root, 'src', 'pkg', 'core.py'), 'x');
+    assert.deepEqual(discoverComponents(root), ['src/pkg']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -1,0 +1,4 @@
+node_modules/
+.lore/.state/
+test/.tmp/
+*.log

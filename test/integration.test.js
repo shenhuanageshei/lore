@@ -1,12 +1,13 @@
 // test/integration.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, cpSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { runManifestCli } from '../lib/manifest.js';
 import { start, stop } from '../lib/serve.js';
+import { init } from '../lib/init.js';
 
 test('e2e: fixtures -> manifest -> serve -> fetch page -> stop', async () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-e2e-'));
@@ -16,10 +17,11 @@ test('e2e: fixtures -> manifest -> serve -> fetch page -> stop', async () => {
     execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
     execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
     const lore = join(root, '.lore');
-    mkdirSync(join(lore, 'site'), { recursive: true });
+    // scaffold .lore + copy the browser shell via the REAL /lore:init path
+    // (was hand-rolled cpSync, which masked the missing init command — spec §7)
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    // overlay the fixture wiki (test data; init does not synthesize wiki content — /lore:sync does)
     cpSync(join(process.cwd(), 'test', 'fixtures', 'wiki'), join(lore, 'wiki'), { recursive: true });
-    cpSync(join(process.cwd(), 'site', 'index.html'), join(lore, 'site', 'index.html'));
-    cpSync(join(process.cwd(), 'site', 'shell.mjs'), join(lore, 'site', 'shell.mjs'));
     execFileSync('git', ['add', '.'], { cwd: root });
     execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
 

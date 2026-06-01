@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scaffold, copyShell, ensureGitignore, discoverComponents } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
 
@@ -126,4 +126,18 @@ test('discoverComponents: workspaces object form {packages:[...]}', () => {
     mkdirSync(join(root, 'apps', 'web'), { recursive: true }); writeFileSync(join(root, 'apps', 'web', 'i.js'), 'x');
     assert.deepEqual(discoverComponents(root), ['apps/web']);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('renderConfigYaml injects roots and declares hook:false', () => {
+  const yaml = renderConfigYaml(['m1', 'm2']);
+  assert.match(yaml, /discover: auto/);
+  assert.match(yaml, /code_roots: \[m1, m2\]/);
+  assert.match(yaml, /hook: false/);
+  assert.match(yaml, /mine: \[commits, changelog, claude_md_pitfalls\]/);
+  assert.match(yaml, /^\s*flow:/m);
+  assert.match(yaml, /^\s*theme:/m);
+});
+
+test('renderConfigYaml handles empty roots', () => {
+  assert.match(renderConfigYaml([]), /code_roots: \[\]/);
 });

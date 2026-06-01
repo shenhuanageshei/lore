@@ -1,7 +1,8 @@
 // test/serve.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { probeRuntime, readPid, writePid, isAlive } from '../lib/serve.js';
+import { probeRuntime, readPid, writePid, isAlive, killPid } from '../lib/serve.js';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
@@ -56,4 +57,15 @@ test('readPid returns null on corrupt JSON', () => {
     writeFileSync(pjoin(state, 'serve.pid'), '{ not valid json');
     assert.equal(readPid(state), null);
   } finally { rmSync(state, { recursive: true, force: true }); }
+});
+
+test('killPid terminates a real child process', async () => {
+  // long-lived child: node that sleeps
+  const child = spawn(process.execPath, ['-e', 'setInterval(()=>{}, 1e9)'],
+    { stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 100));
+  assert.equal(isAlive(child.pid), true);
+  killPid(child.pid, process.platform);
+  await new Promise(r => setTimeout(r, 300));
+  assert.equal(isAlive(child.pid), false);
 });

@@ -72,7 +72,6 @@ test('deriveAxes puts INDEX first and unknown axes last in given order', () => {
   assert.equal(axes[2].label, 'Custom');
 });
 
-// append to test/manifest.test.js
 import { emitManifest } from '../lib/manifest.js';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -130,6 +129,11 @@ test('emitManifest is deterministic for identical inputs (byte-identical)', () =
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('deriveAxes sorts unknown axes alphabetically (cross-platform determinism)', () => {
+  const axes = deriveAxes(['zebra', 'component', 'apple', 'theme']);
+  assert.deepEqual(axes.map(a => a.id), ['component', 'theme', 'apple', 'zebra']);
 });
 
 test('emitManifest tolerates a page missing summary', () => {

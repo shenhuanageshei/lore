@@ -1,7 +1,7 @@
 // test/manifest.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter, deriveAxes } from '../lib/manifest.js';
+import { parseFrontmatter, deriveAxes, runManifestCli } from '../lib/manifest.js';
 
 test('parseFrontmatter extracts flat keys and body', () => {
   const md = [
@@ -153,6 +153,17 @@ test('emitManifest tolerates a page missing summary', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('runManifestCli throws a clear error when not a git repo', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-nogit-'));
+  try {
+    mkdirSync(join(root, '.lore', 'wiki'), { recursive: true });
+    assert.throws(
+      () => runManifestCli(join(root, '.lore'), 't'),
+      /git rev-parse failed/,
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('manifest CLI writes .manifest.json into wiki dir', () => {

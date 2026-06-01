@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lore wiki</title>
+<style>
+  :root {
+    --bg: #1a1b26; --sidebar: #16161e; --panel: #1f2130;
+    --fg: #c0caf5; --fg-dim: #565f89; --fg-bright: #ffffff;
+    --accent: #7aa2f7; --accent-dim: #3d59a1;
+    --green: #9ece6a; --yellow: #e0af68; --red: #f7768e;
+    --border: #2a2e42; --code-bg: #1e202e;
+    --comp: #7dcfff; --flow: #bb9af7; --theme: #ff9e64;
+  }
+  :root[data-theme="light"] {
+    --bg:#ffffff; --sidebar:#f4f5f8; --panel:#eef0f4; --fg:#24283b; --fg-dim:#787c99;
+    --fg-bright:#1a1b26; --accent:#3760bf; --accent-dim:#a4b3e0; --border:#dcdfe6;
+    --code-bg:#eef0f4; --green:#587539; --yellow:#8c6c20; --red:#c64343;
+    --comp:#2e7de9; --flow:#7847bd; --theme:#b15c00;
+  }
+  :root[data-theme="sepia"] {
+    --bg:#f4ecd8; --sidebar:#ece2c8; --panel:#e7dcc0; --fg:#5b4636; --fg-dim:#9c8b73;
+    --fg-bright:#3b2f25; --accent:#9a6a3a; --accent-dim:#cdb892; --border:#d9c9a3;
+    --code-bg:#e7dcc0; --green:#6b7536; --yellow:#9a6a20; --red:#a8443a;
+    --comp:#7a6a3a; --flow:#8a5a6a; --theme:#9a6a3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px/1.6 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden; }
+  #app { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 52px 1fr; height: 100vh; }
+
+  /* top bar */
+  #topbar { grid-column: 1 / 3; background: var(--sidebar); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; padding: 0 18px; }
+  #brand { font-weight: 700; color: var(--fg-bright); letter-spacing: .5px; }
+  #brand .dim { color: var(--fg-dim); font-weight: 400; font-size: 12px; }
+  #search { flex: 1; max-width: 420px; }
+  #search input { width: 100%; background: var(--panel); border: 1px solid var(--border);
+    color: var(--fg); padding: 7px 12px; border-radius: 7px; font-size: 13px; }
+  #search input:focus { outline: none; border-color: var(--accent); }
+  #theme { background: var(--panel); border: 1px solid var(--border); color: var(--fg);
+    padding: 6px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; }
+  #theme:focus { outline: none; border-color: var(--accent); }
+  #serve-badge { margin-left: auto; font-size: 11px; color: var(--green);
+    background: rgba(158,206,106,.12); padding: 4px 10px; border-radius: 12px; }
+
+  /* sidebar */
+  #sidebar { background: var(--sidebar); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 12px 0; }
+  .axis { margin-bottom: 6px; }
+  .axis-h { display: flex; align-items: center; gap: 7px; padding: 7px 16px 4px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-dim); cursor: pointer;
+    user-select: none; }
+  .axis-h .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .axis-h .caret { margin-left: auto; transition: transform .15s; font-size: 9px; }
+  .axis.collapsed .caret { transform: rotate(-90deg); }
+  .axis.collapsed .links { display: none; }
+  .dot.component { background: var(--comp); }
+  .dot.flow { background: var(--flow); }
+  .dot.theme { background: var(--theme); }
+  .dot.index { background: var(--fg-dim); }
+  .links a { display: flex; align-items: center; gap: 8px; padding: 5px 16px 5px 30px;
+    color: var(--fg); text-decoration: none; font-size: 13px; border-left: 2px solid transparent; }
+  .links a:hover { background: var(--panel); }
+  .links a.active { background: var(--panel); border-left-color: var(--accent); color: var(--fg-bright); }
+  .links a .stale { margin-left: auto; font-size: 10px; color: var(--yellow); }
+  .links a.hidden { display: none; }
+
+  /* main */
+  #main { overflow-y: auto; padding: 0; }
+  #meta { background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 12px 36px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; align-items: center; }
+  #meta .chip { display: flex; align-items: center; gap: 6px; color: var(--fg-dim); }
+  #meta .chip b { color: var(--fg); font-weight: 500; }
+  #meta .chip.stale { color: var(--yellow); }
+  #meta .chip.fresh { color: var(--green); }
+  #content { padding: 28px 36px 80px; max-width: 860px; }
+  #content h1 { font-size: 28px; color: var(--fg-bright); margin: 8px 0 18px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border); }
+  #content h2 { font-size: 20px; color: var(--accent); margin: 28px 0 12px; }
+  #content h3 { font-size: 16px; color: var(--fg-bright); margin: 20px 0 8px; }
+  #content p { margin: 10px 0; }
+  #content ul, #content ol { margin: 10px 0 10px 24px; }
+  #content li { margin: 4px 0; }
+  #content code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    font-family: "SF Mono",Consolas,monospace; font-size: 12.5px; color: var(--green); }
+  #content pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    margin: 12px 0; border: 1px solid var(--border); }
+  #content pre code { background: none; padding: 0; color: var(--fg); }
+  #content a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-dim); }
+  #content a:hover { border-bottom-color: var(--accent); }
+  #content a.wikilink { color: var(--flow); border-bottom-color: transparent;
+    background: rgba(187,154,247,.12); padding: 1px 6px; border-radius: 4px; }
+  #content a.wikilink::before { content: "🔗 "; font-size: 11px; }
+  #content blockquote { border-left: 3px solid var(--accent-dim); padding: 4px 16px; margin: 12px 0;
+    color: var(--fg-dim); background: rgba(122,162,247,.05); }
+  #content table { border-collapse: collapse; margin: 14px 0; width: 100%; }
+  #content th, #content td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; font-size: 13px; }
+  #content th { background: var(--panel); color: var(--fg-bright); }
+  #content hr { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+  .tl { border-left: 2px solid var(--border); padding-left: 18px; margin: 14px 0; }
+  .tl-item { position: relative; margin: 16px 0; }
+  .tl-item::before { content: ""; position: absolute; left: -23px; top: 6px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent); }
+  .tl-item .when { font-size: 11px; color: var(--fg-dim); }
+  .tl-item .badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+  .badge.extracted { background: rgba(158,206,106,.15); color: var(--green); }
+  .badge.inferred { background: rgba(224,175,104,.15); color: var(--yellow); }
+  .hidden { display: none; }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div id="brand">lore <span class="dim">// .lore/wiki</span></div>
+    <div id="search"><input id="q" placeholder="🔍 搜索页面 (title + 摘要)..." autocomplete="off"></div>
+    <select id="theme" title="主题">
+      <option value="dark">🌙 暗</option>
+      <option value="light">☀ 亮</option>
+      <option value="sepia">🌿 护眼</option>
+    </select>
+    <div id="serve-badge">● serving</div>
+  </div>
+  <nav id="sidebar"></nav>
+  <main id="main">
+    <div id="meta"></div>
+    <article id="content"></article>
+  </main>
+</div>
+
+<script type="module">
+import {
+  stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
+  buildNavModel, matchesSearch, buildMeta,
+} from './shell.mjs';
+
+let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {};
+
+async function boot() {
+  MANIFEST = await (await fetch('../wiki/.manifest.json')).json();
+  PAGE_INDEX = buildPageIndex(MANIFEST);
+  FLAT = {};
+  for (const ax of MANIFEST.axes) for (const p of ax.pages) FLAT[`${ax.id}/${p.id}`] = p;
+  buildSidebar();
+  wireSearch();
+  wireTheme();
+  window.addEventListener('hashchange', route);
+  route();
+}
+
+function buildSidebar() {
+  const nav = document.getElementById('sidebar');
+  nav.innerHTML = buildNavModel(MANIFEST).map(ax => `
+    <div class="axis" data-axis="${ax.id}">
+      <div class="axis-h"><span class="dot ${ax.id}"></span>${ax.label}<span class="caret">▼</span></div>
+      <div class="links">
+        ${ax.pages.map(p => `<a href="#${ax.id}/${p.id}" data-key="${ax.id}/${p.id}"
+           data-search="${(p.title + ' ' + (p.summary||'')).toLowerCase()}">
+          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}</a>`).join('')}
+      </div>
+    </div>`).join('');
+  nav.querySelectorAll('.axis-h').forEach(h =>
+    h.onclick = () => h.parentElement.classList.toggle('collapsed'));
+}
+
+function renderMeta(page) {
+  const cls = { plain: 'chip', stale: 'chip stale', fresh: 'chip fresh' };
+  return buildMeta(page).chips.map(c =>
+    `<span class="${cls[c.kind]}">${c.icon} ${c.text}</span>`).join('');
+}
+
+async function route() {
+  const hash = location.hash.slice(1) || firstPageKey();
+  const page = FLAT[hash];
+  document.querySelectorAll('#sidebar a').forEach(a =>
+    a.classList.toggle('active', a.dataset.key === hash));
+  if (!page) {
+    document.getElementById('meta').innerHTML = '';
+    document.getElementById('content').innerHTML = `<h1>404</h1><p>无此页：<code>${hash}</code></p>`;
+    return;
+  }
+  const raw = await (await fetch('../wiki/' + page.path)).text();
+  const html = preprocessWikilinks(renderMarkdown(stripFrontmatter(raw)), PAGE_INDEX);
+  document.getElementById('meta').innerHTML = renderMeta(page);
+  document.getElementById('content').innerHTML = html;
+  document.getElementById('main').scrollTop = 0;
+}
+
+function firstPageKey() {
+  for (const ax of MANIFEST.axes) if (ax.pages[0]) return `${ax.id}/${ax.pages[0].id}`;
+  return '';
+}
+
+function wireSearch() {
+  document.getElementById('q').addEventListener('input', e => {
+    const term = e.target.value.toLowerCase().trim();
+    document.querySelectorAll('#sidebar .links a').forEach(a =>
+      a.classList.toggle('hidden', term && !a.dataset.search.includes(term)));
+    document.querySelectorAll('.axis').forEach(ax => {
+      const any = [...ax.querySelectorAll('a')].some(a => !a.classList.contains('hidden'));
+      ax.style.display = any ? '' : 'none';
+    });
+  });
+}
+
+function wireTheme() {
+  const sel = document.getElementById('theme');
+  const saved = localStorage.getItem('lore-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  sel.value = saved;
+  sel.addEventListener('change', () => {
+    document.documentElement.setAttribute('data-theme', sel.value);
+    localStorage.setItem('lore-theme', sel.value);
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
 
@@ -146,4 +146,52 @@ test('renderConfigYaml quotes only roots with YAML-special chars', () => {
   const yaml = renderConfigYaml(['m1', 'a b', 'src/pkg']);
   // normal names stay bare; the one with a space is single-quoted
   assert.match(yaml, /code_roots: \[m1, 'a b', src\/pkg\]/);
+});
+
+function fakeSrcSite() {
+  const src = mkdtempSync(join(tmpdir(), 'lore-srcsite-'));
+  writeFileSync(join(src, 'index.html'), '<!doctype html>shell');
+  writeFileSync(join(src, 'shell.mjs'), 'export const x = 1;');
+  return src;
+}
+
+test('init scaffolds, copies shell, writes config, sets gitignore', () => {
+  const root = tmpRepo();
+  const src = fakeSrcSite();
+  try {
+    mkdirSync(join(root, 'lib')); writeFileSync(join(root, 'lib', 'a.js'), 'x'); // discoverable
+    const r = init({ repoRoot: root, srcSiteDir: src });
+    const lore = join(root, '.lore');
+    for (const d of ['journal', 'wiki', 'site', '.state'])
+      assert.equal(statSync(join(lore, d)).isDirectory(), true);
+    assert.equal(existsSync(join(lore, 'site', 'index.html')), true);
+    assert.equal(existsSync(join(lore, 'site', 'shell.mjs')), true);
+    assert.equal(existsSync(join(lore, 'config.yml')), true);
+    assert.deepEqual(r.copied, ['index.html', 'shell.mjs']);
+    assert.deepEqual(r.codeRoots, ['lib']);
+    assert.equal(r.configWritten, true);
+    assert.equal(r.gitignore, 'created');
+    assert.match(readFileSync(join(lore, 'config.yml'), 'utf8'), /code_roots: \[lib\]/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(src, { recursive: true, force: true });
+  }
+});
+
+test('init re-run keeps user-edited config.yml, still refreshes shell', () => {
+  const root = tmpRepo();
+  const src = fakeSrcSite();
+  try {
+    init({ repoRoot: root, srcSiteDir: src });
+    const cfg = join(root, '.lore', 'config.yml');
+    writeFileSync(cfg, '# user edited\naxes: {}\n');                    // simulate user edit
+    writeFileSync(join(src, 'index.html'), '<!doctype html>UPGRADED');  // engine upgraded shell
+    const r2 = init({ repoRoot: root, srcSiteDir: src });
+    assert.equal(r2.configWritten, false);
+    assert.equal(readFileSync(cfg, 'utf8'), '# user edited\naxes: {}\n'); // preserved
+    assert.equal(readFileSync(join(root, '.lore', 'site', 'index.html'), 'utf8'), '<!doctype html>UPGRADED'); // refreshed
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(src, { recursive: true, force: true });
+  }
 });

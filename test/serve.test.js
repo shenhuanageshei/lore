@@ -130,3 +130,25 @@ test('stop on nothing-running is a no-op', async () => {
     assert.equal(res.stopped, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('start throws if the server never binds within timeout', async () => {
+  const root = mkdtempSync(pjoin(tmpdir(), 'lore-nobind-'));
+  let spawned = null;
+  try {
+    const wiki = pjoin(root, '.lore', 'wiki');
+    mkd(wiki, { recursive: true });
+    wf(pjoin(wiki, '.manifest.json'), '{"axes":[]}');
+    const fakeSpawn = (...args) => {
+      spawned = spawn(process.execPath, ['-e', 'setInterval(()=>{},1e9)'], { stdio: 'ignore' });
+      return spawned;
+    };
+    await assert.rejects(
+      () => start({ loreDir: pjoin(root, '.lore'), port: 0, canRun: () => false, spawnFn: fakeSpawn, now: 't' }),
+      /did not bind/,
+    );
+    assert.equal(readPid(pjoin(root, '.lore', '.state')), null);
+  } finally {
+    if (spawned) { try { spawned.kill('SIGKILL'); } catch {} }
+    rmSync(root, { recursive: true, force: true });
+  }
+});

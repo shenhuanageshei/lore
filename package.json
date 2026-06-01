@@ -1,0 +1,10 @@
+{
+  "name": "lore",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Repo living-docs / decision-history framework — /lore:serve",
+  "scripts": {
+    "test": "node --test"
+  }
+}

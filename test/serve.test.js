@@ -178,8 +178,12 @@ test('CLI: serve start without manifest exits non-zero with hint', () => {
   const root = mkdtempSync(pjoin(tmpdir(), 'lore-cli3-'));
   try {
     mkd(pjoin(root, '.lore'), { recursive: true });
-    assert.throws(() => exec('node',
-      ['lib/serve.js', 'start', '--lore', pjoin(root, '.lore')],
-      { cwd: process.cwd(), stdio: 'pipe' }));
+    let err = null;
+    try {
+      exec('node', ['lib/serve.js', 'start', '--lore', pjoin(root, '.lore')],
+        { cwd: process.cwd(), stdio: 'pipe' });
+    } catch (e) { err = e; }
+    assert.notEqual(err, null);                       // non-zero exit threw
+    assert.match(String(err.stderr), /lore:sync/);    // hint present in stderr
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

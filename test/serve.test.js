@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { probeRuntime, readPid, writePid, isAlive } from '../lib/serve.js';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
 
@@ -48,4 +48,12 @@ test('readPid returns null when absent', () => {
 test('isAlive is true for current process, false for unused pid', () => {
   assert.equal(isAlive(process.pid), true);
   assert.equal(isAlive(2 ** 31 - 1), false);   // implausible pid
+});
+
+test('readPid returns null on corrupt JSON', () => {
+  const state = mkdtempSync(pjoin(tmpdir(), 'lore-state-'));
+  try {
+    writeFileSync(pjoin(state, 'serve.pid'), '{ not valid json');
+    assert.equal(readPid(state), null);
+  } finally { rmSync(state, { recursive: true, force: true }); }
 });

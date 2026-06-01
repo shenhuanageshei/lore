@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lore wiki — /lore:serve 壳 mockup</title>
+<style>
+  :root {
+    --bg: #1a1b26; --sidebar: #16161e; --panel: #1f2130;
+    --fg: #c0caf5; --fg-dim: #565f89; --fg-bright: #ffffff;
+    --accent: #7aa2f7; --accent-dim: #3d59a1;
+    --green: #9ece6a; --yellow: #e0af68; --red: #f7768e;
+    --border: #2a2e42; --code-bg: #1e202e;
+    --comp: #7dcfff; --flow: #bb9af7; --theme: #ff9e64;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px/1.6 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden; }
+  #app { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 52px 1fr; height: 100vh; }
+
+  /* top bar */
+  #topbar { grid-column: 1 / 3; background: var(--sidebar); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; padding: 0 18px; }
+  #brand { font-weight: 700; color: var(--fg-bright); letter-spacing: .5px; }
+  #brand .dim { color: var(--fg-dim); font-weight: 400; font-size: 12px; }
+  #search { flex: 1; max-width: 420px; }
+  #search input { width: 100%; background: var(--panel); border: 1px solid var(--border);
+    color: var(--fg); padding: 7px 12px; border-radius: 7px; font-size: 13px; }
+  #search input:focus { outline: none; border-color: var(--accent); }
+  #serve-badge { margin-left: auto; font-size: 11px; color: var(--green);
+    background: rgba(158,206,106,.12); padding: 4px 10px; border-radius: 12px; }
+
+  /* sidebar */
+  #sidebar { background: var(--sidebar); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 12px 0; }
+  .axis { margin-bottom: 6px; }
+  .axis-h { display: flex; align-items: center; gap: 7px; padding: 7px 16px 4px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-dim); cursor: pointer;
+    user-select: none; }
+  .axis-h .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .axis-h .caret { margin-left: auto; transition: transform .15s; font-size: 9px; }
+  .axis.collapsed .caret { transform: rotate(-90deg); }
+  .axis.collapsed .links { display: none; }
+  .dot.component { background: var(--comp); }
+  .dot.flow { background: var(--flow); }
+  .dot.theme { background: var(--theme); }
+  .dot.index { background: var(--fg-dim); }
+  .links a { display: flex; align-items: center; gap: 8px; padding: 5px 16px 5px 30px;
+    color: var(--fg); text-decoration: none; font-size: 13px; border-left: 2px solid transparent; }
+  .links a:hover { background: var(--panel); }
+  .links a.active { background: var(--panel); border-left-color: var(--accent); color: var(--fg-bright); }
+  .links a .stale { margin-left: auto; font-size: 10px; color: var(--yellow); }
+  .links a.hidden { display: none; }
+
+  /* main */
+  #main { overflow-y: auto; padding: 0; }
+  #meta { background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 12px 36px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; align-items: center; }
+  #meta .chip { display: flex; align-items: center; gap: 6px; color: var(--fg-dim); }
+  #meta .chip b { color: var(--fg); font-weight: 500; }
+  #meta .chip.stale { color: var(--yellow); }
+  #meta .chip.fresh { color: var(--green); }
+  #content { padding: 28px 36px 80px; max-width: 860px; }
+  #content h1 { font-size: 28px; color: var(--fg-bright); margin: 8px 0 18px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border); }
+  #content h2 { font-size: 20px; color: var(--accent); margin: 28px 0 12px; }
+  #content h3 { font-size: 16px; color: var(--fg-bright); margin: 20px 0 8px; }
+  #content p { margin: 10px 0; }
+  #content ul, #content ol { margin: 10px 0 10px 24px; }
+  #content li { margin: 4px 0; }
+  #content code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    font-family: "SF Mono",Consolas,monospace; font-size: 12.5px; color: var(--green); }
+  #content pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    margin: 12px 0; border: 1px solid var(--border); }
+  #content pre code { background: none; padding: 0; color: var(--fg); }
+  #content a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-dim); }
+  #content a:hover { border-bottom-color: var(--accent); }
+  #content a.wikilink { color: var(--flow); border-bottom-color: transparent;
+    background: rgba(187,154,247,.12); padding: 1px 6px; border-radius: 4px; }
+  #content a.wikilink::before { content: "🔗 "; font-size: 11px; }
+  #content blockquote { border-left: 3px solid var(--accent-dim); padding: 4px 16px; margin: 12px 0;
+    color: var(--fg-dim); background: rgba(122,162,247,.05); }
+  #content table { border-collapse: collapse; margin: 14px 0; width: 100%; }
+  #content th, #content td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; font-size: 13px; }
+  #content th { background: var(--panel); color: var(--fg-bright); }
+  #content hr { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+  .tl { border-left: 2px solid var(--border); padding-left: 18px; margin: 14px 0; }
+  .tl-item { position: relative; margin: 16px 0; }
+  .tl-item::before { content: ""; position: absolute; left: -23px; top: 6px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent); }
+  .tl-item .when { font-size: 11px; color: var(--fg-dim); }
+  .tl-item .badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+  .badge.extracted { background: rgba(158,206,106,.15); color: var(--green); }
+  .badge.inferred { background: rgba(224,175,104,.15); color: var(--yellow); }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div id="brand">lore <span class="dim">// .lore/wiki</span></div>
+    <div id="search"><input id="q" placeholder="🔍 搜索页面 (title + 摘要)..." autocomplete="off"></div>
+    <div id="serve-badge">● serving :7842</div>
+  </div>
+  <nav id="sidebar"></nav>
+  <main id="main">
+    <div id="meta"></div>
+    <article id="content"></article>
+  </main>
+</div>
+
+<script>
+// ============================================================
+//  MOCKUP 数据 —— 真实运行时这些来自 fetch('.manifest.json') + fetch('<page>.md')
+//  本 mockup 把数据内嵌，故 file:// 双击即可看，无需服务器。
+// ============================================================
+const MANIFEST = {
+  generated: "2026-05-31T08:14:00Z",
+  current_code_sha: "abc1234",
+  axes: [
+    { id: "index",     label: "INDEX",     pages: [
+      { id:"INDEX", title:"目录索引", summary:"全轴全页导航 + 一行摘要" } ] },
+    { id: "component", label: "Component", pages: [
+      { id:"m1_crawler", title:"M1 Crawler", summary:"抓取层 — fetch + 每源上限", stale:0 },
+      { id:"m3_nlp",     title:"M3 NLP",     summary:"实体/IOC/主题抽取 — 批内并发", stale:3 } ] },
+    { id: "flow",      label: "Flow", pages: [
+      { id:"article-pipeline", title:"Article Pipeline", summary:"M1→M2→M3 端到端文章流", stale:0 } ] },
+    { id: "theme",     label: "Theme", pages: [
+      { id:"quality",    title:"质量保证", summary:"抽取准确率 + 报告质量演进", stale:0 },
+      { id:"timeliness", title:"时效治理", summary:"数据流时效 / 跑赢人工", stale:0 } ] }
+  ]
+};
+
+const PAGES = {
+  "theme/quality": {
+    fm: { last_updated:"2026-05-31", synthesized_from:{atoms:14, commits:9, code_sha:"abc1234"}, stale:0 },
+    md: `# theme: 质量保证
+
+> 横切主线 — 跨 M1-M5 的实体/IOC/主题抽取准确率与报告质量。
+
+## 当前架构
+
+质量保证当前形态分三道关：
+
+- **抽取层** — [[m3_nlp]] 批内 \`asyncio.gather\` + \`Semaphore\`，每篇文章独立打分
+- **去重层** — 迁移到 ZSET 后误报率下降，见 pit:193
+- **报告层** — [[m4_report]] 出报前跑 \`quality_score\` 阈值闸
+
+\`\`\`python
+score = await extract_and_score(article)
+if score < THRESHOLD:   # 0.62, 经 v2.5 调参
+    flag_for_review(article)
+\`\`\`
+
+## 决策历史
+
+<div class="tl">
+<div class="tl-item"><span class="when">2026-04-12 · pit:142</span><span class="badge extracted">EXTRACTED</span>
+<div><b>v2 → v2.5：阈值从 0.5 提到 0.62</b> — 误报太多，人工复核队列爆。why: 召回换精度，下游报告读者信噪比优先。</div></div>
+<div class="tl-item"><span class="when">2026-05-18 · pit:193</span><span class="badge extracted">EXTRACTED</span>
+<div><b>去重 SET → ZSET</b> — SET 丢时间维度致旧文压新文。why: ZSET score=ts 保序，O(logN) 范围删。</div></div>
+<div class="tl-item"><span class="when">2026-05-30 · pit:195</span><span class="badge inferred">INFERRED</span>
+<div><b>M3 串行→批内并发</b> — IO-bound LLM 串行阻塞。why: 批量读≠批量处理。</div></div>
+</div>
+
+## 交叉链接
+
+- 组件：[[m3_nlp]] · [[m4_report]]
+- 流程：[[article-pipeline]]
+- 源 docs：\`CLAUDE.md#pitfall-195\` · \`CHANGELOG.md#v2.5\``
+  },
+  "component/m3_nlp": {
+    fm: { last_updated:"2026-05-28", synthesized_from:{atoms:8, commits:5, code_sha:"def5678"}, stale:3 },
+    md: `# component: M3 NLP
+
+> ⚠ 本页落后当前代码 3 commits — 运行 \`/lore:sync\` 重建。
+
+## 当前架构
+
+M3 = 实体 / IOC / 主题抽取层。输入 M2 清洗后文章，输出结构化标注。
+
+- 批量读 BATCH 条 → 批内 \`asyncio.gather(*tasks)\` 并发
+- \`Semaphore(m3_article_concurrency)\` 限流防 LLM 打爆
+- 失败单篇 best-effort 跳过，不阻断整批
+
+\`\`\`python
+async def process_batch(batch):
+    sem = asyncio.Semaphore(CONCURRENCY)
+    async def one(a):
+        async with sem:
+            return await nlp_extract(a)
+    return await asyncio.gather(*[one(a) for a in batch])
+\`\`\`
+
+## 决策历史
+
+<div class="tl">
+<div class="tl-item"><span class="when">2026-05-30 · pit:195</span><span class="badge extracted">EXTRACTED</span>
+<div><b>串行消费瓶颈修复</b> — 读 BATCH 但 await 串行处理。CPU 0% + 内存富余 + 吞吐低 = 串行非资源不足。fix: 批内 gather + Semaphore。</div></div>
+</div>
+
+## 交叉链接
+
+- 流程：[[article-pipeline]]
+- 专题：[[quality]] · [[timeliness]]
+- 代码：\`m3_nlp/main.py\` · \`m3_nlp/fetchers.py\``
+  },
+  "flow/article-pipeline": {
+    fm: { last_updated:"2026-05-29", synthesized_from:{atoms:11, commits:7, code_sha:"abc1234"}, stale:0 },
+    md: `# flow: Article Pipeline
+
+> 端到端文章流 — 跨 [[m1_crawler]] → M2 → [[m3_nlp]]。
+
+## 当前架构
+
+\`\`\`
+M1 抓取 ──► M2 清洗 ──► M3 抽取 ──► M4 报告
+  │           │           │
+每源上限   去重 ZSET   批内并发
+\`\`\`
+
+三模块串成主管线，每段有独立背压控制。
+
+## 决策历史
+
+<div class="tl">
+<div class="tl-item"><span class="when">2026-05-31 · commit:b5d4100</span><span class="badge inferred">INFERRED</span>
+<div><b>每源每轮上限</b> — anti 数据源爆炸。fix: WebFetch max_links 截断。</div></div>
+</div>
+
+## 交叉链接
+
+- 组件：[[m1_crawler]] · [[m3_nlp]]
+- 专题：[[timeliness]]`
+  },
+  "INDEX/INDEX": {
+    fm: { last_updated:"2026-05-31", synthesized_from:{atoms:33, commits:21, code_sha:"abc1234"}, stale:0 },
+    md: `# lore wiki — 索引
+
+合成于 2026-05-31 · code_sha \`abc1234\` · 33 atoms / 21 commits
+
+## Component
+- [[m1_crawler]] — 抓取层
+- [[m3_nlp]] — 实体/IOC/主题抽取 ⚠ 落后3
+
+## Flow
+- [[article-pipeline]] — M1→M2→M3 端到端
+
+## Theme
+- [[quality]] — 质量保证演进
+- [[timeliness]] — 时效治理`
+  },
+  // 占位页 (交叉链接指向但 mockup 未细写)
+  "component/m1_crawler": { fm:{last_updated:"2026-05-31",synthesized_from:{atoms:6,commits:4,code_sha:"abc1234"},stale:0},
+    md:"# component: M1 Crawler\n\n> mockup 占位页 — 演示交叉链跳转。\n\n## 当前架构\n抓取层，每源每轮上限防爆炸。\n\n## 交叉链接\n- 流程：[[article-pipeline]]" },
+  "component/m4_report": { fm:{last_updated:"2026-05-20",synthesized_from:{atoms:5,commits:3,code_sha:"old0000"},stale:7},
+    md:"# component: M4 Report\n\n> ⚠ 落后 7 commits。\n\n## 当前架构\n报告层，出报前质量闸。\n\n## 交叉链接\n- 专题：[[quality]]" },
+  "theme/timeliness": { fm:{last_updated:"2026-05-31",synthesized_from:{atoms:9,commits:6,code_sha:"abc1234"},stale:0},
+    md:"# theme: 时效治理\n\n> 数据流时效性 / 跑赢人工。\n\n## 当前架构\n端到端 lag 监控 + backlog 告警。\n\n## 决策历史\n<div class=\"tl\"><div class=\"tl-item\"><span class=\"when\">2026-05-30 · pit:195</span><span class=\"badge inferred\">INFERRED</span><div><b>批内并发降 lag</b></div></div></div>\n\n## 交叉链接\n- 组件：[[m3_nlp]]" }
+};
+
+// 页 id → 实际 PAGES key 解析 (wikilink 只给短 id, 要找到它在哪个轴)
+const PAGE_INDEX = {}; // shortid -> "axis/id"
+MANIFEST.axes.forEach(ax => ax.pages.forEach(p => { PAGE_INDEX[p.id] = ax.id + "/" + p.id; }));
+
+// ============================================================
+//  极简 markdown 渲染器 (mockup 用; 真实壳用内嵌 marked.js)
+//  够演示: 标题/段落/列表/代码块/行内码/表格/引用/链接/hr/裸 HTML 透传
+// ============================================================
+function renderMD(src) {
+  const lines = src.split("\n");
+  let html = "", i = 0;
+  const inline = t => t
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  while (i < lines.length) {
+    let ln = lines[i];
+    if (/^<div|^<\/div>/.test(ln)) {            // 裸 HTML 块 (时间线) 透传到匹配收尾
+      let buf = ln + "\n";
+      if (/^<div class="tl">/.test(ln)) { i++; let depth=1;
+        while (i<lines.length && depth>0){ const l=lines[i]; depth += (l.match(/<div/g)||[]).length - (l.match(/<\/div>/g)||[]).length; buf+=l+"\n"; i++; }
+        html += buf; continue; }
+      html += buf; i++; continue;
+    }
+    if (/^```/.test(ln)) { let buf=""; i++; while(i<lines.length && !/^```/.test(lines[i])){ buf+=lines[i]+"\n"; i++; } i++;
+      html += "<pre><code>"+buf.replace(/</g,"&lt;")+"</code></pre>"; continue; }
+    if (/^### /.test(ln)) { html += "<h3>"+inline(ln.slice(4))+"</h3>"; i++; continue; }
+    if (/^## /.test(ln))  { html += "<h2>"+inline(ln.slice(3))+"</h2>"; i++; continue; }
+    if (/^# /.test(ln))   { html += "<h1>"+inline(ln.slice(2))+"</h1>"; i++; continue; }
+    if (/^> /.test(ln))   { html += "<blockquote>"+inline(ln.slice(2))+"</blockquote>"; i++; continue; }
+    if (/^---\s*$/.test(ln)){ html += "<hr>"; i++; continue; }
+    if (/^[-*] /.test(ln)) { let buf="<ul>"; while(i<lines.length && /^[-*] /.test(lines[i])){ buf+="<li>"+inline(lines[i].slice(2))+"</li>"; i++; } html+=buf+"</ul>"; continue; }
+    if (/^\|/.test(ln)) { let rows=[]; while(i<lines.length && /^\|/.test(lines[i])){ rows.push(lines[i]); i++; }
+      let body=rows.filter(r=>!/^\|[\s\-:|]+\|?\s*$/.test(r)).map((r,ri)=>{ const cells=r.split("|").slice(1,-1).map(c=>c.trim());
+        const tag=ri===0?"th":"td"; return "<tr>"+cells.map(c=>"<"+tag+">"+inline(c)+"</"+tag+">").join("")+"</tr>"; }).join("");
+      html += "<table>"+body+"</table>"; continue; }
+    if (ln.trim()==="") { i++; continue; }
+    html += "<p>"+inline(ln)+"</p>"; i++;
+  }
+  // wikilink 预处理: [[shortid]] → 壳内跳转链接 (这就是 Obsidian 兼容那 ~10 行)
+  html = html.replace(/\[\[([a-zA-Z0-9_\-]+)\]\]/g, (m, id) => {
+    const target = PAGE_INDEX[id];
+    const label = id;
+    if (target) return '<a class="wikilink" href="#'+target+'">'+label+'</a>';
+    return '<a class="wikilink" href="#'+("component/"+id)+'">'+label+'</a>'; // 占位 fallback
+  });
+  return html;
+}
+
+// ============================================================
+//  渲染逻辑
+// ============================================================
+function buildSidebar() {
+  const nav = document.getElementById("sidebar");
+  nav.innerHTML = MANIFEST.axes.map(ax => `
+    <div class="axis" data-axis="${ax.id}">
+      <div class="axis-h"><span class="dot ${ax.id}"></span>${ax.label}<span class="caret">▼</span></div>
+      <div class="links">
+        ${ax.pages.map(p => `<a href="#${ax.id}/${p.id}" data-search="${(p.title+" "+p.summary).toLowerCase()}">
+          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ""}</a>`).join("")}
+      </div>
+    </div>`).join("");
+  nav.querySelectorAll(".axis-h").forEach(h =>
+    h.onclick = () => h.parentElement.classList.toggle("collapsed"));
+}
+
+function renderMeta(fm) {
+  const f = fm.synthesized_from;
+  const staleChip = fm.stale > 0
+    ? `<span class="chip stale">⚠ <b>落后 ${fm.stale} commits</b> · 跑 /lore:sync</span>`
+    : `<span class="chip fresh">✓ <b>最新</b></span>`;
+  return `
+    <span class="chip">📅 last-updated <b>${fm.last_updated}</b></span>
+    <span class="chip">🔗 synthesized from <b>${f.atoms} atoms · ${f.commits} commits</b></span>
+    <span class="chip">⎇ code_sha <b>${f.code_sha}</b></span>
+    ${staleChip}`;
+}
+
+function route() {
+  let hash = location.hash.slice(1) || "INDEX/INDEX";
+  const page = PAGES[hash];
+  document.querySelectorAll("#sidebar a").forEach(a =>
+    a.classList.toggle("active", a.getAttribute("href") === "#"+hash));
+  if (!page) {
+    document.getElementById("meta").innerHTML = "";
+    document.getElementById("content").innerHTML = "<h1>404</h1><p>页 <code>"+hash+"</code> 不存在。mockup 未细写此占位页。</p>";
+    return;
+  }
+  document.getElementById("meta").innerHTML = renderMeta(page.fm);
+  document.getElementById("content").innerHTML = renderMD(page.md);
+  document.getElementById("main").scrollTop = 0;
+}
+
+function wireSearch() {
+  document.getElementById("q").addEventListener("input", e => {
+    const term = e.target.value.toLowerCase().trim();
+    document.querySelectorAll("#sidebar .links a").forEach(a =>
+      a.classList.toggle("hidden", term && !a.dataset.search.includes(term)));
+    document.querySelectorAll(".axis").forEach(ax => {
+      const anyVisible = [...ax.querySelectorAll("a")].some(a => !a.classList.contains("hidden"));
+      ax.style.display = anyVisible ? "" : "none";
+    });
+  });
+}
+
+buildSidebar();
+wireSearch();
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>

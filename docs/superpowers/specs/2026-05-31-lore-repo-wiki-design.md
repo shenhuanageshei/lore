@@ -28,7 +28,8 @@
 | **v1 骨架** | 决策 + 架构历史（Karpathy-leaning）。这是唯一无现成工具覆盖的缺口；Graphify 已覆盖结构。决策史顺带交付「agent 不用重头理解代码」的收益。 |
 | **存储** | markdown-in-git。便携、免费版本/回溯/diff/对比、Obsidian 可视、agent 原生可读、零 DB。 |
 | **交付载体** | Claude Code 插件 + slash 命令 + git hook + resident-mode。合成逻辑写成可移植脚本，结构上为未来 CLI 留口。 |
-| **不在 v1** | query 引擎 / 图可视化（v2）、AST 结构抽取（v3）、PPT / 项目介绍生成（v4）、本地/git/服务器一致性漂移工具（v5，独立兄弟项目）。 |
+| **本地浏览** | `/lore:serve` 起本地静态服务器 + 单文件浏览器壳，无需 Obsidian 也能看 wiki（侧栏导航 + md 渲染 + 全文搜索 + 鲜度元数据 + 多主题）。详见 §5.5。 |
+| **不在 v1** | query 引擎（v2）、**关系图谱可视化**（v2，力导向图 facet↔code↔atom）、AST 结构抽取（v3）、PPT / 项目介绍生成（v4）、本地/git/服务器一致性漂移工具（v5，独立兄弟项目）。 |
 
 **构建策略 = A「Journal-first 薄合成」**（评审选定）：先把耐久捕获 + 薄合成 + lint 跑通，证明 WAL 耐久性，给后续 query 层留干净接缝。Bootstrap 包含回填现有产物（commits / CHANGELOG / 195 踩坑）。
 
@@ -111,10 +112,13 @@ journal: { hook: true, mine: [commits, changelog, claude_md_pitfalls] }
 │   └── 2026/05/2026-05-31.ndjson   # 按日分片 → append 友好、低 merge 冲突
 ├── wiki/               # TIER 2 — 可重建
 │   ├── INDEX.md        # 目录 + 导航（Karpathy index.md + log.md 合一）
+│   ├── .manifest.json  # INDEX.md 的机器可读孪生 — serve 壳建导航/搜索用（dot 前缀 → Obsidian 隐藏）
 │   ├── component/      # 组件轴 — auto-anchored 到代码目录 (m1_crawler.md…)
 │   ├── flow/           # 流程轴 — 跨模块 (article-pipeline.md…)
 │   └── theme/          # 横切轴 — (timeliness.md, quality.md…)
-└── .state/             # 引擎缓存（每页 source-SHA + journal-offset）— gitignored
+├── site/               # serve 壳（引擎产物，/lore:init 拷入）— index.html 单文件，非 repo 知识
+│   └── index.html      # vanilla JS + 内嵌 marked.js + 多主题；fetch wiki/ 实时渲染
+└── .state/             # 引擎缓存（每页 source-SHA + journal-offset + serve.pid）— gitignored
 ```
 
 `.lore/` 放**目标 repo 内** + git 跟踪：git 直接给"commit X 时架构长啥样"+ 分支局部 wiki 匹配分支代码 + 回溯/对比全免费。**插件（引擎）全局装一次，ship 零 repo 知识。**
@@ -223,13 +227,124 @@ slash `/lore:note`，agent / 人在**决策当下**调用："选 X 弃 Y 因为 
 ### v1 命令面（CC 插件）
 
 ```
-/lore:init     # 脚手架 .lore/ + 装 post-commit hook + 起 config.yml(自动发现组件)
+/lore:init     # 脚手架 .lore/ + 装 post-commit hook + 起 config.yml(自动发现组件) + 拷 site/index.html
 /lore:mine     # bootstrap：挖 commits + CHANGELOG + 踩坑 → journal（一次性 + 追平）
 /lore:note     # agent/人 追加/enrich 决策原子（补「为什么」）
-/lore:sync     # 增量合成：journal + 代码 → wiki 页 + INDEX
+/lore:sync     # 增量合成：journal + 代码 → wiki 页 + INDEX + emit .manifest.json
 /lore:lint     # 陈旧/矛盾/孤儿报告（只读）
 /lore:ask <q>  # 从 wiki 答（agent 消费）
+/lore:serve    # 起本地可视化服务器（--port N / --stop）— 浏览器看 wiki，详见 §5.5
 ```
+
+---
+
+## 5.5 本地可视化：`/lore:serve`
+
+**问题**：§5 消费假定 dev 用 Obsidian 看 wiki/。但没装 Obsidian、或想浏览器直接开的场景，v1 之前是真空。`/lore:serve` 补这个刚需：**一条命令起本地服务器 → 浏览器看 wiki，零 Obsidian 依赖**。
+
+### 架构：哑静态服务器 + 客户端 JS 壳
+
+核心拆分：**服务器只哑服文件，零渲染逻辑；所有渲染在浏览器**。
+
+```
+/lore:serve  ──┐
+               │ 1. 探测 runtime: python3 -m http.server
+               │                → python -m http.server
+               │                → 兜底 <plugin>/server.js (Node, CC 环境必有)
+               │ 2. 后台 detached 起进程, 根 = .lore/, 绑 127.0.0.1:<port>
+               │ 3. 存 .state/serve.pid, 立即返回 URL (不阻塞会话)
+               ▼
+  浏览器 ──► .lore/site/index.html  (单文件壳, 内嵌 marked.js + 多主题)
+               │ fetch ../wiki/.manifest.json → 建侧栏(按轴分组) + 搜索索引
+               │ 点页 → fetch ../wiki/<facet>/<page>.md → marked.js 渲染 → 注入
+               │ front-matter → 顶部元数据条(鲜度/溯源); 内链 [[x]] → 壳内 hash 路由跳转
+               ▼
+  /lore:serve --stop ──► 读 serve.pid → 跨平台 kill → 删 pid 文件
+```
+
+**核心不变量**：服务器哑服 `.lore/`，壳读 `.manifest.json`（不自己解析目录/markdown），进程后台跑命令秒回，知识仍只在 wiki/（serve 是又一只读渲染器，与 Obsidian 平行共存）。
+
+### 双渲染器兼容约束（serve 壳 + Obsidian 并存）
+
+两者都是 `wiki/*.md` 的**只读消费者**，无根本冲突。强化「wiki = 视图、多渲染器各取所需」模型。3 条兼容约束：
+
+1. **链接语法**：synthesis 出 Obsidian 原生 `[[x]]` 双链。壳加 ~10 行预处理正则 `[[x]]`→`<a href="#axis/x">` → 两个渲染器都能跳。Obsidian 保持一等公民，壳适配它。
+2. **manifest 隐藏**：`.lore/wiki/.manifest.json` dot 前缀 → Obsidian 默认隐藏 dotfile，壳照 `fetch` → 零污染 vault。
+3. **front-matter**：Obsidian 渲属性面板 / 壳 strip 成元数据条 — 各自处理同一 YAML，已覆盖。
+
+### 壳页面（`.lore/site/index.html` 单文件）
+
+**设计原则**：单文件（HTML+CSS+JS+marked.js 全内嵌，零构建零 npm），vanilla 无框架（总量目标 <400 行），hash 路由（`#component/m3_nlp` 可分享/前进后退/刷新不丢），离线（marked.js 内嵌非 CDN）。
+
+**四功能（全客户端零后端）**：
+
+| # | 功能 | 实现 | 行数估 |
+|---|---|---|---|
+| 1 | 侧栏 facet 导航 | 读 `.manifest.json` → 按轴分组渲染 `<nav>`，⚠N 标陈旧页 | ~40 |
+| 2 | md 渲染 + 内链 | marked.js + `[[x]]`/相对路径预处理 → hashchange 壳内跳转 | ~50 |
+| 3 | 全文搜索 | manifest 含 title+summary → client filter 侧栏（v1 不搜正文） | ~40 |
+| 4 | 元数据条 | 解析当前页 front-matter → 渲 last-updated/synthesized_from/陈旧旗 | ~25 |
+
+**多主题**：CSS 变量驱动全部配色。≥3 主题 — **暗**（Tokyo Night）/ **亮**（白底深字）/ **护眼**（暖米黄低蓝光）。顶栏切换器 + `localStorage` 记忆，`<html data-theme=x>` + 变量覆盖（~30 行，用户可加主题只加一组 var）。
+
+### 进程生命周期
+
+**启动序列**：
+1. 已在跑？读 `serve.pid` → 进程活 → 直接返回现有 URL（幂等，不重起）
+2. `.manifest.json` 不存在 → 提示先 `/lore:sync` → 退出
+3. 选端口：`--port` 给则用，否则从 7842 起探空闲口
+4. 探测 runtime 链起哑服务（根 = `.lore/`）
+5. 后台 detached 起进程，存 `{pid,port,runtime,started}` → `.state/serve.pid`
+6. 立即返回 URL + 停法提示
+
+**`--stop`**：读 `serve.pid` → kill → 删 pid 文件（幂等：已死/无文件 → "无运行中服务"）。
+
+**关键设计点**：
+
+| 点 | 决策 | 理由 |
+|---|---|---|
+| 绑定 | `127.0.0.1` only（非 `0.0.0.0`） | 安全 — 本地专用不暴露局域网，wiki 含代码架构不外泄 |
+| 端口 | 默认 7842，占用自增，可 `--port` 覆盖 | 避免撞常用口 |
+| 后台 | detached 进程命令秒回 | CC slash 命令禁阻塞（否则卡死会话） |
+| PID | `.state/serve.pid`（JSON，gitignored） | `--stop` 找得到 + 幂等检测 |
+| 跨平台 kill | Win `taskkill /PID` · *nix `kill` | 探测 OS 选命令 |
+| site/ 来源 | `/lore:init` 拷壳进 `.lore/site/` | 引擎产物，非 repo 知识 |
+
+**兜底 Node 服务器**（`<plugin>/server.js`，~30 行）：零依赖纯 `http`+`fs`，只服 `.lore/` 静态文件，**path 规范化防目录穿越（`../` 攻击）**，MIME 覆盖 `.html/.js/.css/.json/.md`。CC 插件环境保证能跑的最终兜底。
+
+### `.manifest.json` schema + sync 集成
+
+manifest = **sync 已持有信息的机器可读投影**（零额外 LLM/扫描，纯结构化吐出）：
+
+```jsonc
+{
+  "generated":        "2026-05-31T08:14:00Z",  // sync 跑的时刻
+  "current_code_sha": "abc1234",               // 当前 HEAD short sha (算陈旧)
+  "axes": [                                     // 顺序 = 侧栏序
+    { "id":"component", "label":"Component", "pages": [
+      { "id":"m3_nlp", "title":"M3 NLP", "summary":"实体/IOC/主题抽取 — 批内并发",
+        "path":"component/m3_nlp.md", "stale":3, "code_sha":"def5678" } ] }
+  ]
+}
+```
+
+字段来源：`axes` ← config；`id/title/summary/path` ← 页 front-matter + H1；`stale` ← lint 同款 code_sha diff；`current_code_sha` ← `git rev-parse`。
+
+**sync 集成**：`emit_manifest()` 是 `/lore:sync` **最后一步**，纯机械（读全页 front-matter 拼 JSON），**无条件全量重写**（manifest 小，全量比增量简单无陈旧风险）。`INDEX.md`（人读）与 `.manifest.json`（机读）= 同源孪生，一次 sync 同时更新。
+
+### 新增引擎文件
+
+```
+<plugin>/
+├── commands/lore-serve.md   # slash 命令定义
+├── site/index.html          # 壳 (init 拷到 .lore/site/) — vanilla + marked.js + 多主题
+├── server.js                # Node 兜底静态服务器 (~30 行零依赖, 防穿越)
+└── lib/
+    ├── emit_manifest.*       # sync 收尾: front-matter → .manifest.json
+    └── serve_runtime.*       # 探测链 + 后台起停 + PID + 跨平台 kill
+```
+
+碰现有命令仅 2 处（最小侵入）：`/lore:init` 末尾拷壳、`/lore:sync` 末尾 emit manifest。
 
 ---
 
@@ -259,8 +374,8 @@ slash `/lore:note`，agent / 人在**决策当下**调用："选 X 弃 Y 因为 
 
 | 版本 | 内容 |
 |---|---|
-| **v1（本 spec）** | 捕获 (hook + note + mine) + journal + 增量合成 + lint + resident-mode + git 原生历史。CC 插件。策略 A。 |
-| **v2** | B 的 query 层：`/lore:history-of X`、`/lore:diff <facet> <v1> <v2>` 富渲染、交叉链接图、AMBIGUOUS 自动消解 |
+| **v1（本 spec）** | 捕获 (hook + note + mine) + journal + 增量合成 + lint + resident-mode + git 原生历史 + **`/lore:serve` 本地静态浏览（壳 + 哑服务器 + manifest，§5.5）**。CC 插件。策略 A。 |
+| **v2** | B 的 query 层：`/lore:history-of X`、`/lore:diff <facet> <v1> <v2>` 富渲染、**关系图谱可视化（facet↔code↔atom 力导向图，扩 manifest 交叉链接数据，serve 壳加图视图）**、AMBIGUOUS 自动消解 |
 | **v3** | Graphify 结构：可选 AST 抽取喂 component 页（调用图 / 依赖）—— 倾向**集成 / 借用 Graphify 而非重造** |
 | **v4** | 输出生成：`/lore:present` → 从 wiki 出项目介绍 / PPT / 架构图（wiki 为源 → 准确） |
 | **v5** | 一致性真相（踩坑 #163/#164 本地 / git / 服务器漂移）：**独立兄弟项目**，diff 部署态 vs git vs 本地。lore-wiki 范围外。 |
@@ -274,7 +389,8 @@ slash `/lore:note`，agent / 人在**决策当下**调用："选 X 弃 Y 因为 
 - **单元（无 LLM）**：component facet 推导（diff → code_roots 表驱动）、match-rule 打标、journal append + fold-by-id（骨架→enrich 合并正确性）、ndjson 读写往返 + 分片、SHA 指纹陈旧检测、lint 机械检查、踩坑 / CHANGELOG miner 解析（幂等重跑无 dup）
 - **LLM-mock**：synthesis 给定 fixture 原子 + 代码 → 断言结构（3 段 + front-matter 溯源），mock 返罐头 prose
 - **集成（真 LLM，可选小）**：tiny fixture repo 上 `/lore:sync` 断言出页有效
-- **不变量显式测**：nuke `wiki/` 重 sync → 同样页（materialized-view 性质）；并发 commit 下 hook append 不损坏 journal
+- **不变量显式测**：nuke `wiki/` 重 sync → 同样页（materialized-view 性质）；并发 commit 下 hook append 不损坏 journal；nuke `wiki/` 重 sync → `.manifest.json` 一致（manifest 也是物化视图）
+- **serve（全确定性，零 LLM）**：manifest emit 确定性（同 wiki 状态 → 同字节）+ front-matter 缺字段降级（无 summary 不崩）；端口探测（占用→自增）+ PID 写/读/死进程检测；runtime 探测链（mock which → 选对二进制）+ 跨平台 kill 命令选择；**路径穿越防护（`../` 拒服）**；集成冒烟 `init→sync→serve`：起进程 → curl 200 拿到 index.html + manifest → `--stop` 杀干净
 
 ---
 
@@ -289,6 +405,9 @@ slash `/lore:note`，agent / 人在**决策当下**调用："选 X 弃 Y 因为 
 | wiki 陈旧没人 sync | lint 报警 +（Phase B）CI / cron 定期 lint + sync；resident-mode 让 agent 顺手 sync |
 | agent 不查 wiki 仍 grep | resident 规则 + INDEX.md 放显眼；`/lore:ask` 比 grep 更快形成习惯 |
 | 跨 repo 假设泄漏 | 引擎零硬编码全走 config；CI 在 2+ 不同语言 repo 上跑 init + sync 冒烟 |
+| serve 进程泄漏（起了没停/僵尸） | PID 存盘 + 启动幂等检测（活进程直接复用 URL）；`--stop` 幂等；绑 127.0.0.1 限本地 |
+| serve 暴露代码架构 | 仅绑 `127.0.0.1` 非 `0.0.0.0`；兜底 Node 服务器 path 规范化防 `../` 穿越 |
+| 目标 repo 无 Python/Node runtime | 探测链兜底到插件自带 Node 服务器（CC 环境必有 Node），永不落空 |
 
 ---
 
@@ -304,6 +423,7 @@ v1 视为完成当且仅当：
 6. **lint 漂移检测**：改一处代码不 sync → `/lore:lint` 报对应页陈旧。
 7. **内容验证（规则 #21）**：`theme/quality.md`、`theme/timeliness.md`、`component/m3_nlp.md` 经用户核为基本准确。
 8. **消费习惯**（定性）：agent 回答"X 怎么工作"时优先读 wiki 而非重 grep 代码。
+9. **本地浏览冒烟**：`/lore:sync` 后 `/lore:serve` 起服务、返回 `127.0.0.1` URL；浏览器开壳 → 侧栏列全 facet 页、点页渲染 md、`[[链接]]` 壳内跳转、元数据条显鲜度、≥3 主题可切；`--stop` 杀干净无僵尸。`.manifest.json` 经 `nuke wiki/` 重 sync 后字节一致。
 
 ---
 
@@ -314,7 +434,9 @@ v1 视为完成当且仅当：
 - **`/lore:note` 触发纪律**：仅靠 resident 软提醒，还是加更强的 Stop-hook 强制 flush？v1 先软，观察跳步率。
 - **journal compact 策略**：v1 不做，膨胀到何阈值才引入待观察。
 - **spec 与代码位置**：本 spec 在 `D:\workspace\lore`（独立 repo，不绑 threat-intel）。插件代码同 repo。
+- **serve 壳布局已出 mockup**：`docs/superpowers/specs/2026-05-31-lore-serve-mockup.html`（内嵌假数据，`file://` 双击即看）——布局/配色/信息层次已用户核可，实现壳照此还原（真壳换内嵌 marked.js）。
+- **serve 默认端口 7842**：暂定，撞口自增。无强约束，实现可调。
 
 ---
 
-*参考：Karpathy LLM Wiki gist · Graphify (safishamsi/graphify) · 本 spec 经多轮交互式 brainstorming 收敛，决策链见 git 历史。*
+*参考：Karpathy LLM Wiki gist · Graphify (safishamsi/graphify) · serve 壳 mockup 见同目录 `*-lore-serve-mockup.html` · 本 spec 经多轮交互式 brainstorming 收敛，决策链见 git 历史。*

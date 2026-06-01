@@ -1,7 +1,7 @@
 // test/manifest.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter } from '../lib/manifest.js';
+import { parseFrontmatter, deriveAxes } from '../lib/manifest.js';
 
 test('parseFrontmatter extracts flat keys and body', () => {
   const md = [
@@ -54,4 +54,20 @@ test('parseFrontmatter coerces a non-numeric numeric-key to 0', () => {
   const md = '---\ntitle: X\nstale: broken\n---\nbody';
   const { data } = parseFrontmatter(md);
   assert.equal(data.stale, 0);
+});
+
+test('deriveAxes orders known axes and capitalizes labels', () => {
+  const axes = deriveAxes(['theme', 'component', 'flow']);
+  assert.deepEqual(axes, [
+    { id: 'component', label: 'Component' },
+    { id: 'flow', label: 'Flow' },
+    { id: 'theme', label: 'Theme' },
+  ]);
+});
+
+test('deriveAxes puts INDEX first and unknown axes last in given order', () => {
+  const axes = deriveAxes(['custom', 'theme', 'INDEX']);
+  assert.deepEqual(axes.map(a => a.id), ['INDEX', 'theme', 'custom']);
+  assert.equal(axes[0].label, 'INDEX');
+  assert.equal(axes[2].label, 'Custom');
 });

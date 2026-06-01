@@ -108,3 +108,22 @@ test('discoverComponents: src/ layout reports src/<pkg> and drops bare src (ance
     assert.deepEqual(discoverComponents(root), ['src/pkg']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('discoverComponents: JS workspaces expand dir/* and drop the bare parent', () => {
+  const root = tmpRepo();
+  try {
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ workspaces: ['packages/*'] }));
+    mkdirSync(join(root, 'packages', 'a'), { recursive: true }); writeFileSync(join(root, 'packages', 'a', 'i.js'), 'x');
+    mkdirSync(join(root, 'packages', 'b'), { recursive: true }); writeFileSync(join(root, 'packages', 'b', 'i.js'), 'x');
+    assert.deepEqual(discoverComponents(root), ['packages/a', 'packages/b']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverComponents: workspaces object form {packages:[...]}', () => {
+  const root = tmpRepo();
+  try {
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ workspaces: { packages: ['apps/*'] } }));
+    mkdirSync(join(root, 'apps', 'web'), { recursive: true }); writeFileSync(join(root, 'apps', 'web', 'i.js'), 'x');
+    assert.deepEqual(discoverComponents(root), ['apps/web']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

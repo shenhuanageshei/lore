@@ -15,6 +15,16 @@ node lib/init.js <目标仓库>          # 引导（打印发现的 code_roots�
 拷壳到 `.lore/site/`（覆盖刷新）；给目标仓库 `.gitignore` 追加 `.lore/.state/`。重跑安全：刷新壳、不毁已编辑的 config。
 **本版不装 post-commit hook**（随后续 journal 子系统落地）。引导后跑 `/lore:sync` 才能 `/lore:serve` 浏览。
 
+## `/lore:mine`（已实现）
+
+bootstrap 回填 journal：挖 `git log` 历史 → 每个非 merge commit 一条 commit 原子（`title`/`why`/变更文件 + `component` facet 由路径→`code_roots` 机械推导），按 `commit:<sha>` 去重，写 `.lore/journal/YYYY/MM/*.ndjson`。纯确定性，零 LLM。本版只挖 commits。
+
+```bash
+node lib/mine.js <目标仓库>          # 回填（幂等，重跑只加新 commit）
+```
+
+捕获链：`/lore:mine` 填 journal（生产者）→ 未来 `/lore:sync` 折叠进「决策历史」段（消费者）。component 打标需先 `/lore:init` 生成 `config.yml`。
+
 ## `/lore:sync`（已实现）
 
 把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由 agent 读源码 LLM 写），机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme/journal 折叠推迟）。

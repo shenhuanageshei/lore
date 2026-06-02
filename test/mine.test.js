@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathComponent, parseGitLog, commitAtom, mineCommits, mine } from '../lib/mine.js';
+import { init } from '../lib/init.js';
+import { readAllAtoms } from '../lib/journal.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-mine-')); }
 
@@ -116,5 +118,29 @@ test('mine appends new atoms; re-run is idempotent (dedup by id)', () => {
     assert.deepEqual(r1, { scanned: 2, added: 2, skipped: 0 });
     const r2 = mine({ repoRoot: root, journalDir, codeRoots: ['lib'] });
     assert.deepEqual(r2, { scanned: 2, added: 0, skipped: 2 });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI integration: init + mine populates journal with component facets, idempotent', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'export const x = 1;', 'add lib module');
+    // real init writes .lore/config.yml (discovers lib/ → code_roots: [lib]) + shell
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const journalDir = join(root, '.lore', 'journal');
+
+    const out = execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() }).toString();
+    assert.match(out, /mined 1 new commit atom/);
+
+    const atoms = readAllAtoms(journalDir);
+    assert.equal(atoms.length, 1);
+    assert.equal(atoms[0].title, 'add lib module');
+    assert.deepEqual(atoms[0].facets.component, ['lib']);
+    assert.equal(atoms[0].source, 'miner:commits');
+
+    // idempotent re-run via CLI
+    const out2 = execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() }).toString();
+    assert.match(out2, /mined 0 new commit atom/);
+    assert.equal(readAllAtoms(journalDir).length, 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

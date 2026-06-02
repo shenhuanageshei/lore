@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseConfigCodeRoots, planSync, stampFrontmatter } from '../lib/sync.js';
+import { parseConfigCodeRoots, planSync, stampFrontmatter, buildIndex } from '../lib/sync.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
 
@@ -71,4 +71,14 @@ test('stampFrontmatter merges mechanical fields, preserves title/summary + body'
   assert.match(out, /# component: m3_nlp/);
   assert.match(out, /## Current architecture/);
   assert.match(out, /prose/);
+});
+
+test('buildIndex renders TOC with half front-matter and component links', () => {
+  const out = buildIndex([{ id: 'm3_nlp', title: 'M3 NLP' }, { id: 'lib', title: 'Lib' }]);
+  assert.match(out, /title: Index/);
+  assert.match(out, /summary: table of contents/);
+  assert.match(out, /# lore wiki — index/);
+  assert.match(out, /## Component/);
+  assert.match(out, /- \[\[m3_nlp\]\]/);
+  assert.match(out, /- \[\[lib\]\]/);
 });

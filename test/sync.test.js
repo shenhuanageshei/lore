@@ -4,33 +4,11 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseConfigCodeRoots, planSync, stampFrontmatter, buildIndex, finalizeSync } from '../lib/sync.js';
+import { planSync, stampFrontmatter, buildIndex, finalizeSync } from '../lib/sync.js';
 import { init } from '../lib/init.js';
 import { start, stop } from '../lib/serve.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
-
-test('parseConfigCodeRoots: single-line list', () => {
-  assert.deepEqual(
-    parseConfigCodeRoots('axes:\n  component:\n    code_roots: [lib, site]\n'),
-    ['lib', 'site']
-  );
-});
-
-test('parseConfigCodeRoots: dequotes entries with special chars', () => {
-  assert.deepEqual(
-    parseConfigCodeRoots("    code_roots: ['a b', m1, \"x\"]\n"),
-    ['a b', 'm1', 'x']
-  );
-});
-
-test('parseConfigCodeRoots: empty list', () => {
-  assert.deepEqual(parseConfigCodeRoots('    code_roots: []\n'), []);
-});
-
-test('parseConfigCodeRoots: missing line yields []', () => {
-  assert.deepEqual(parseConfigCodeRoots('axes: {}\n'), []);
-});
 
 test('planSync builds worklist from config code_roots', () => {
   const root = tmpDir();

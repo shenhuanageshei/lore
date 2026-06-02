@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pathComponent, parseGitLog } from '../lib/mine.js';
+import { pathComponent, parseGitLog, commitAtom } from '../lib/mine.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-mine-')); }
 
@@ -41,4 +41,36 @@ test('parseGitLog parses commits with multi-line body and files', () => {
 
 test('parseGitLog: empty stdout → []', () => {
   assert.deepEqual(parseGitLog(''), []);
+});
+
+test('commitAtom builds full-schema atom with component facets', () => {
+  const raw = {
+    sha: 'abc123def', ts: '2026-06-01T08:00:00Z', subject: 'fix crawler',
+    body: 'why text', files: ['m1_crawler/fetch.py', 'shared/util.py', 'README.md'],
+  };
+  const atom = commitAtom(raw, ['m1_crawler', 'shared']);
+  assert.equal(atom.id, 'commit:abc123def');
+  assert.equal(atom.ts, '2026-06-01T08:00:00Z');
+  assert.equal(atom.kind, 'commit');
+  assert.equal(atom.commit, 'abc123def');
+  assert.equal(atom.title, 'fix crawler');
+  assert.equal(atom.why, 'why text');
+  assert.equal(atom.what_changed, '');
+  assert.deepEqual(atom.facets.component, ['m1_crawler', 'shared']); // sorted, deduped, README excluded
+  assert.deepEqual(atom.facets.flow, []);
+  assert.deepEqual(atom.facets.theme, []);
+  assert.deepEqual(atom.refs.files, ['m1_crawler/fetch.py', 'shared/util.py', 'README.md']);
+  assert.equal(atom.refs.pitfall, null);
+  assert.deepEqual(atom.refs.related, []);
+  assert.equal(atom.source, 'miner:commits');
+  assert.equal(atom.enriched, false);
+  assert.equal(atom.confidence, 'EXTRACTED');
+});
+
+test('commitAtom: no matching component → empty component facet', () => {
+  const atom = commitAtom(
+    { sha: 'x', ts: '2026-06-01T08:00:00Z', subject: 's', body: '', files: ['README.md'] },
+    ['lib'],
+  );
+  assert.deepEqual(atom.facets.component, []);
 });

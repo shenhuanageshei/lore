@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { parseConfigCodeRoots, planSync, stampFrontmatter, buildIndex, finalizeSync } from '../lib/sync.js';
+import { init } from '../lib/init.js';
+import { start, stop } from '../lib/serve.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
 
@@ -153,4 +155,39 @@ test('CLI plan prints worklist JSON', () => {
 
 test('CLI without args exits non-zero', () => {
   assert.throws(() => execFileSync('node', ['lib/sync.js'], { cwd: process.cwd(), stdio: 'pipe' }));
+});
+
+test('integration: init -> agent page -> sync finalize -> serve renders', async () => {
+  const root = gitRepo();
+  try {
+    // a discoverable code dir so init writes code_roots: [lib]
+    mkdirSync(join(root, 'lib'));
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const lore = join(root, '.lore');
+
+    // plan sees the component
+    const plan = JSON.parse(execFileSync('node', ['lib/sync.js', 'plan', lore], { cwd: process.cwd() }).toString());
+    assert.ok(plan.worklist.some(w => w.component === 'lib'));
+
+    // simulate the agent synthesis step
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), agentPage('Lib', 'core lib'));
+
+    // real finalize via CLI
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+
+    // serve (force node fallback for determinism) + fetch
+    const info = await start({ loreDir: lore, port: 0, canRun: () => false, now: 't' });
+    try {
+      assert.equal((await fetch(info.url + '../wiki/INDEX.md')).status, 200);
+      const page = await fetch(info.url + '../wiki/component/lib.md');
+      assert.equal(page.status, 200);
+      assert.match(await page.text(), /Current architecture/);
+      assert.equal((await fetch(info.url + '../wiki/.manifest.json')).status, 200);
+    } finally {
+      await stop({ loreDir: lore });
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

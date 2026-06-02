@@ -15,6 +15,17 @@ node lib/init.js <目标仓库>          # 引导（打印发现的 code_roots�
 拷壳到 `.lore/site/`（覆盖刷新）；给目标仓库 `.gitignore` 追加 `.lore/.state/`。重跑安全：刷新壳、不毁已编辑的 config。
 **本版不装 post-commit hook**（随后续 journal 子系统落地）。引导后跑 `/lore:sync` 才能 `/lore:serve` 浏览。
 
+## `/lore:sync`（已实现）
+
+把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由 agent 读源码 LLM 写），机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme/journal 折叠推迟）。
+
+```bash
+node lib/sync.js plan <.lore目录>       # 出 worklist（agent 据此逐页合成）
+node lib/sync.js finalize <.lore目录>   # 盖 front-matter + INDEX + manifest
+```
+
+O1 两阶段：`plan`（Node 出 worklist）→ agent 读源码写页正文 → `finalize`（Node 盖机械 front-matter + INDEX + emit manifest，复用 `lib/manifest.js`）。引导链：`/lore:init` → `/lore:sync` → `/lore:serve` 浏览真内容。
+
 ## `/lore:serve`（已实现）
 
 在浏览器中浏览 wiki —— 无需 Obsidian。

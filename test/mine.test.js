@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pathComponent, parseGitLog, commitAtom, mineCommits } from '../lib/mine.js';
+import { pathComponent, parseGitLog, commitAtom, mineCommits, mine } from '../lib/mine.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-mine-')); }
 
@@ -103,5 +103,18 @@ test('mineCommits returns commit atoms with component facets from a real repo', 
     assert.deepEqual(byTitle['add site'].facets.component, ['site']);
     assert.equal(byTitle['add lib'].kind, 'commit');
     assert.match(byTitle['add lib'].id, /^commit:[0-9a-f]{40}$/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('mine appends new atoms; re-run is idempotent (dedup by id)', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'c1');
+    commitFile(root, 'lib/b.js', 'y', 'c2');
+    const journalDir = join(root, '.lore', 'journal');
+    const r1 = mine({ repoRoot: root, journalDir, codeRoots: ['lib'] });
+    assert.deepEqual(r1, { scanned: 2, added: 2, skipped: 0 });
+    const r2 = mine({ repoRoot: root, journalDir, codeRoots: ['lib'] });
+    assert.deepEqual(r2, { scanned: 2, added: 0, skipped: 2 });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

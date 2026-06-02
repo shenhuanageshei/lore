@@ -136,3 +136,21 @@ test('finalizeSync stamps pages, writes INDEX + manifest', () => {
     assert.deepEqual(comp.pages.map(p => p.id).slice().sort(), ['lib', 'm3_nlp']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('CLI plan prints worklist JSON', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib, site]\n');
+    const out = execFileSync('node', ['lib/sync.js', 'plan', lore], { cwd: process.cwd() }).toString();
+    const parsed = JSON.parse(out);
+    assert.deepEqual(parsed.codeRoots, ['lib', 'site']);
+    assert.equal(parsed.worklist.length, 2);
+    assert.equal(parsed.worklist[0].component, 'lib');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI without args exits non-zero', () => {
+  assert.throws(() => execFileSync('node', ['lib/sync.js'], { cwd: process.cwd(), stdio: 'pipe' }));
+});

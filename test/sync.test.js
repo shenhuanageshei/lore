@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseConfigCodeRoots, planSync, stampFrontmatter, buildIndex } from '../lib/sync.js';
+import { parseConfigCodeRoots, planSync, stampFrontmatter, buildIndex, finalizeSync } from '../lib/sync.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
 
@@ -81,4 +81,58 @@ test('buildIndex renders TOC with half front-matter and component links', () => 
   assert.match(out, /## Component/);
   assert.match(out, /- \[\[m3_nlp\]\]/);
   assert.match(out, /- \[\[lib\]\]/);
+});
+
+function gitRepo() {
+  const root = tmpDir();
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  writeFileSync(join(root, 'f.txt'), 'x');
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return root;
+}
+
+function agentPage(title, summary) {
+  return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
+    `## Current architecture\n\narch prose\n\n## Decision history\n\n暂无 journal 原子。\n\n` +
+    `## Cross-links\n\n- [[other]]\n`;
+}
+
+test('finalizeSync stamps pages, writes INDEX + manifest', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'm3_nlp.md'), agentPage('M3 NLP', 'entity extraction'));
+    writeFileSync(join(compDir, 'lib.md'), agentPage('Lib', 'core lib'));
+
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    const r = finalizeSync(lore, '2026-06-01T08:00:00Z');
+
+    assert.deepEqual(r.stamped.slice().sort(), ['component/lib.md', 'component/m3_nlp.md']);
+    assert.equal(r.indexWritten, true);
+
+    // pages stamped, body preserved
+    const page = readFileSync(join(compDir, 'm3_nlp.md'), 'utf8');
+    assert.match(page, new RegExp('code_sha: ' + sha));
+    assert.match(page, /last_updated: 2026-06-01/);
+    assert.match(page, /atoms: 0/);
+    assert.match(page, /title: M3 NLP/);
+    assert.match(page, /## Current architecture/);
+
+    // INDEX
+    const index = readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8');
+    assert.match(index, /- \[\[m3_nlp\]\]/);
+    assert.match(index, /- \[\[lib\]\]/);
+    assert.match(index, new RegExp('code_sha: ' + sha));
+
+    // manifest
+    const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
+    const comp = manifest.axes.find(a => a.id === 'component');
+    assert.equal(comp.pages.length, 2);
+    assert.deepEqual(comp.pages.map(p => p.id).slice().sort(), ['lib', 'm3_nlp']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

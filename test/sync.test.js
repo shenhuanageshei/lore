@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseConfigCodeRoots } from '../lib/sync.js';
+import { parseConfigCodeRoots, planSync } from '../lib/sync.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
 
@@ -28,4 +28,29 @@ test('parseConfigCodeRoots: empty list', () => {
 
 test('parseConfigCodeRoots: missing line yields []', () => {
   assert.deepEqual(parseConfigCodeRoots('axes: {}\n'), []);
+});
+
+test('planSync builds worklist from config code_roots', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'component'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib, src/pkg]\n');
+    writeFileSync(join(lore, 'wiki', 'component', 'lib.md'), 'x');   // makes priorExists true for lib
+    const { codeRoots, worklist } = planSync(lore);
+    assert.deepEqual(codeRoots, ['lib', 'src/pkg']);
+    assert.deepEqual(worklist, [
+      { component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true },
+      { component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false },
+    ]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('planSync returns empty when config missing', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    assert.deepEqual(planSync(lore), { codeRoots: [], worklist: [] });
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

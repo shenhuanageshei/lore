@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseConfigCodeRoots, planSync } from '../lib/sync.js';
+import { parseConfigCodeRoots, planSync, stampFrontmatter } from '../lib/sync.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
 
@@ -53,4 +53,22 @@ test('planSync returns empty when config missing', () => {
     mkdirSync(lore, { recursive: true });
     assert.deepEqual(planSync(lore), { codeRoots: [], worklist: [] });
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('stampFrontmatter merges mechanical fields, preserves title/summary + body', () => {
+  const page =
+    '---\ntitle: M3 NLP\nsummary: entity extraction\n---\n' +
+    '# component: m3_nlp\n\n## Current architecture\n\nprose\n';
+  const out = stampFrontmatter(page, { codeSha: 'abc1234', lastUpdated: '2026-06-01', commits: 0, atoms: 0 });
+  assert.match(out, /^---\n/);
+  assert.match(out, /title: M3 NLP/);
+  assert.match(out, /summary: entity extraction/);
+  assert.match(out, /last_updated: 2026-06-01/);
+  assert.match(out, /code_sha: abc1234/);
+  assert.match(out, /atoms: 0/);
+  assert.match(out, /commits: 0/);
+  // body preserved
+  assert.match(out, /# component: m3_nlp/);
+  assert.match(out, /## Current architecture/);
+  assert.match(out, /prose/);
 });

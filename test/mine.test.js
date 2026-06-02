@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pathComponent, parseGitLog, commitAtom } from '../lib/mine.js';
+import { pathComponent, parseGitLog, commitAtom, mineCommits } from '../lib/mine.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-mine-')); }
 
@@ -73,4 +73,35 @@ test('commitAtom: no matching component → empty component facet', () => {
     ['lib'],
   );
   assert.deepEqual(atom.facets.component, []);
+});
+
+function gitRepo() {
+  const root = tmpDir();
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  return root;
+}
+
+function commitFile(root, relpath, content, msg) {
+  const p = join(root, relpath);
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, content);
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', msg], { cwd: root });
+}
+
+test('mineCommits returns commit atoms with component facets from a real repo', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'add lib');
+    commitFile(root, 'site/b.mjs', 'y', 'add site');
+    const atoms = mineCommits(root, ['lib', 'site']);
+    assert.equal(atoms.length, 2);
+    const byTitle = Object.fromEntries(atoms.map(a => [a.title, a]));
+    assert.deepEqual(byTitle['add lib'].facets.component, ['lib']);
+    assert.deepEqual(byTitle['add site'].facets.component, ['site']);
+    assert.equal(byTitle['add lib'].kind, 'commit');
+    assert.match(byTitle['add lib'].id, /^commit:[0-9a-f]{40}$/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -192,3 +192,24 @@ test('manifest CLI writes .manifest.json into wiki dir', () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+import { gitCurrentSha, makeCountCommitsSince } from '../lib/manifest.js';
+
+test('gitCurrentSha + makeCountCommitsSince are exported and work', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mf-git-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    writeFileSync(join(root, 'a.txt'), '1');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'c1'], { cwd: root });
+    const sha1 = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    writeFileSync(join(root, 'b.txt'), '2');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'c2'], { cwd: root });
+
+    assert.match(gitCurrentSha(root), /^[0-9a-f]{7,}$/);
+    assert.equal(makeCountCommitsSince(root)(sha1), 1);   // 1 commit (c2) since c1
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

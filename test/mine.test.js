@@ -174,3 +174,26 @@ test('commitAtom: themes param tags facets.theme; default empty', () => {
   assert.deepEqual(commitAtom(raw, []).facets.theme, []);          // default no themes
   assert.equal(commitAtom(raw, []).source, 'miner:commits');       // 3-arg default still works
 });
+
+test('mineCommits: passes themes → commit atoms get facets.theme', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'improve accuracy');
+    const atoms = mineCommits(root, ['lib'], [{ id: 'quality', match: ['accuracy'] }]);
+    assert.deepEqual(atoms[0].facets.theme, ['quality']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('mine CLI reads config themes', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'fix latency');
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n  theme:\n    values:\n    - { id: perf, match: [latency] }\n');
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });
+    const atoms = readAllAtoms(join(lore, 'journal'));
+    const a = atoms.find(x => x.title === 'fix latency');
+    assert.deepEqual(a.facets.theme, ['perf']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -251,3 +251,24 @@ test('installHook: no-git dir', () => {
     assert.equal(installHook(root), 'no-git');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('installHook: works from inside a git worktree (resolves common git dir)', () => {
+  const root = bareGitRepo();
+  const wt = mkdtempSync(join(tmpdir(), 'lore-wt-'));
+  try {
+    // a commit is needed before adding a worktree
+    writeFileSync(join(root, 'f.txt'), 'x');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+    rmSync(wt, { recursive: true, force: true });   // git worktree add needs the path to not exist
+    execFileSync('git', ['worktree', 'add', '-q', wt], { cwd: root });
+
+    // installing from inside the worktree must succeed (not throw) and land in the COMMON hooks dir
+    assert.equal(installHook(wt), 'installed');
+    assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), true);
+  } finally {
+    try { execFileSync('git', ['worktree', 'remove', '--force', wt], { cwd: root }); } catch {}
+    rmSync(wt, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});

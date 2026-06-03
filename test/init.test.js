@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, re
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
 
@@ -206,5 +206,48 @@ test('CLI: node lib/init.js <repo> initializes and prints summary', () => {
     // uses the REAL plugin site/ (self-located) — both shell files land in the temp repo
     assert.equal(existsSync(join(root, '.lore', 'site', 'index.html')), true);
     assert.equal(existsSync(join(root, '.lore', 'site', 'shell.mjs')), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+function bareGitRepo() {
+  const root = mkdtempSync(join(tmpdir(), 'lore-hook-init-'));
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  return root;
+}
+
+test('installHook: installs lore post-commit when absent (idempotent)', () => {
+  const root = bareGitRepo();
+  try {
+    assert.equal(installHook(root), 'installed');
+    const hook = readFileSync(join(root, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(hook, /# lore:post-commit/);
+    assert.match(hook, /lib\/hook\.js/);          // forward-slash path
+    assert.doesNotMatch(hook, /\\/);              // no backslashes (sh-safe)
+    assert.equal(installHook(root), 'present');   // idempotent
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('installHook: does not clobber a foreign hook', () => {
+  const root = bareGitRepo();
+  try {
+    const hp = join(root, '.git', 'hooks', 'post-commit');
+    writeFileSync(hp, '#!/bin/sh\necho custom\n');
+    assert.equal(installHook(root), 'exists-foreign');
+    assert.equal(readFileSync(hp, 'utf8'), '#!/bin/sh\necho custom\n');  // untouched
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('installHook: warns when core.hooksPath set', () => {
+  const root = bareGitRepo();
+  try {
+    execFileSync('git', ['config', 'core.hooksPath', '.husky'], { cwd: root });
+    assert.equal(installHook(root), 'hookspath-set');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('installHook: no-git dir', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-nogit-'));
+  try {
+    assert.equal(installHook(root), 'no-git');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

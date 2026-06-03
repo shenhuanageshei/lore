@@ -65,6 +65,17 @@ test('CLI never throws / exits 0 even on a non-git dir', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('captureHead tags theme from config themes', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'improve accuracy');
+    const journalDir = join(root, '.lore', 'journal');
+    const r = captureHead({ repoRoot: root, journalDir, codeRoots: ['lib'], themes: [{ id: 'quality', match: ['accuracy'] }] });
+    assert.equal(r.added, 1);
+    assert.deepEqual(readAllAtoms(journalDir)[0].facets.theme, ['quality']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('integration: init installs hook → a real commit auto-writes a journal atom', () => {
   const root = gitRepo();   // helper already in this file: git init + user config, no commit yet
   try {

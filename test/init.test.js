@@ -129,11 +129,11 @@ test('discoverComponents: workspaces object form {packages:[...]}', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('renderConfigYaml injects roots and declares hook:false', () => {
+test('renderConfigYaml injects roots and declares hook:true', () => {
   const yaml = renderConfigYaml(['m1', 'm2']);
   assert.match(yaml, /discover: auto/);
   assert.match(yaml, /code_roots: \[m1, m2\]/);
-  assert.match(yaml, /hook: false/);
+  assert.match(yaml, /hook: true/);
   assert.match(yaml, /mine: \[commits, changelog, claude_md_pitfalls\]/);
   assert.match(yaml, /^\s*flow:/m);
   assert.match(yaml, /^\s*theme:/m);
@@ -270,5 +270,19 @@ test('installHook: works from inside a git worktree (resolves common git dir)', 
     try { execFileSync('git', ['worktree', 'remove', '--force', wt], { cwd: root }); } catch {}
     rmSync(wt, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('init installs the hook and sets config hook: true', () => {
+  const root = bareGitRepo();
+  const src = fakeSrcSite();
+  try {
+    const r = init({ repoRoot: root, srcSiteDir: src });
+    assert.equal(r.hook, 'installed');
+    assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), true);
+    assert.match(readFileSync(join(root, '.lore', 'config.yml'), 'utf8'), /hook: true/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(src, { recursive: true, force: true });
   }
 });

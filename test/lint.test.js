@@ -84,3 +84,30 @@ test('lint: clean repo → clean:true', () => {
     assert.deepEqual(r, { stale: [], orphans: [], missing: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('CLI: prints report and exits 0 (drift)', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib, site]\n');
+    page(lore, 'gone', '');   // orphan
+    const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
+    assert.match(out, /orphans/);
+    assert.match(out, /gone/);
+    assert.match(out, /missing/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI: clean repo prints clean and exits 0', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    const cur = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
+    page(lore, 'lib', cur);
+    const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
+    assert.match(out, /clean/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

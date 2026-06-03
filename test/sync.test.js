@@ -255,3 +255,32 @@ test('finalizeSync backward-compat: page without token does not crash, still sta
     assert.match(libPage, /atoms: 1/);            // counts still stamped from journal
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('integration: init → mine → sync folds commit atom into component page', () => {
+  const root = gitRepo();   // has an initial commit (f.txt)
+  try {
+    // a commit touching lib/ so mine tags it component:[lib]
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'add lib feature'], { cwd: root });
+
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });   // config code_roots: [lib]
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), tokenPage('Lib', 'core'));   // agent page with the token
+
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });             // populate journal
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() }); // fold + manifest
+
+    const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.match(libPage, /add lib feature/);            // commit atom title now in decision history
+    assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);
+    assert.match(libPage, /atoms: 1/);                   // only the lib-touching commit matches
+
+    const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
+    const libEntry = manifest.axes.find(a => a.id === 'component').pages.find(p => p.id === 'lib');
+    assert.equal(libEntry.synthesized_from.atoms, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

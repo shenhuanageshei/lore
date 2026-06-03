@@ -21,8 +21,8 @@ test('planSync builds worklist from config code_roots', () => {
     const { codeRoots, worklist } = planSync(lore);
     assert.deepEqual(codeRoots, ['lib', 'src/pkg']);
     assert.deepEqual(worklist, [
-      { component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true },
-      { component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false },
+      { axis: 'component', id: 'lib', component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true },
+      { axis: 'component', id: 'pkg', component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false },
     ]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -32,7 +32,7 @@ test('planSync returns empty when config missing', () => {
   try {
     const lore = join(root, '.lore');
     mkdirSync(lore, { recursive: true });
-    assert.deepEqual(planSync(lore), { codeRoots: [], worklist: [] });
+    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], worklist: [] });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -324,4 +324,17 @@ test('renderDecisionHistory: mixes commit + decision atoms, ts-desc', () => {
   assert.match(out, /new note[\s\S]*old commit/);                          // ts desc
   assert.match(out, /- \*\*new note\*\* — because \(2026-06-03\)/);        // decision: (date)
   assert.match(out, /- \*\*old commit\*\* \(aaaaaaa, 2026-06-01\)/);       // commit: (sha, date)
+});
+
+test('planSync includes theme worklist items with axis', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n  theme:\n    values:\n    - { id: quality, match: [质量] }\n');
+    const { worklist, themes } = planSync(lore);
+    assert.deepEqual(themes, [{ id: 'quality', match: ['质量'] }]);
+    assert.ok(worklist.some(w => w.axis === 'component' && w.id === 'lib' && w.path === 'component/lib.md'));
+    assert.ok(worklist.some(w => w.axis === 'theme' && w.id === 'quality' && w.path === 'theme/quality.md'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

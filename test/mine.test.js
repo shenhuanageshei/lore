@@ -167,3 +167,10 @@ test('tagThemes: empty text / does not mutate input', () => {
   tagThemes('x', t);
   assert.equal(t.length, 1);
 });
+
+test('commitAtom: themes param tags facets.theme; default empty', () => {
+  const raw = { sha: 'a', ts: '2026-06-03T00:00:00Z', subject: 'fix accuracy bug', body: 'better 质量', files: [] };
+  assert.deepEqual(commitAtom(raw, [], 'miner:commits', [{ id: 'quality', match: ['accuracy', '质量'] }]).facets.theme, ['quality']);
+  assert.deepEqual(commitAtom(raw, []).facets.theme, []);          // default no themes
+  assert.equal(commitAtom(raw, []).source, 'miner:commits');       // 3-arg default still works
+});

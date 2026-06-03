@@ -4,7 +4,7 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 
 # /lore:sync
 
-把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由你读源码写），再机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme 推迟）。
+把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由你读源码写），再机械建 `INDEX.md` + `.manifest.json`。本版产 component + theme 页（flow 推迟）。
 
 ## 用法
 
@@ -42,6 +42,30 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
    - [[<相关 sibling 组件>]]
    ```
 
+对每个 `axis:'theme'` 的 worklist 项，写 `.lore/wiki/theme/<id>.md` —— 同 component 页结构，但讲「这条横切主线怎么演进」：
+
+   ```markdown
+   ---
+   title: <主线显示名>
+   summary: <一行摘要>
+   ---
+   # theme: <id>
+
+   ## Current state
+
+   <这条主线的当前状态/约束/为什么重要>
+
+   ## Decision history
+
+   {{LORE_JOURNAL}}
+
+   ## Cross-links
+
+   - [[<相关组件或主题>]]
+   ```
+
+   finalize 会把标了该 theme 的 journal 原子自动折进 `{{LORE_JOURNAL}}`（按 `facets.theme` 过滤）。
+
 3. **finalize**（机械）：
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" finalize "$(pwd)/.lore"
@@ -55,4 +79,5 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 - 「决策历史」段写占位符 `{{LORE_JOURNAL}}` —— finalize 自动用 journal 原子机械填充（按 component facet 过滤、ts 倒序）。先跑 `/lore:mine` 让 journal 有料。
 - 「交叉链接」段用 worklist 的全组件列表，链相关 sibling。
 - 跑完提示 `/lore:serve` 浏览。
+- theme 页讲横切主线（质量/性能/时效…）的演进，决策历史 token 自动折该 theme 的原子；先确保 config 的 `theme.values` 填了 + 跑过 `/lore:mine` 让原子带 theme facet。
 - 零侵入：只写 `.lore/wiki/`，绝不改业务源码。

@@ -55,7 +55,7 @@ test('stampFrontmatter merges mechanical fields, preserves title/summary + body'
 });
 
 test('buildIndex renders TOC with half front-matter and component links', () => {
-  const out = buildIndex([{ id: 'm3_nlp', title: 'M3 NLP' }, { id: 'lib', title: 'Lib' }]);
+  const out = buildIndex({ component: [{ id: 'm3_nlp', title: 'M3 NLP' }, { id: 'lib', title: 'Lib' }] });
   assert.match(out, /title: Index/);
   assert.match(out, /summary: table of contents/);
   assert.match(out, /# lore wiki — index/);
@@ -336,5 +336,31 @@ test('planSync includes theme worklist items with axis', () => {
     assert.deepEqual(themes, [{ id: 'quality', match: ['质量'] }]);
     assert.ok(worklist.some(w => w.axis === 'component' && w.id === 'lib' && w.path === 'component/lib.md'));
     assert.ok(worklist.some(w => w.axis === 'theme' && w.id === 'quality' && w.path === 'theme/quality.md'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('buildIndex: object form renders per-axis sections', () => {
+  const out = buildIndex({ component: [{ id: 'lib', title: 'Lib' }], theme: [{ id: 'quality', title: 'Quality' }] });
+  assert.match(out, /## Component\n- \[\[lib\]\]/);
+  assert.match(out, /## Theme\n- \[\[quality\]\]/);
+});
+
+test('finalizeSync folds both component and theme axes', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    for (const axis of ['component', 'theme']) mkdirSync(join(lore, 'wiki', axis), { recursive: true });
+    writeFileSync(join(lore, 'wiki', 'component', 'lib.md'), tokenPage('Lib', 'c'));
+    writeFileSync(join(lore, 'wiki', 'theme', 'quality.md'), tokenPage('Quality', 't'));
+    const journalDir = join(lore, 'journal');
+    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-03T00:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'lib fix', why: '', facets: { component: ['lib'], flow: [], theme: ['quality'] } });
+
+    finalizeSync(lore, '2026-06-03T00:00:00Z');
+
+    assert.match(readFileSync(join(lore, 'wiki', 'component', 'lib.md'), 'utf8'), /- \*\*lib fix\*\*/);
+    assert.match(readFileSync(join(lore, 'wiki', 'theme', 'quality.md'), 'utf8'), /- \*\*lib fix\*\*/);
+    const index = readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8');
+    assert.match(index, /## Component/);
+    assert.match(index, /## Theme/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

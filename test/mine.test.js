@@ -150,3 +150,20 @@ test('CLI integration: init + mine populates journal with component facets, idem
     assert.equal(readAllAtoms(journalDir).length, 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+import { tagThemes } from '../lib/mine.js';
+
+const THEMES = [{ id: 'quality', match: ['质量', 'accuracy'] }, { id: 'perf', match: ['性能', 'latency'] }];
+
+test('tagThemes: substring case-insensitive, sorted unique', () => {
+  assert.deepEqual(tagThemes('fix Accuracy and 性能 issue', THEMES), ['perf', 'quality']);
+  assert.deepEqual(tagThemes('improve LATENCY', THEMES), ['perf']);
+  assert.deepEqual(tagThemes('unrelated change', THEMES), []);
+});
+
+test('tagThemes: empty text / does not mutate input', () => {
+  assert.deepEqual(tagThemes('', THEMES), []);
+  const t = [{ id: 'a', match: ['x'] }];
+  tagThemes('x', t);
+  assert.equal(t.length, 1);
+});

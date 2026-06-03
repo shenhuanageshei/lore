@@ -308,3 +308,20 @@ test('finalizeSync injects journal markdown literally — no $-pattern corruptio
     assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('renderDecisionHistory: decision atom (no commit) omits sha', () => {
+  const out = renderDecisionHistory([
+    { title: 'use ZSET', why: 'range queries', commit: null, ts: '2026-06-03T08:00:00Z', kind: 'decision' },
+  ]);
+  assert.equal(out, '- **use ZSET** — range queries (2026-06-03)');
+});
+
+test('renderDecisionHistory: mixes commit + decision atoms, ts-desc', () => {
+  const out = renderDecisionHistory([
+    { title: 'old commit', why: '', commit: 'aaaaaaa0', ts: '2026-06-01T00:00:00Z', kind: 'commit' },
+    { title: 'new note', why: 'because', commit: null, ts: '2026-06-03T00:00:00Z', kind: 'decision' },
+  ]);
+  assert.match(out, /new note[\s\S]*old commit/);                          // ts desc
+  assert.match(out, /- \*\*new note\*\* — because \(2026-06-03\)/);        // decision: (date)
+  assert.match(out, /- \*\*old commit\*\* \(aaaaaaa, 2026-06-01\)/);       // commit: (sha, date)
+});

@@ -48,19 +48,24 @@ function page(loreDir, id, codeSha) {
 }
 
 test('lint orchestrator reports stale + orphan + missing', () => {
-  const root = gitRepo();
+  const root = gitRepo();   // has commit c1
   try {
     const lore = join(root, '.lore');
     mkdirSync(lore, { recursive: true });
-    const cur = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    const sha1 = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    // a second commit so HEAD advances past sha1 (sha1 is now 1 behind)
+    writeFileSync(join(root, 'g.txt'), 'y');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'c2'], { cwd: root });
+
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib, site]\n');
-    page(lore, 'lib', 'deadbee');   // stale (old sha) + valid root
-    page(lore, 'gone', cur);        // orphan (no code_root 'gone'), not stale
+    page(lore, 'lib', sha1);    // stale: page stamped at c1, HEAD now at c2 → behind 1
+    page(lore, 'gone', execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim());   // orphan, current sha → not stale
     // 'site' code_root has no page → missing
 
     const r = lint({ loreDir: lore });
     assert.deepEqual(r.stale.map(s => s.page), ['lib']);
-    assert.ok(r.stale[0].behind >= 1);
+    assert.equal(r.stale[0].behind, 1);          // exactly 1 commit behind (real reachable sha)
     assert.deepEqual(r.orphans, ['gone']);
     assert.deepEqual(r.missing, ['site']);
     assert.equal(r.clean, false);

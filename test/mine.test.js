@@ -121,6 +121,12 @@ test('mine appends new atoms; re-run is idempotent (dedup by id)', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('commitAtom: source param overrides default', () => {
+  const raw = { sha: 'abc', ts: '2026-06-01T08:00:00Z', subject: 's', body: '', files: [] };
+  assert.equal(commitAtom(raw, []).source, 'miner:commits');         // default unchanged
+  assert.equal(commitAtom(raw, [], 'hook').source, 'hook');          // override
+});
+
 test('CLI integration: init + mine populates journal with component facets, idempotent', () => {
   const root = gitRepo();
   try {

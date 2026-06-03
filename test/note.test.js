@@ -1,12 +1,13 @@
 // test/note.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { noteAtom } from '../lib/note.js';
 import { readAllAtoms } from '../lib/journal.js';
+import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-note-')); }
 
@@ -45,5 +46,42 @@ test('CLI: note flags → decision atom in journal', () => {
     assert.deepEqual(atoms[0].facets.component, ['lib']);
     assert.deepEqual(atoms[0].refs.files, ['lib/a.js', 'lib/b.js']);
     assert.match(atoms[0].id, /^note:/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+function gitRepo() {
+  const root = tmpDir();
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  writeFileSync(join(root, 'f.txt'), 'x');
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return root;
+}
+
+function tokenPage(title, summary) {
+  return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
+    `## Current architecture\n\narch\n\n## Decision history\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`;
+}
+
+test('integration: note → sync folds the decision atom into the component page', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });   // config code_roots:[lib]
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), tokenPage('Lib', 'core'));
+
+    execFileSync('node', ['lib/note.js', root, '--title', 'use ZSET', '--why', 'range queries', '--component', 'lib'], { cwd: process.cwd() });
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+
+    const page = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.match(page, /use ZSET/);          // decision title in the page
+    assert.match(page, /range queries/);     // why
+    assert.doesNotMatch(page, /\{\{LORE_JOURNAL\}\}/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

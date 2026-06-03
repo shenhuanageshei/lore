@@ -284,3 +284,27 @@ test('integration: init → mine → sync folds commit atom into component page'
     assert.equal(libEntry.synthesized_from.atoms, 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('finalizeSync injects journal markdown literally — no $-pattern corruption', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), tokenPage('Lib', 'core'));
+    const journalDir = join(lore, 'journal');
+    // commit title containing replacement-pattern special sequences
+    appendAtom(journalDir, {
+      id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0',
+      title: 'fix $& and $$ and $1 patterns', why: '', facets: { component: ['lib'] },
+    });
+
+    finalizeSync(lore, '2026-06-02T00:00:00Z');
+
+    const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    // function-form replace inserts md literally; the string form would turn
+    // $& into the token text and $$ into a single $ — these assertions catch that.
+    assert.match(libPage, /fix \$& and \$\$ and \$1 patterns/);
+    assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

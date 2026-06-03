@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { planSync, stampFrontmatter, buildIndex, finalizeSync } from '../lib/sync.js';
+import { planSync, stampFrontmatter, buildIndex, finalizeSync, renderDecisionHistory } from '../lib/sync.js';
 import { init } from '../lib/init.js';
 import { start, stop } from '../lib/serve.js';
 
@@ -133,6 +133,34 @@ test('CLI plan prints worklist JSON', () => {
 
 test('CLI without args exits non-zero', () => {
   assert.throws(() => execFileSync('node', ['lib/sync.js'], { cwd: process.cwd(), stdio: 'pipe' }));
+});
+
+test('renderDecisionHistory: empty → placeholder', () => {
+  assert.equal(renderDecisionHistory([]), '暂无 journal 原子（跑 /lore:mine 补全）。');
+});
+
+test('renderDecisionHistory: atom with why → bullet with why, short sha, date', () => {
+  const out = renderDecisionHistory([
+    { title: 'fix crawler', why: 'anti data blowup\nsecond line', commit: 'abc1234567', ts: '2026-06-01T08:00:00Z', kind: 'commit' },
+  ]);
+  assert.equal(out, '- **fix crawler** — anti data blowup (abc1234, 2026-06-01)');
+});
+
+test('renderDecisionHistory: atom without why → no why segment', () => {
+  const out = renderDecisionHistory([
+    { title: 'add site', why: '', commit: 'def4567890', ts: '2026-05-30T10:00:00Z', kind: 'commit' },
+  ]);
+  assert.equal(out, '- **add site** (def4567, 2026-05-30)');
+});
+
+test('renderDecisionHistory: multiple atoms sorted ts-desc; input not mutated', () => {
+  const atoms = [
+    { title: 'older', why: '', commit: 'aaaaaaa0', ts: '2026-05-01T00:00:00Z', kind: 'commit' },
+    { title: 'newer', why: '', commit: 'bbbbbbb0', ts: '2026-06-01T00:00:00Z', kind: 'commit' },
+  ];
+  const out = renderDecisionHistory(atoms);
+  assert.match(out, /newer[\s\S]*older/);   // newer first
+  assert.equal(atoms[0].title, 'older');     // input order unchanged
 });
 
 test('integration: init -> agent page -> sync finalize -> serve renders', async () => {

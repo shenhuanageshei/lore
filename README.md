@@ -25,6 +25,10 @@ node lib/mine.js <目标仓库>          # 回填（幂等，重跑只加新 com
 
 捕获链：`/lore:mine` 填 journal（生产者）→ 未来 `/lore:sync` 折叠进「决策历史」段（消费者）。component 打标需先 `/lore:init` 生成 `config.yml`。
 
+## `/lore:note`（已实现）
+
+决策当下记一条 decision 原子：`/lore:note "选 X 弃 Y 因为 Z"` → agent 定 `title`/`why`/`component` 调 `lib/note.js` 追加 `kind:decision`、`source:agent` 原子进 `.lore/journal/`。下次 `/lore:sync` 折进对应组件页的「决策历史」段。捕获三源之一（hook 机械骨架 · mine 历史回填 · note 人工 why）。
+
 ## `/lore:sync`（已实现）
 
 把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由 agent 读源码 LLM 写），机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme/journal 折叠推迟）。

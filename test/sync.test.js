@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { planSync, stampFrontmatter, buildIndex, finalizeSync, renderDecisionHistory } from '../lib/sync.js';
 import { init } from '../lib/init.js';
 import { start, stop } from '../lib/serve.js';
+import { appendAtom } from '../lib/journal.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
 
@@ -195,5 +196,62 @@ test('integration: init -> agent page -> sync finalize -> serve renders', async 
     } finally {
       await stop({ loreDir: lore });
     }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// agent page whose Decision history section is the injection token (new command format)
+function tokenPage(title, summary) {
+  return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
+    `## Current architecture\n\narch prose\n\n## Decision history\n\n{{LORE_JOURNAL}}\n\n` +
+    `## Cross-links\n\n- [[other]]\n`;
+}
+
+test('finalizeSync folds journal atoms into the {{LORE_JOURNAL}} token + stamps per-page counts', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), tokenPage('Lib', 'core'));
+    writeFileSync(join(compDir, 'other.md'), tokenPage('Other', 'x'));   // no matching atoms
+
+    const journalDir = join(lore, 'journal');
+    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'newer fix', why: 'because', facets: { component: ['lib'] } });
+    appendAtom(journalDir, { id: 'commit:b', ts: '2026-05-01T08:00:00Z', kind: 'commit', commit: 'bbbbbbb0', title: 'older fix', why: '', facets: { component: ['lib'] } });
+
+    finalizeSync(lore, '2026-06-02T00:00:00Z');
+
+    const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);                       // token replaced
+    assert.match(libPage, /- \*\*newer fix\*\* — because \(aaaaaaa, 2026-06-01\)/);
+    assert.match(libPage, /- \*\*older fix\*\* \(bbbbbbb, 2026-05-01\)/);
+    assert.match(libPage, /newer fix[\s\S]*older fix/);                          // ts desc
+    assert.match(libPage, /atoms: 2/);
+    assert.match(libPage, /commits: 2/);
+
+    const otherPage = readFileSync(join(compDir, 'other.md'), 'utf8');
+    assert.match(otherPage, /暂无 journal 原子/);
+    assert.match(otherPage, /atoms: 0/);
+
+    const index = readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8');
+    assert.match(index, /atoms: 2/);                                            // grand totals
+    assert.match(index, /commits: 2/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync backward-compat: page without token does not crash, still stamps counts', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), agentPage('Lib', 'core'));   // old format, no token
+    const journalDir = join(lore, 'journal');
+    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 't', why: '', facets: { component: ['lib'] } });
+
+    finalizeSync(lore, '2026-06-02T00:00:00Z');
+    const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.match(libPage, /暂无 journal 原子/);   // agent's own placeholder untouched (no token)
+    assert.match(libPage, /atoms: 1/);            // counts still stamped from journal
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -40,6 +40,10 @@ node lib/sync.js finalize <.lore目录>   # 盖 front-matter + INDEX + manifest
 
 O1 两阶段：`plan`（Node 出 worklist）→ agent 读源码写页正文 → `finalize`（Node 盖机械 front-matter + INDEX + emit manifest，复用 `lib/manifest.js`）。引导链：`/lore:init` → `/lore:sync` → `/lore:serve` 浏览真内容。「决策历史」段现由 finalize 机械折叠 `.lore/journal/` 原子（按 component facet 过滤、ts 倒序）填充 —— 先跑 `/lore:mine` 让 journal 有料。
 
+## `/lore:lint`（已实现）
+
+只读漂移报告：`node lib/lint.js <.lore目录>` → 报陈旧页（`code_sha` 落后 HEAD N commits）/ orphan（页无对应 code_root）/ missing（code_root 无页 → 提示 sync）。只报不改，exit 0（检测与修复分离：lint 报、sync 修）。stale 逻辑与 serve manifest 同源。
+
 ## `/lore:serve`（已实现）
 
 在浏览器中浏览 wiki —— 无需 Obsidian。

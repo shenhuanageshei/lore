@@ -1,11 +1,12 @@
 // test/lint.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { lintOrphans, lintMissing, lintStale, lint } from '../lib/lint.js';
+import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
 
@@ -109,5 +110,27 @@ test('CLI: clean repo prints clean and exits 0', () => {
     page(lore, 'lib', cur);
     const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
     assert.match(out, /clean/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('integration: sync then a new commit makes the page stale → lint reports it', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), `---\ntitle: Lib\nsummary: c\n---\n# component: Lib\n\n## Current architecture\n\nx\n\n## Decision history\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`);
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });   // stamps page code_sha = current HEAD
+    assert.equal(lint({ loreDir: lore }).stale.length, 0);   // page sha == HEAD → not stale
+    // a new commit moves HEAD forward → page is now behind
+    writeFileSync(join(root, 'lib', 'b.js'), 'export const y = 2;');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'add b'], { cwd: root });
+    const r = lint({ loreDir: lore });
+    assert.deepEqual(r.stale.map(s => s.page), ['lib']);
+    assert.ok(r.stale[0].behind >= 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

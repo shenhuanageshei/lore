@@ -7,6 +7,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { captureHead } from '../lib/hook.js';
 import { readAllAtoms } from '../lib/journal.js';
+import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-hook-')); }
 function gitRepo() {
@@ -61,5 +62,27 @@ test('CLI never throws / exits 0 even on a non-git dir', () => {
   const root = tmpDir();   // not a git repo
   try {
     execFileSync('node', ['lib/hook.js', root], { cwd: process.cwd() });   // must not throw
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('integration: init installs hook → a real commit auto-writes a journal atom', () => {
+  const root = gitRepo();   // helper already in this file: git init + user config, no commit yet
+  try {
+    // a discoverable code dir so init writes code_roots: [lib]
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    const r = init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    assert.equal(r.hook, 'installed');
+
+    // a real commit AFTER init → the installed post-commit hook fires and captures it
+    writeFileSync(join(root, 'lib', 'b.js'), 'export const y = 2;');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'add b'], { cwd: root });
+
+    const atoms = readAllAtoms(join(root, '.lore', 'journal'));
+    const added = atoms.find(a => a.title === 'add b');
+    assert.ok(added, 'hook should have captured the "add b" commit');
+    assert.equal(added.source, 'hook');
+    assert.deepEqual(added.facets.component, ['lib']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

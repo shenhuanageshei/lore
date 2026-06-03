@@ -364,3 +364,27 @@ test('finalizeSync folds both component and theme axes', () => {
     assert.match(index, /## Theme/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('integration: config theme → mine tags it → sync folds into theme page', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const lore = join(root, '.lore');
+    // rewrite config with code_roots + a theme whose keyword the commit will contain
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n  theme:\n    values:\n    - { id: quality, match: [accuracy] }\n');
+    // a commit whose subject contains the keyword
+    writeFileSync(join(root, 'lib', 'b.js'), 'y');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'improve accuracy'], { cwd: root });
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });   // tags theme:quality
+
+    const themeDir = join(lore, 'wiki', 'theme');
+    mkdirSync(themeDir, { recursive: true });
+    writeFileSync(join(themeDir, 'quality.md'), tokenPage('Quality', 'q'));   // agent theme page (stub)
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+
+    assert.match(readFileSync(join(themeDir, 'quality.md'), 'utf8'), /improve accuracy/);   // theme page folds the commit
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

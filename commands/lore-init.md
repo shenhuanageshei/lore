@@ -29,4 +29,5 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/init.js" "$(pwd)"
 - 跑完把发现的 `code_roots` 摆给用户：这是**自动提议**，邀请用户编辑 `.lore/config.yml`（重命名 / 分组 / 删 / 增）。
 - 下一步：`/lore:sync` 合成 wiki（之后才能 `/lore:serve` 浏览）。
 - 重跑 `/lore:init` 安全：刷新壳、保留用户已编辑的 `config.yml`。
-- 零侵入：只写 `.lore/` + 给 `.gitignore` 追加一行，绝不改业务源码。本版**不安装 post-commit hook**（hook 随后续 journal 子系统落地）。
+- 零侵入：只写 `.lore/` + 给 `.gitignore` 追加一行 + 装一个 post-commit hook（git 机制，非业务源码），绝不改业务源码。
+- 现装 **post-commit hook**：每 commit 自动写一条 journal 骨架原子（机械、零 LLM、不阻断 commit）。已有 hook / 设了 core.hooksPath / 非 git repo → 跳过并提示（不覆盖你的 hook）。

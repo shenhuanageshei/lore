@@ -13,7 +13,7 @@ node lib/init.js <目标仓库>          # 引导（打印发现的 code_roots�
 
 自动发现组件（兜底顶层代码目录 + Python 包 + JS workspaces）写进 `.lore/config.yml`（已存在则保留）；
 拷壳到 `.lore/site/`（覆盖刷新）；给目标仓库 `.gitignore` 追加 `.lore/.state/`。重跑安全：刷新壳、不毁已编辑的 config。
-**本版不装 post-commit hook**（随后续 journal 子系统落地）。引导后跑 `/lore:sync` 才能 `/lore:serve` 浏览。
+init 现装 post-commit hook —— 每 commit 自动写 journal 骨架原子（已有 hook / core.hooksPath / 非 git 则跳过）。引导后跑 `/lore:sync` 才能 `/lore:serve` 浏览。
 
 ## `/lore:mine`（已实现）
 

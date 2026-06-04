@@ -32,7 +32,7 @@ test('planSync returns empty when config missing', () => {
   try {
     const lore = join(root, '.lore');
     mkdirSync(lore, { recursive: true });
-    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], worklist: [] });
+    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], flows: [], worklist: [] });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -386,5 +386,30 @@ test('integration: config theme → mine tags it → sync folds into theme page'
     execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
 
     assert.match(readFileSync(join(themeDir, 'quality.md'), 'utf8'), /improve accuracy/);   // theme page folds the commit
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('planSync includes flow worklist items', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n  flow:\n    values:\n    - { id: pipe, spans: [lib] }\n');
+    const { worklist, flows } = planSync(lore);
+    assert.deepEqual(flows, [{ id: 'pipe', spans: ['lib'] }]);
+    assert.ok(worklist.some(w => w.axis === 'flow' && w.id === 'pipe' && w.path === 'flow/pipe.md'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync folds the flow axis', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'flow'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', 'flow', 'pipe.md'), tokenPage('Pipe', 'p'));
+    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-03T00:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'flow fix', why: '', facets: { component: ['lib'], flow: ['pipe'], theme: [] } });
+    finalizeSync(lore, '2026-06-03T00:00:00Z');
+    assert.match(readFileSync(join(lore, 'wiki', 'flow', 'pipe.md'), 'utf8'), /- \*\*flow fix\*\*/);
+    assert.match(readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8'), /## Flow/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

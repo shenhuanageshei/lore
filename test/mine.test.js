@@ -221,3 +221,25 @@ test('commitAtom: flows param tags facets.flow; default empty', () => {
   assert.deepEqual(commitAtom(raw, ['lib']).facets.flow, []);   // default no flows
   assert.deepEqual(commitAtom(raw, ['lib'], 'miner:commits', [{ id: 'q', match: ['s'] }]).facets.theme, ['q']);   // themes (4-arg) still works
 });
+
+test('mineCommits: passes flows → commit atoms get facets.flow', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'change lib');
+    const atoms = mineCommits(root, ['lib'], [], [{ id: 'f1', spans: ['lib'] }]);
+    assert.deepEqual(atoms[0].facets.flow, ['f1']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('mine CLI reads config flows', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'touch lib');
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n  flow:\n    values:\n    - { id: pipe, spans: [lib] }\n');
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });
+    const a = readAllAtoms(join(lore, 'journal')).find(x => x.title === 'touch lib');
+    assert.deepEqual(a.facets.flow, ['pipe']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

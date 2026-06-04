@@ -6,12 +6,14 @@
 
 ## 近期（高价值、自洽）
 
-### changelog / pitfalls miner（母 §4③ 另两源）
-- `/lore:mine` 现只挖 commits。加两个可插拔 source extractor：
-  - **changelog**：解析 `CHANGELOG.md`（Keep-a-Changelog `## [x.y.z] - date` 段）→ `kind:decision` 原子。半通用。
-  - **pitfalls**：解析 CLAUDE.md 的 Problem/Fix/Prevention 结构化踩坑 → `kind:incident` 富 why 原子。格式特定（试验田 threat-intel 的金矿）。
-- config `journal.mine: [commits, changelog, claude_md_pitfalls]` 已声明哪些源跑；按 config gate。
-- 触发：想把现有产物（CHANGELOG / 踩坑）一夜变成可导航原子流时。
+### 文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源，⭐ 当前最大缺口）
+- **现状**：journal 只来自 commits（hook/mine）+ agent note。`docs/` 下的设计文档/ADR/spec/runbook、`CHANGELOG.md`、`CLAUDE.md` 踩坑 —— 全部不进 wiki（只在 commit message 间接反映）。threat-intel 的 `docs/` + 186KB `CLAUDE.md`、lore 自己的 `docs/superpowers/specs` 都是金矿却隐形。
+- **做**：加可插拔 doc extractor（config `journal.mine` gate）：
+  - `docs/**/*.md` → 每文档（或每 H2 段）一条 `kind:decision`/`kind:doc` 原子，facet 按路径/关键词标，`refs.files` 指原文档。
+  - `CHANGELOG.md`（Keep-a-Changelog `## [x.y.z] - date` 段）→ `kind:decision`。半通用。
+  - `CLAUDE.md` 结构化踩坑（Problem/Fix/Prevention）→ `kind:incident` 富 why。格式特定（threat-intel 金矿）。
+- **难点**：去重（文档常复述 commit 已说的）、增量（文档改了重摄取）、facet 归属（跨多组件的设计文档）。
+- 价值：把团队已写的知识一夜变成可导航 wiki —— 用户明确点的缺口。config `journal.mine: [commits, docs, changelog, claude_md_pitfalls]` gate 哪些源跑。
 
 ### per-facet confidence 显示（母 §4 line 190）
 - 现 commit 原子整体 `confidence:'EXTRACTED'`。母 spec：component=EXTRACTED、flow/theme=INFERRED（机械推断）。
@@ -22,6 +24,20 @@
 - `/lore:note` 现只产新 decision 原子。加 **enrich 已有 commit 骨架**：同 `commit:<hash>` append 新行补 `why`（append-only 神圣，不改旧行）。
 - 配套 **journal fold-by-id**：`readAllAtoms` 之上加按 id 折叠（取并集/最新）；sync / ask / lint 消费 folded 原子。保留 骨架→enriched 演化轨迹，审计友好。
 - 中等：碰 journal 读层 + 所有消费者。
+
+## 呈现（wiki 渲染，⭐ 用户明确要）
+
+### mermaid 架构图 + 数据流图
+- **现状**：页「当前架构」全文字；壳 `renderMarkdown`（site/shell.mjs）把 ```mermaid``` 当普通代码块渲染（纯文本）。
+- **做**：(a) 壳 `renderMarkdown` 识别 ```mermaid``` → `<div class="mermaid">`；vendored `mermaid.min.js` 随 `site/` 由 init 拷入。**不破零依赖**——零依赖是 Node runtime 不变量，静态壳资产不算；vendor 而非 CDN → 保持离线 + 127-only。(b) `/lore:sync` 指引 agent：component 页出架构图、flow 页出数据流图、theme 页涉及流程时也出图。
+- **为什么好**：mermaid 是文本 → git 可 diff、随 journal/commit 一起演进（远胜二进制 PNG），完全契合 lore git-native 哲学。flow 轴（m1→m5）天然就是 flowchart。
+- 高价值、接缝干净（壳 + sync 命令层，lib 几乎不动）。
+
+### 双语切换（中/EN）
+- **现状**：壳有主题切换（暗/亮/护眼）但无语言概念；页是单语（agent 写啥语言就啥）。
+- **做**：(a) 壳加 `#lang` 选择器（localStorage，同 `wireTheme` 模式）。(b) agent 写页时出双语 prose —— 配对段（`## Current architecture` + `## 当前架构`）或配对文件（`lib.md`/`lib.en.md`），壳按 lang 切显。
+- **诚实约束**：决策历史是 journal 折叠 = commit message 原文（不可变事实），不机械翻译 → 决策史保持源语言（或未来 LLM 翻译折叠，贵）。双语只覆盖 agent 写的「当前架构/状态」prose。
+- 中等：agent 2× prose 成本（sync 时）；壳 + sync 模板改。
 
 ## 中期（消费纪律 + 质量）
 

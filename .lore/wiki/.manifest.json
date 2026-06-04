@@ -1,0 +1,44 @@
+{
+  "generated": "2026-06-04T06:16:23.739Z",
+  "current_code_sha": "9f0ab79",
+  "axes": [
+    {
+      "id": "INDEX",
+      "label": "INDEX",
+      "pages": [
+        {
+          "id": "INDEX",
+          "title": "Index",
+          "summary": "table of contents",
+          "last_updated": "2026-06-04",
+          "path": "INDEX.md",
+          "stale": 0,
+          "code_sha": "9f0ab79",
+          "synthesized_from": {
+            "atoms": 127,
+            "commits": 127
+          }
+        }
+      ]
+    },
+    {
+      "id": "component",
+      "label": "Component",
+      "pages": [
+        {
+          "id": "lib",
+          "title": "lib — lore 引擎",
+          "summary": "零依赖 Node 确定性核心，跑「捕获 → 合成 → 消费」全闭环，唯一例外把 prose 交给 agent。",
+          "last_updated": "2026-06-04",
+          "path": "component/lib.md",
+          "stale": 0,
+          "code_sha": "9f0ab79",
+          "synthesized_from": {
+            "atoms": 70,
+            "commits": 70
+          }
+        }
+      ]
+    }
+  ]
+}

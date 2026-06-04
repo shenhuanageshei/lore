@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { planSync, stampFrontmatter, buildIndex, finalizeSync, renderDecisionHistory } from '../lib/sync.js';
+import { planSync, stampFrontmatter, buildIndex, finalizeSync, renderDecisionHistory, foldJournal } from '../lib/sync.js';
 import { init } from '../lib/init.js';
 import { start, stop } from '../lib/serve.js';
 import { appendAtom } from '../lib/journal.js';
@@ -306,6 +306,78 @@ test('finalizeSync injects journal markdown literally — no $-pattern corruptio
     // $& into the token text and $$ into a single $ — these assertions catch that.
     assert.match(libPage, /fix \$& and \$\$ and \$1 patterns/);
     assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('foldJournal: single token folds journal md (regression), no warning', () => {
+  const warnings = [];
+  const text = '# C\n\n## Decision history\n\n{{LORE_JOURNAL}}\n';
+  const out = foldJournal(text, '- **x** (2026-06-01)', { page: 'component/c.md', warn: m => warnings.push(m) });
+  assert.match(out, /- \*\*x\*\* \(2026-06-01\)/);
+  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
+  assert.equal(warnings.length, 0);
+});
+
+test('foldJournal: zero tokens → text unchanged, no warning (own-history pages are a valid pattern)', () => {
+  const warnings = [];
+  const text = '# C\n\n## Decision history\n\n暂无 journal 原子。\n';
+  const out = foldJournal(text, '- **x**', { page: 'component/c.md', warn: m => warnings.push(m) });
+  assert.equal(out, text);                              // page untouched, no fold slot
+  assert.equal(warnings.length, 0);                     // 0 is silent; only >1 (corruption) warns
+});
+
+test('foldJournal: multiple tokens → folds into LAST, blanks earlier, warns, no literal token', () => {
+  const warnings = [];
+  const text =
+    '# C\n\n## Current architecture\n\nThe {{LORE_JOURNAL}} token marks history.\n\n' +
+    '## Decision history\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n';
+  const md = '- **real entry** (2026-06-01)';
+  const out = foldJournal(text, md, { page: 'component/c.md', warn: m => warnings.push(m) });
+  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);                                  // no literal token survives
+  assert.match(out, /## Decision history\n\n- \*\*real entry\*\* \(2026-06-01\)\n/); // folded into the LAST slot
+  assert.match(out, /The  token marks history\./);                                  // earlier prose token blanked
+  assert.equal((out.match(/real entry/g) || []).length, 1);                         // journal md inserted exactly once
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /component\/c\.md/);                                     // names the page
+  assert.match(warnings[0], /expected 1/);                                          // names the ambiguity
+});
+
+test('foldJournal: multi-token path inserts md literally — $-pattern safe', () => {
+  const text = 'a {{LORE_JOURNAL}} b {{LORE_JOURNAL}} c';
+  const out = foldJournal(text, 'fix $& and $$ and $1', { page: 'p', warn: () => {} });
+  assert.match(out, /fix \$& and \$\$ and \$1/);
+  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
+});
+
+// agent page that mentions the token in prose AND in the real Decision-history slot
+function twoTokenPage(title, summary) {
+  return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
+    `## Current architecture\n\nThe {{LORE_JOURNAL}} token marks where history goes.\n\n` +
+    `## Decision history\n\n{{LORE_JOURNAL}}\n\n` +
+    `## Cross-links\n\n- [[other]]\n`;
+}
+
+test('finalizeSync: duplicate {{LORE_JOURNAL}} tokens fold into the last, ship no literal token + warn', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), twoTokenPage('Lib', 'core'));
+    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'real fix', why: 'reason', facets: { component: ['lib'] } });
+
+    const warnings = [];
+    finalizeSync(lore, '2026-06-02T00:00:00Z', { warn: m => warnings.push(m) });
+
+    const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);                 // no literal token shipped
+    assert.match(libPage, /## Decision history\n\n- \*\*real fix\*\*/);  // folded into the LAST (decision-history) slot
+    assert.match(libPage, /The  token marks where history goes\./);      // earlier prose token blanked
+    assert.equal((libPage.match(/real fix/g) || []).length, 1);          // journal injected exactly once
+    assert.match(libPage, /atoms: 1/);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /component\/lib\.md/);
+    assert.match(warnings[0], /expected 1/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -197,3 +197,20 @@ test('mine CLI reads config themes', () => {
     assert.deepEqual(a.facets.theme, ['perf']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+import { tagFlows } from '../lib/mine.js';
+
+const FLOWS = [{ id: 'pipeline', spans: ['m1', 'm3'] }, { id: 'dedup', spans: ['shared'] }];
+
+test('tagFlows: component∩spans non-empty → flow id, sorted', () => {
+  assert.deepEqual(tagFlows(['m3', 'shared'], FLOWS), ['dedup', 'pipeline']);
+  assert.deepEqual(tagFlows(['m1'], FLOWS), ['pipeline']);
+  assert.deepEqual(tagFlows(['lib'], FLOWS), []);
+  assert.deepEqual(tagFlows([], FLOWS), []);
+});
+
+test('tagFlows: does not mutate input', () => {
+  const f = [{ id: 'a', spans: ['x'] }];
+  tagFlows(['x'], f);
+  assert.equal(f.length, 1);
+});

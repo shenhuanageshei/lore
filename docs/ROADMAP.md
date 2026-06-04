@@ -25,6 +25,18 @@
 
 ## 中期（消费纪律 + 质量）
 
+### 单机共享 wiki server（多 repo 聚合门户）⚑ 待头脑风暴
+- **现状痛点**：每 repo 独立 server，各占一个端口（7842 先到先得、其余随机），`detached` 常驻 → 易堆积、无 stop-all、2+ repo 端口不固定、无中央登记。
+- **目标**：**单机一个常驻 server** 聚合本机所有 lore repo；顶层先选 repo → 再进该 repo 的多轴 wiki（按 repo 切分页/导航）。
+- **待定（brainstorm 项）**：
+  - 注册表：server 怎么发现本机各 repo 的 `.lore/`？中央 `~/.lore/registry.json`（init 时登记）vs 扫描 vs 手动 add。
+  - 路由 + namespace：`/<repo>/wiki/…` 路径前缀？manifest 怎么按 repo 命名空间聚合。
+  - 单一稳定端口（固定 7842）+ 单进程生命周期（替代 per-repo `.state/serve.pid`）。
+  - 安全：仍只绑 `127.0.0.1`；跨 repo 只读；repo 路径白名单 + 防目录穿越（聚合多路径放大攻击面）。
+  - 壳改造：顶层 repo 选择器 UI；跨 repo 搜索（全局 vs 当前 repo）。
+  - 与现有 per-repo serve 的兼容/迁移（保留单 repo fallback？）。
+- **踏脚石（低风险过渡）**：先做 `/lore:serve --list` / `--stop-all`（扫已知 `.state/serve.pid`）+ 每 repo 稳定端口（`hash(loreDir)→7000-7999`，同 repo URL 永远一致），再演进到聚合门户。
+
 ### resident-mode（母 §5 消费）
 - 让 agent **grep / 读大文件排查前先查 `.lore/wiki/INDEX.md` + 相关 facet 页**。
 - 形态：插件注入 CLAUDE.md 规则 / PreToolUse 提醒（plugin 打包 / hook 配置活，非可测 lib）。把 `/lore:ask` 的「按需查」升级成「always-on 纪律」。

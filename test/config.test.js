@@ -36,3 +36,21 @@ test('parseConfigThemes: uncommented themes (field order independent)', () => {
 test('parseConfigThemes: ignores flow items (spans, no match)', () => {
   assert.deepEqual(parseConfigThemes('    - { id: f1, spans: [lib] }\n    - { id: x, match: [a] }\n'), [{ id: 'x', match: ['a'] }]);
 });
+
+import { parseConfigFlows } from '../lib/config.js';
+
+test('parseConfigFlows: commented example → []', () => {
+  assert.deepEqual(parseConfigFlows('  flow:\n    values: []\n    # - { id: article-pipeline, spans: [lib] }\n'), []);
+});
+
+test('parseConfigFlows: uncommented flows (field order independent)', () => {
+  const cfg = '  flow:\n    values:\n    - { id: pipeline, spans: [m1, m3, shared] }\n    - { spans: [lib], id: dedup }\n';
+  assert.deepEqual(parseConfigFlows(cfg), [
+    { id: 'pipeline', spans: ['m1', 'm3', 'shared'] },
+    { id: 'dedup', spans: ['lib'] },
+  ]);
+});
+
+test('parseConfigFlows: ignores theme items (match, no spans)', () => {
+  assert.deepEqual(parseConfigFlows('    - { id: quality, match: [a] }\n    - { id: f1, spans: [lib] }\n'), [{ id: 'f1', spans: ['lib'] }]);
+});

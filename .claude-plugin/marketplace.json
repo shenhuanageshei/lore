@@ -1,0 +1,11 @@
+{
+  "name": "lore-local",
+  "owner": { "name": "lore" },
+  "plugins": [
+    {
+      "name": "lore",
+      "source": "./",
+      "description": "Repo living-docs / decision-history framework — capture → synthesize → consume"
+    }
+  ]
+}

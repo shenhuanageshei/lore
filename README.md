@@ -40,7 +40,9 @@ node lib/sync.js finalize <.lore目录>   # 盖 front-matter + INDEX + manifest
 
 O1 两阶段：`plan`（Node 出 worklist）→ agent 读源码写页正文 → `finalize`（Node 盖机械 front-matter + INDEX + emit manifest，复用 `lib/manifest.js`）。引导链：`/lore:init` → `/lore:sync` → `/lore:serve` 浏览真内容。「决策历史」段现由 finalize 机械折叠 `.lore/journal/` 原子（按 component facet 过滤、ts 倒序）填充 —— 先跑 `/lore:mine` 让 journal 有料。
 
-本版产 component + theme 两轴页：theme 由 config `match:` 关键词自动给 commit 原子打标（mine/hook），sync 产 `theme/<id>.md` 折该主线原子。flow 轴随后。
+本版产 component + theme + flow 三轴页：theme 由 config `match:` 关键词自动给 commit 原子打标（mine/hook），sync 产 `theme/<id>.md` 折该主线原子。
+
+flow 轴：config `flow.values` 用 `spans:[组件…]` 声明一条数据流跨哪些组件；原子的 component ∈ 某 flow 的 spans → 自动标该 flow；sync 产 `flow/<id>.md`。lore 三轴齐（component/theme/flow）。
 
 ## `/lore:lint`（已实现）
 

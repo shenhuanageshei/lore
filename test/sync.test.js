@@ -413,3 +413,25 @@ test('finalizeSync folds the flow axis', () => {
     assert.match(readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8'), /## Flow/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('integration: config flow → mine tags it → sync folds into flow page', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const lore = join(root, '.lore');
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n  flow:\n    values:\n    - { id: pipe, spans: [lib] }\n');
+    writeFileSync(join(root, 'lib', 'b.js'), 'y');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'touch lib pipeline'], { cwd: root });
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });   // atom component:[lib] → flow:[pipe]
+
+    const flowDir = join(lore, 'wiki', 'flow');
+    mkdirSync(flowDir, { recursive: true });
+    writeFileSync(join(flowDir, 'pipe.md'), tokenPage('Pipe', 'p'));
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+
+    assert.match(readFileSync(join(flowDir, 'pipe.md'), 'utf8'), /touch lib pipeline/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

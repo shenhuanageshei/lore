@@ -54,3 +54,33 @@ test('CLI: prints candidates; no-manifest → exit non-zero', () => {
     rmSync(root2, { recursive: true, force: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+import { init } from '../lib/init.js';
+
+function gitRepo() {
+  const root = tmpDir();
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  writeFileSync(join(root, 'f.txt'), 'x');
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return root;
+}
+
+test('integration: init → write page → sync → ask finds it', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), `---\ntitle: Lib Core\nsummary: dedup ZSET accuracy\n---\n# component: lib\n\n## Current architecture\n\nx\n\n## Decision history\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`);
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });   // emits manifest with the page
+
+    const out = execFileSync('node', ['lib/ask.js', lore, 'dedup accuracy'], { cwd: process.cwd() }).toString();
+    assert.match(out, /component\/lib\.md/);   // ask finds the page by its summary keywords
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

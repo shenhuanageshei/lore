@@ -64,6 +64,10 @@ node lib/serve.js stop  --lore <目标仓库>/.lore    # 停止
 
 服务器仅绑定 `127.0.0.1`，绝不暴露到局域网；serve 只读取 `.lore/`，从不修改目标仓库源码。
 
+## `/lore:ask`（已实现）
+
+从 wiki 答问：`node lib/ask.js <.lore目录> "<问题>"` → 按关键词命中 title+summary 排序的候选页 → agent 读 top 页从合成页（当前架构+决策历史）答，不重 grep 代码（resident-mode payoff，省 token）。只读，复用 sync 产的 `.manifest.json`。
+
 ## 开发
 
 ```bash

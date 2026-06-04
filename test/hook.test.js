@@ -97,3 +97,14 @@ test('integration: init installs hook → a real commit auto-writes a journal at
     assert.deepEqual(added.facets.component, ['lib']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('captureHead tags flow from config flows', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'lib change');
+    const journalDir = join(root, '.lore', 'journal');
+    const r = captureHead({ repoRoot: root, journalDir, codeRoots: ['lib'], flows: [{ id: 'pipe', spans: ['lib'] }] });
+    assert.equal(r.added, 1);
+    assert.deepEqual(readAllAtoms(journalDir)[0].facets.flow, ['pipe']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -245,6 +245,25 @@ test('installHook: warns when core.hooksPath set', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('installHook: core.hooksPath at a DIFFERENT dir → skips, writes no hook', () => {
+  const root = bareGitRepo();
+  try {
+    execFileSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: root });
+    assert.equal(installHook(root), 'hookspath-set');
+    assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), false);  // untouched
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('installHook: core.hooksPath at the repo default .git/hooks → installs', () => {
+  const root = bareGitRepo();
+  try {
+    execFileSync('git', ['config', 'core.hooksPath', '.git/hooks'], { cwd: root });   // resolves equal to default
+    assert.equal(installHook(root), 'installed');
+    const hook = readFileSync(join(root, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(hook, /# lore:post-commit/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('installHook: no-git dir', () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-nogit-'));
   try {

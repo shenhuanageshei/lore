@@ -1,75 +1,118 @@
 # lore
 
-面向 AI Agent 与开发者的代码仓库活文档 / 决策历史框架。设计文档见
-`docs/superpowers/specs/`。
+> **面向 AI Agent 与开发者的代码仓库活文档 / 决策历史框架。**
+> 捕获每个决策与变更 → 合成可导航的多轴 wiki → agent 读 wiki 答问而非重头读代码。
+> 零外部依赖 · 零侵入目标仓库 · 确定性核心可测 / 创造性 prose 交给 agent。
 
-## `/lore:init`（已实现）
+---
 
-在目标仓库引导 lore：搭 `.lore/` 骨架、把浏览器壳拷进 `.lore/site/`、自动发现组件生成 `config.yml`。
+## 是什么 / 为什么
 
-```bash
-node lib/init.js <目标仓库>          # 引导（打印发现的 code_roots）
-```
+代码会变，但**「为什么这么做」**总在流失——埋在 commit body、CHANGELOG、踩坑记录、和 agent 被压缩掉的上下文里。下次再碰这块代码，人和 agent 都得重头 grep、重读、重推理。
 
-自动发现组件（兜底顶层代码目录 + Python 包 + JS workspaces）写进 `.lore/config.yml`（已存在则保留）；
-拷壳到 `.lore/site/`（覆盖刷新）；给目标仓库 `.gitignore` 追加 `.lore/.state/`。重跑安全：刷新壳、不毁已编辑的 config。
-init 现装 post-commit hook —— 每 commit 自动写 journal 骨架原子（已有 hook / core.hooksPath / 非 git 则跳过）。引导后跑 `/lore:sync` 才能 `/lore:serve` 浏览。
+lore 把这些**决策与架构知识沉淀成 git 内的活文档**：
 
-## `/lore:mine`（已实现）
+- **捕获**（durable）：每个 commit 自动留一条带 what/when/files/component 的耐久原子（抗上下文压缩的地板）；agent 在决策当下补「为什么」；miner 回填历史。
+- **合成**（synthesize）：把代码 + journal 原子合成多轴 wiki 页（component / theme / flow），每页含「当前架构 / 决策历史 / 交叉链接」三段。
+- **消费**（consume）：agent 带问题查 wiki（合成页 token 远低于重读代码），浏览器壳给人看。
 
-bootstrap 回填 journal：挖 `git log` 历史 → 每个非 merge commit 一条 commit 原子（`title`/`why`/变更文件 + `component` facet 由路径→`code_roots` 机械推导），按 `commit:<sha>` 去重，写 `.lore/journal/YYYY/MM/*.ndjson`。纯确定性，零 LLM。本版只挖 commits。
+知识活在 `.lore/` 内、随 git 跟踪 → 「commit X 时架构长啥样」「这条质量主线怎么演进」全靠 git 原生历史免费拿到，分支局部 wiki 匹配分支代码。
 
-```bash
-node lib/mine.js <目标仓库>          # 回填（幂等，重跑只加新 commit）
-```
+## 核心理念
 
-捕获链：`/lore:mine` 填 journal（生产者）→ 未来 `/lore:sync` 折叠进「决策历史」段（消费者）。component 打标需先 `/lore:init` 生成 `config.yml`。
+| 理念 | 含义 |
+|---|---|
+| **Journal-first** | `.lore/journal/` 的 append-only 决策原子是**唯一耐久知识层**。wiki 是它的物化视图（可 nuke 重建）。 |
+| **三源捕获** | `hook`（每 commit 机械骨架，零 LLM，<50ms，永不阻断 commit）+ `mine`（回填历史）+ `note`（agent 补 why）。 |
+| **确定性 / LLM 分层** | 确定性活（捕获、folding、manifest、lint、检索）纯 Node 可测；只有「当前架构」prose 交给 agent。→ 廉价的活可自动/秒级，贵的 LLM 活手动触发。 |
+| **零依赖** | 纯 Node 内置模块，含自写的 config YAML 子集解析器。无 `node_modules`。 |
+| **零侵入** | 只写 `.lore/` + 一个 `.git/hooks/post-commit`（git 机制，非业务源码，唯一例外）。卸载 = 删 `.lore/` + 摘 hook，源码丝毫不动。 |
 
-## `/lore:note`（已实现）
-
-决策当下记一条 decision 原子：`/lore:note "选 X 弃 Y 因为 Z"` → agent 定 `title`/`why`/`component` 调 `lib/note.js` 追加 `kind:decision`、`source:agent` 原子进 `.lore/journal/`。下次 `/lore:sync` 折进对应组件页的「决策历史」段。捕获三源之一（hook 机械骨架 · mine 历史回填 · note 人工 why）。
-
-## `/lore:sync`（已实现）
-
-把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由 agent 读源码 LLM 写），机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme/journal 折叠推迟）。
+## 快速上手
 
 ```bash
-node lib/sync.js plan <.lore目录>       # 出 worklist（agent 据此逐页合成）
-node lib/sync.js finalize <.lore目录>   # 盖 front-matter + INDEX + manifest
+# 0. 全局装插件（Claude Code 插件）。lore 引擎本身在 D:\workspace\lore，与目标 repo 隔离。
+
+# 1. 在目标仓库引导：搭 .lore/、自动发现组件、装 post-commit hook
+node lib/init.js /path/to/your-repo
+
+# 2.（可选）回填历史：git log → commit 原子
+node lib/mine.js /path/to/your-repo
+
+# 3. 合成 wiki：plan → agent 读源码写页 → finalize（折 journal + INDEX + manifest）
+node lib/sync.js plan     /path/to/your-repo/.lore   # agent 据 worklist 逐页写
+node lib/sync.js finalize /path/to/your-repo/.lore
+
+# 4. 浏览（浏览器，无需 Obsidian）
+node lib/serve.js start --lore /path/to/your-repo/.lore   # 打印 127.0.0.1 URL
+node lib/serve.js stop  --lore /path/to/your-repo/.lore
+
+# 5. agent 答问（从 wiki 检索）
+node lib/ask.js /path/to/your-repo/.lore "M3 的准确率为什么这么调"
+
+# 漂移检查（只读）
+node lib/lint.js /path/to/your-repo/.lore
 ```
 
-O1 两阶段：`plan`（Node 出 worklist）→ agent 读源码写页正文 → `finalize`（Node 盖机械 front-matter + INDEX + emit manifest，复用 `lib/manifest.js`）。引导链：`/lore:init` → `/lore:sync` → `/lore:serve` 浏览真内容。「决策历史」段现由 finalize 机械折叠 `.lore/journal/` 原子（按 component facet 过滤、ts 倒序）填充 —— 先跑 `/lore:mine` 让 journal 有料。
+> 实际使用走 slash 命令（`/lore:init`、`/lore:sync` …，定义在 `commands/`）；上面的 `node lib/*.js` 是其底层 CLI。
 
-本版产 component + theme + flow 三轴页：theme 由 config `match:` 关键词自动给 commit 原子打标（mine/hook），sync 产 `theme/<id>.md` 折该主线原子。
+## 命令
 
-flow 轴：config `flow.values` 用 `spans:[组件…]` 声明一条数据流跨哪些组件；原子的 component ∈ 某 flow 的 spans → 自动标该 flow；sync 产 `flow/<id>.md`。lore 三轴齐（component/theme/flow）。
+| 命令 | 角色 | 写什么 | LLM? |
+|---|---|---|---|
+| `/lore:init` | 脚手架 | `.lore/` 骨架 + `config.yml`（自动发现组件）+ 拷壳 + 装 post-commit hook | 否 |
+| **post-commit hook** | 捕获①（自动） | 每 commit 一条 commit 骨架原子（component facet 路径推导） | 否 |
+| `/lore:mine` | 捕获③（回填） | `git log` 全历史 → commit 原子（按 sha 去重，幂等） | 否 |
+| `/lore:note` | 捕获②（人工 why） | agent 决策当下记 `kind:decision` 原子（why + facets） | agent |
+| `/lore:sync` | 合成 | component/theme/flow 三轴页（agent 写架构 prose；Node 折 journal + INDEX + manifest） | 混合 |
+| `/lore:serve` | 浏览 | 起本地哑服务器 + 浏览器壳（侧栏/渲染/搜索/多主题），只读 | 否 |
+| `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
+| `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing），不自动改 | 否 |
 
-## `/lore:lint`（已实现）
+## 架构
 
-只读漂移报告：`node lib/lint.js <.lore目录>` → 报陈旧页（`code_sha` 落后 HEAD N commits）/ orphan（页无对应 code_root）/ missing（code_root 无页 → 提示 sync）。只报不改，exit 0（检测与修复分离：lint 报、sync 修）。stale 逻辑与 serve manifest 同源。
-
-## `/lore:serve`（已实现）
-
-在浏览器中浏览 wiki —— 无需 Obsidian。
-
-```bash
-node lib/serve.js start --lore <目标仓库>/.lore    # 启动（打印 URL）
-node lib/serve.js stop  --lore <目标仓库>/.lore    # 停止
+```
+目标仓库/
+├── .lore/                       # git 跟踪（除 .state/）
+│   ├── config.yml               # 唯一存放本 repo 特定信息处（axes / code_roots / theme.match / flow.spans / journal）
+│   ├── journal/YYYY/MM/*.ndjson # append-only 决策原子（耐久知识层）
+│   ├── wiki/                    # 合成的物化视图
+│   │   ├── INDEX.md             # 全轴目录（人读）
+│   │   ├── .manifest.json       # 机读投影（壳 + ask 消费）
+│   │   ├── component/<id>.md    # 轴：代码结构
+│   │   ├── theme/<id>.md        # 轴：横切主线（关键词 match 打标）
+│   │   └── flow/<id>.md         # 轴：数据流（component ∈ spans 打标）
+│   ├── site/index.html          # 浏览器壳（init 拷入）
+│   └── .state/                  # 引擎缓存 + serve.pid（gitignored）
+└── .git/hooks/post-commit       # lore 装的唯一 .git 产物
 ```
 
-一个哑静态服务器（依次探测 `python3` → `python` → 内置 Node 兜底）伺服 `.lore/`；
-`site/` 下的免构建壳在浏览器端渲染 wiki（侧栏导航、Markdown 渲染、`[[wikilink]]`
-壳内跳转、全文搜索、鲜度元数据、多主题）。壳消费的 manifest 由
-`node lib/manifest.js <目标仓库>/.lore` 生成（后续会作为 `/lore:sync` 的收尾步骤调用）。
+**原子 schema**（ndjson 一行一原子）：`id · ts · kind(commit|decision) · commit · title · why · what_changed · facets{component,flow,theme} · refs{files,pitfall,related} · source(hook|agent|miner:commits) · enriched · confidence`。
 
-服务器仅绑定 `127.0.0.1`，绝不暴露到局域网；serve 只读取 `.lore/`，从不修改目标仓库源码。
+**三轴打标**：component = 变更路径前缀匹配 `code_roots`；theme = `title+why` 含 config `match:` 关键词（子串，大小写无关）；flow = 原子的 component ∈ config flow 的 `spans`。
 
-## `/lore:ask`（已实现）
+**引擎文件**（`lib/`，全零依赖）：`config` `journal` `mine` `hook` `note` `sync` `manifest` `serve` `lint` `ask` `init` + `server.js`（serve 兜底）。
 
-从 wiki 答问：`node lib/ask.js <.lore目录> "<问题>"` → 按关键词命中 title+summary 排序的候选页 → agent 读 top 页从合成页（当前架构+决策历史）答，不重 grep 代码（resident-mode payoff，省 token）。只读，复用 sync 产的 `.manifest.json`。
+## 不变量（测试显式守）
+
+- **零侵入**：跑完整 `init→mine→sync→serve` 后，`git status` 对业务源码 0 改动；唯一写入 = `.lore/` + `.git/hooks/post-commit`。
+- **物化视图**：nuke `wiki/` 重 sync → 同结构页 + 同 `.manifest.json`。
+- **best-effort hook**：hook 失败/坏 repo → exit 0，绝不阻断 commit。
+- **journal 神圣**：append-only，永不覆写。
 
 ## 开发
 
 ```bash
-node --test        # 运行全部测试（零外部依赖）
+node --test        # 全部测试（152，零外部依赖）
 ```
+
+- 流程：每功能走 brainstorming → spec（`docs/superpowers/specs/`）→ plan（`docs/superpowers/plans/`）→ TDD → 双审 → 合并。
+- 设计文档 + 路线图见 `docs/superpowers/`。
+
+## 路线图
+
+见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。v1 核心（捕获三源 + journal + 三轴合成 + lint + serve + ask）已完整；后续：changelog/pitfalls miner、per-facet confidence「(推断)」显示、resident-mode（agent grep 前先查 wiki 的强制纪律）、note enrich 骨架 + fold-by-id、增量 sync、codegraph 可选集成（AST 接地架构段）。
+
+## 变更
+
+见 [`CHANGELOG.md`](CHANGELOG.md)。

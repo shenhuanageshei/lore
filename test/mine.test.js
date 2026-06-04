@@ -214,3 +214,10 @@ test('tagFlows: does not mutate input', () => {
   tagFlows(['x'], f);
   assert.equal(f.length, 1);
 });
+
+test('commitAtom: flows param tags facets.flow; default empty', () => {
+  const raw = { sha: 'a', ts: '2026-06-03T00:00:00Z', subject: 's', body: '', files: ['lib/x.js'] };
+  assert.deepEqual(commitAtom(raw, ['lib'], 'miner:commits', [], [{ id: 'f1', spans: ['lib'] }]).facets.flow, ['f1']);
+  assert.deepEqual(commitAtom(raw, ['lib']).facets.flow, []);   // default no flows
+  assert.deepEqual(commitAtom(raw, ['lib'], 'miner:commits', [{ id: 'q', match: ['s'] }]).facets.theme, ['q']);   // themes (4-arg) still works
+});

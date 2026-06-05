@@ -31,7 +31,7 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 
    ## Current architecture
 
-   <读源码写当前真实架构：入口、关键模块、数据流、职责。非泛词。>
+   <先放一张 mermaid 架构图（flowchart：入口 / 关键模块 / 依赖方向，~5-15 节点），再写架构 prose：入口、关键模块、数据流、职责。非泛词。>
 
    ## Decision history
 
@@ -77,7 +77,7 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 
    ## End-to-end path
 
-   <入口 → 各阶段(经过的组件) → 出口；关键转换/约束>
+   <先放一张 mermaid 数据流图（flowchart LR：入口 → 各阶段(组件) → 出口），再写 prose：关键转换/约束>
 
    ## Decision history
 
@@ -105,4 +105,12 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 - 跑完提示 `/lore:serve` 浏览。
 - theme 页讲横切主线（质量/性能/时效…）的演进，决策历史 token 自动折该 theme 的原子；先确保 config 的 `theme.values` 填了 + 跑过 `/lore:mine` 让原子带 theme facet。
 - flow 页讲一条数据流端到端怎么跑（入口→阶段→出口）；先在 config 的 `flow.values` 用 `spans:[组件…]` 声明、跑过 `/lore:mine` 让原子带 flow facet。
+- **出图**：component 页「Current architecture」顶部放一张 mermaid 架构图（入口/关键模块/依赖），flow 页「End-to-end path」顶部放数据流图（入口→各阶段(组件)→出口）。据真实代码画、~5-15 节点、保持可读；图是文本 → git 可 diff、随历史演进。坏语法不阻断页面但会丢该图；label 避免裸 `"`/`<`（壳已转义，简洁优先）。
 - 零侵入：只写 `.lore/wiki/`，绝不改业务源码。
+
+**出图速记**（component=架构图，flow=数据流图，各放该页首段顶部）：
+
+```mermaid
+flowchart TD
+  A[入口] --> B[关键模块] --> C[出口]
+```

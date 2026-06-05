@@ -132,11 +132,14 @@
   </main>
 </div>
 
+<script src="./mermaid.min.js"></script>
 <script type="module">
 import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
   buildNavModel, buildMeta,
 } from './shell.mjs';
+
+const mapMermaidTheme = t => (t === 'dark' ? 'dark' : 'default');
 
 let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {};
 
@@ -187,6 +190,11 @@ async function route() {
   const html = preprocessWikilinks(renderMarkdown(stripFrontmatter(raw)), PAGE_INDEX);
   document.getElementById('meta').innerHTML = renderMeta(page);
   document.getElementById('content').innerHTML = html;
+  if (window.mermaid) {
+    try {
+      await mermaid.run({ nodes: document.querySelectorAll('#content .mermaid') });
+    } catch { /* bad diagram syntax: leave the source text visible, page stays usable */ }
+  }
   document.getElementById('main').scrollTop = 0;
 }
 
@@ -212,9 +220,12 @@ function wireTheme() {
   const saved = localStorage.getItem('lore-theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
   sel.value = saved;
+  window.mermaid?.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(saved) });
   sel.addEventListener('change', () => {
     document.documentElement.setAttribute('data-theme', sel.value);
     localStorage.setItem('lore-theme', sel.value);
+    window.mermaid?.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(sel.value) });
+    route();   // re-render current page so diagrams pick up the new mermaid theme
   });
 }
 

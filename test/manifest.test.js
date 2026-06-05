@@ -193,6 +193,26 @@ test('manifest CLI writes .manifest.json into wiki dir', () => {
   }
 });
 
+test('emitManifest: docs axis pages sorted by last_updated desc (other axes stay alpha)', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mf-docs-'));
+  try {
+    const wiki = join(root, 'wiki');
+    mkdirSync(join(wiki, 'docs'), { recursive: true });
+    const page = (d) => `---\ntitle: ${d}\nsummary: s\nlast_updated: ${d}\n---\nbody`;
+    writeFileSync(join(wiki, 'docs', 'old.md'), page('2026-06-01'));
+    writeFileSync(join(wiki, 'docs', 'new.md'), page('2026-06-10'));
+    writeFileSync(join(wiki, 'docs', 'mid.md'), page('2026-06-05'));
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    writeFileSync(join(wiki, 'component', 'aaa.md'), page('2026-06-01'));   // alpha-first but oldest
+    writeFileSync(join(wiki, 'component', 'bbb.md'), page('2026-06-10'));   // alpha-last but newest
+    const m = emitManifest({ wikiDir: wiki, currentSha: 'abc', countCommitsSince: () => 0, now: 'now' });
+    const docs = m.axes.find(a => a.id === 'docs');
+    assert.deepEqual(docs.pages.map(p => p.id), ['new', 'mid', 'old']);   // date desc, not alpha (mid/new/old)
+    const comp = m.axes.find(a => a.id === 'component');
+    assert.deepEqual(comp.pages.map(p => p.id), ['aaa', 'bbb']);   // alphabetical, NOT date-desc → sort is docs-only
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 import { gitCurrentSha, makeCountCommitsSince } from '../lib/manifest.js';
 
 test('gitCurrentSha + makeCountCommitsSince are exported and work', () => {

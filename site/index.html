@@ -133,7 +133,6 @@
   </main>
 </div>
 
-<script src="./mermaid.min.js"></script>
 <script type="module">
 import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
@@ -141,6 +140,25 @@ import {
 } from './shell.mjs';
 
 const mapMermaidTheme = t => (t === 'dark' ? 'dark' : 'default');
+
+let mermaidLoad = null;   // Promise once mermaid.min.js has been injected + initialized
+function ensureMermaid() {
+  if (!mermaidLoad) {
+    mermaidLoad = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = './mermaid.min.js';
+      s.onload = () => {
+        try {
+          window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(document.documentElement.getAttribute('data-theme')) });
+          resolve();
+        } catch (e) { mermaidLoad = null; reject(e); }
+      };
+      s.onerror = (e) => { mermaidLoad = null; reject(e); };
+      document.head.appendChild(s);
+    });
+  }
+  return mermaidLoad;
+}
 
 let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {};
 
@@ -191,10 +209,10 @@ async function route() {
   const html = preprocessWikilinks(renderMarkdown(stripFrontmatter(raw)), PAGE_INDEX);
   document.getElementById('meta').innerHTML = renderMeta(page);
   document.getElementById('content').innerHTML = html;
-  if (window.mermaid) {
-    try {
-      await mermaid.run({ nodes: document.querySelectorAll('#content .mermaid') });
-    } catch { /* bad diagram syntax: leave the source text visible, page stays usable */ }
+  const mNodes = document.querySelectorAll('#content .mermaid');
+  if (mNodes.length) {
+    try { await ensureMermaid(); await window.mermaid.run({ nodes: mNodes }); }
+    catch { /* missing asset or bad diagram: leave source text visible, page stays usable */ }
   }
   document.getElementById('main').scrollTop = 0;
 }
@@ -221,12 +239,13 @@ function wireTheme() {
   const saved = localStorage.getItem('lore-theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
   sel.value = saved;
-  window.mermaid?.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(saved) });
   sel.addEventListener('change', () => {
     document.documentElement.setAttribute('data-theme', sel.value);
     localStorage.setItem('lore-theme', sel.value);
-    window.mermaid?.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(sel.value) });
-    route();   // re-render current page so diagrams pick up the new mermaid theme
+    if (mermaidLoad) {   // mermaid already on this page → re-theme + re-render its diagrams
+      window.mermaid?.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(sel.value) });
+      route();
+    }
   });
 }
 

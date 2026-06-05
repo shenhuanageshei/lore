@@ -121,30 +121,27 @@ test('pitfallsExtractor: no CLAUDE.md or no markers → []', () => {
 
 import { renderDocsPage } from '../lib/docs.js';
 
-test('renderDocsPage: plain doc spec → front-matter + summary + source link', () => {
-  const md = renderDocsPage({ id: 'a', title: 'Doc A', summary: 'about A', sourcePath: 'docs/a.md', date: '2026-06-04' });
+test('renderDocsPage: spec with body → embeds body, plain-text source ref, no link, no # docs:', () => {
+  const md = renderDocsPage({ id: 'a', title: 'Doc A', summary: 'about A', sourcePath: 'docs/a.md', date: '2026-06-04', body: '# Doc A\n\nfull content here.\n' });
   assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\n---/);
-  assert.match(md, /# docs: Doc A/);
-  assert.match(md, /about A/);
-  assert.match(md, /\[docs\/a\.md\]\(\.\.\/\.\.\/\.\.\/docs\/a\.md\)/);   // repo-relative source link
+  assert.match(md, /> 源文档：`docs\/a\.md`/);     // plain-text reference
+  assert.match(md, /# Doc A\n\nfull content here\./); // body embedded verbatim
+  assert.doesNotMatch(md, /\]\(\.\.\/\.\.\/\.\.\//);  // NO markdown link → no 404
+  assert.doesNotMatch(md, /# docs:/);                 // no double-H1 wrapper
 });
 
-test('renderDocsPage: spec with entries (changelog) → bullet list', () => {
-  const md = renderDocsPage({
-    id: 'changelog', title: 'CHANGELOG', summary: '2 versions', sourcePath: 'CHANGELOG.md', date: '2026-06-04',
-    entries: [{ version: '0.2.0', date: '2026-06-04' }, { version: '0.1.0', date: '2026-06-03' }],
-  });
-  assert.match(md, /- \*\*0\.2\.0\*\* — 2026-06-04/);
-  assert.match(md, /- \*\*0\.1\.0\*\* — 2026-06-03/);
+test('renderDocsPage: pitfalls (no body, has entries) → # title + entries list', () => {
+  const md = renderDocsPage({ id: 'pitfalls', title: 'Pitfalls', summary: '1 条', sourcePath: 'CLAUDE.md', date: '', entries: [{ problem: 'P', fix: 'F', prevention: 'V' }] });
+  assert.match(md, /> 源文档：`CLAUDE\.md`/);
+  assert.match(md, /# Pitfalls/);
+  assert.match(md, /- \*\*P\*\* — 修复：F；预防：V/);
 });
 
-test('renderDocsPage: pitfalls entries → problem + 修复/预防 tail', () => {
-  const md = renderDocsPage({
-    id: 'pitfalls', title: 'Pitfalls', summary: '2 条', sourcePath: 'CLAUDE.md', date: '',
-    entries: [{ problem: 'P1', fix: 'F1', prevention: 'V1' }, { problem: 'P2', fix: '', prevention: '' }],
-  });
-  assert.match(md, /- \*\*P1\*\* — 修复：F1；预防：V1/);
-  assert.match(md, /- \*\*P2\*\*\n/);   // no tail when fix+prevention both empty
+test('renderDocsPage: changelog body embeds (entries not rendered as list)', () => {
+  const md = renderDocsPage({ id: 'changelog', title: 'CHANGELOG', summary: '1 版本', sourcePath: 'CHANGELOG.md', date: '2026-06-03', entries: [{ version: '0.1.0', date: '2026-06-03' }], body: '# Changelog\n\n## [0.1.0] — 2026-06-03\n- x\n' });
+  assert.match(md, /# Changelog/);
+  assert.match(md, /## \[0\.1\.0\]/);
+  assert.doesNotMatch(md, /- \*\*0\.1\.0\*\* —/);  // entries NOT rendered (body present wins)
 });
 
 test('buildDocsAxis: writes wiki/docs pages; nuke-rebuild drops removed docs', () => {

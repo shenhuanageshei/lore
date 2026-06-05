@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { docsExtractor, changelogExtractor, pitfallsExtractor } from '../lib/docs.js';
+import { docsExtractor, changelogExtractor, pitfallsExtractor, buildDocsAxis } from '../lib/docs.js';
+import { existsSync as exists } from 'node:fs';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-docs-')); }
 
@@ -144,4 +145,27 @@ test('renderDocsPage: pitfalls entries → problem + 修复/预防 tail', () => 
   });
   assert.match(md, /- \*\*P1\*\* — 修复：F1；预防：V1/);
   assert.match(md, /- \*\*P2\*\*\n/);   // no tail when fix+prevention both empty
+});
+
+test('buildDocsAxis: writes wiki/docs pages; nuke-rebuild drops removed docs', () => {
+  const root = tmp();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'a.md'), '# A\n\npara\n');
+    writeFileSync(join(root, 'docs', 'b.md'), '# B\n\npara\n');
+    writeFileSync(join(root, 'CHANGELOG.md'), '## [0.1.0] — 2026-06-03\n- x\n');
+
+    let pages = buildDocsAxis(lore, root, { sources: ['docs', 'changelog'], docsGlob: 'docs/**/*.md' });
+    assert.deepEqual(pages.map(p => p.id).sort(), ['a', 'b', 'changelog']);
+    assert.ok(exists(join(lore, 'wiki', 'docs', 'a.md')));
+    assert.ok(exists(join(lore, 'wiki', 'docs', 'changelog.md')));
+
+    // remove b.md, rebuild → b page must disappear (materialized view)
+    rmSync(join(root, 'docs', 'b.md'));
+    pages = buildDocsAxis(lore, root, { sources: ['docs', 'changelog'], docsGlob: 'docs/**/*.md' });
+    assert.ok(!exists(join(lore, 'wiki', 'docs', 'b.md')));
+    assert.ok(exists(join(lore, 'wiki', 'docs', 'a.md')));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

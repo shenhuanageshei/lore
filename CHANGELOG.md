@@ -3,6 +3,14 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.3.0] — 2026-06-05
+
+### 新增
+- **docs 轴 —— 文档摄取（捕获第 4 源）** — `/lore:sync` 的 finalize 机械把当前 `docs/**/*.md` + `CHANGELOG.md` + `CLAUDE.md`(踩坑) 摄入一个新 **docs 轴**：每文档一页（标题 + 摘要 + repo 相对源链 + 日期），CHANGELOG / 踩坑各折一页。**零 LLM、无 journal、物化视图**——每 sync nuke-rebuild，删源文档则对应页消失，永远反映当前文件（架构 Y：直读文件而非 journal 原子）。新 `lib/docs.js`（`docsExtractor` / `changelogExtractor` / `pitfallsExtractor` + `renderDocsPage` + `buildDocsAxis`）；config `axes.docs` opt-in（`sources` + `docs_glob`）；接入 `finalizeSync` + manifest `AXIS_ORDER` + `buildIndex` + 壳配色，serve 零改（复用多轴机制）。dogfood：lore 自身 28 个 `docs/` 文件 + CHANGELOG → 29 个可导航 `wiki/docs` 页。设计/计划见 `docs/superpowers/{specs,plans}/2026-06-05-lore-docs-ingestion*`。
+
+### 修复
+- **INDEX / 侧栏轴序对齐** — `buildIndex` 的轴序（曾 theme 在 flow 之前）对齐 manifest `AXIS_ORDER`（component → flow → theme → docs），消除 INDEX 页与侧栏排序不一致（pre-existing）。
+
 ## [0.2.0] — 2026-06-04
 
 ### 新增

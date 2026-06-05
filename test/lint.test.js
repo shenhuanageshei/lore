@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lint } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -82,7 +82,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -132,5 +132,80 @@ test('integration: sync then a new commit makes the page stale → lint reports 
     const r = lint({ loreDir: lore });
     assert.deepEqual(r.stale.map(s => s.page), ['lib']);
     assert.ok(r.stale[0].behind >= 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+function wikiPage(loreDir, axis, id, frontmatter, body) {
+  const dir = join(loreDir, 'wiki', axis);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${id}.md`), `---\n${frontmatter}\n---\n${body}`);
+}
+
+test('lintUnfolded: finalized page (has code_sha) still holding a literal token → flagged', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    wikiPage(lore, 'component', 'lib', 'title: Lib\ncode_sha: abc1234', '# Lib\n\n## Decision history\n\n{{LORE_JOURNAL}}\n');
+    assert.deepEqual(lintUnfolded(join(lore, 'wiki')), ['component/lib.md']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintUnfolded: finalized page without token → not flagged', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    wikiPage(lore, 'component', 'lib', 'title: Lib\ncode_sha: abc1234', '# Lib\n\nclean body\n');
+    assert.deepEqual(lintUnfolded(join(lore, 'wiki')), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintUnfolded: pre-sync page (no code_sha) with token → not flagged (legit pre-fold state)', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    wikiPage(lore, 'component', 'lib', 'title: Lib', '# Lib\n\n{{LORE_JOURNAL}}\n');
+    assert.deepEqual(lintUnfolded(join(lore, 'wiki')), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintUnfolded: scans theme + flow axes too', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    wikiPage(lore, 'theme', 'quality', 'title: Quality\ncode_sha: abc1234', '# Quality\n\n{{LORE_JOURNAL}}\n');
+    wikiPage(lore, 'flow', 'pipe', 'title: Pipe\ncode_sha: abc1234', '# Pipe\n\nclean\n');
+    assert.deepEqual(lintUnfolded(join(lore, 'wiki')), ['theme/quality.md']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lint orchestrator flags unfolded (finalized page with literal token) → clean:false', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    const cur = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
+    // current sha → not stale; matches root → not orphan/missing; but carries a literal token
+    wikiPage(lore, 'component', 'lib', `title: Lib\ncode_sha: ${cur}`, '# Lib\n\n{{LORE_JOURNAL}}\n');
+    const r = lint({ loreDir: lore });
+    assert.deepEqual(r.unfolded, ['component/lib.md']);
+    assert.equal(r.clean, false);
+    assert.deepEqual(r.stale, []);
+    assert.deepEqual(r.orphans, []);
+    assert.deepEqual(r.missing, []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI: reports unfolded literal token and exits 0', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    const cur = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
+    wikiPage(lore, 'component', 'lib', `title: Lib\ncode_sha: ${cur}`, '# Lib\n\n{{LORE_JOURNAL}}\n');
+    const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
+    assert.match(out, /unfolded/);
+    assert.match(out, /component\/lib\.md/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

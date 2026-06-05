@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-04T06:16:23.739Z",
-  "current_code_sha": "9f0ab79",
+  "generated": "2026-06-04T09:34:36.860Z",
+  "current_code_sha": "f3578a0",
   "axes": [
     {
       "id": "INDEX",
@@ -13,10 +13,10 @@
           "last_updated": "2026-06-04",
           "path": "INDEX.md",
           "stale": 0,
-          "code_sha": "9f0ab79",
+          "code_sha": "f3578a0",
           "synthesized_from": {
-            "atoms": 127,
-            "commits": 127
+            "atoms": 132,
+            "commits": 131
           }
         }
       ]
@@ -32,10 +32,10 @@
           "last_updated": "2026-06-04",
           "path": "component/lib.md",
           "stale": 0,
-          "code_sha": "9f0ab79",
+          "code_sha": "f3578a0",
           "synthesized_from": {
-            "atoms": 70,
-            "commits": 70
+            "atoms": 73,
+            "commits": 72
           }
         }
       ]

@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-05T15:14:48.577Z",
-  "current_code_sha": "1eb0ad8",
+  "generated": "2026-06-05T18:03:00.138Z",
+  "current_code_sha": "943b46a",
   "axes": [
     {
       "id": "INDEX",
@@ -13,10 +13,10 @@
           "last_updated": "2026-06-05",
           "path": "INDEX.md",
           "stale": 0,
-          "code_sha": "1eb0ad8",
+          "code_sha": "943b46a",
           "synthesized_from": {
-            "atoms": 147,
-            "commits": 146
+            "atoms": 148,
+            "commits": 147
           }
         }
       ]
@@ -32,7 +32,7 @@
           "last_updated": "2026-06-05",
           "path": "component/lib.md",
           "stale": 0,
-          "code_sha": "1eb0ad8",
+          "code_sha": "943b46a",
           "synthesized_from": {
             "atoms": 88,
             "commits": 87
@@ -45,23 +45,10 @@
       "label": "Docs",
       "pages": [
         {
-          "id": "ROADMAP",
-          "title": "lore 路线图",
-          "summary": "> v0.1.0 = 捕获三源 + journal + 三轴合成 + lint + serve + ask（核心闭环完整）。 > 下面是后续迭代，按价值/依赖排序。每项仍走 spec → plan → TDD → 审查 → 合并。 > 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`。",
-          "last_updated": "",
-          "path": "docs/ROADMAP.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
           "id": "changelog",
           "title": "CHANGELOG",
-          "summary": "2 个版本，最新 0.2.0",
-          "last_updated": "2026-06-04",
+          "summary": "3 个版本，最新 0.3.0",
+          "last_updated": "2026-06-05",
           "path": "docs/changelog.md",
           "stale": 0,
           "code_sha": "",
@@ -71,24 +58,11 @@
           }
         },
         {
-          "id": "superpowers-notes-2026-06-02-codegraph-integration-roadmap",
-          "title": "Roadmap note: codegraph integration + adjacent ideas",
-          "summary": "> 2026-06-02 · 非 spec/plan，是路线图记录。来源：用户提供参考项目 [codegraph](https://github.com/colbymchenry/codegraph)（[docs](https://colbymchenry.github.io/codegraph/getting-started/introduction/)）。**当前不实施**——记录想法 ...",
-          "last_updated": "2026-06-02",
-          "path": "docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-plans-2026-05-31-lore-serve",
-          "title": "/lore:serve Implementation Plan",
+          "id": "superpowers-plans-2026-06-05-lore-docs-axis-v2",
+          "title": "lore docs 轴 v2 + mermaid 懒加载 Implementation Plan",
           "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-05-31",
-          "path": "docs/superpowers-plans-2026-05-31-lore-serve.md",
+          "last_updated": "2026-06-05",
+          "path": "docs/superpowers-plans-2026-06-05-lore-docs-axis-v2.md",
           "stale": 0,
           "code_sha": "",
           "synthesized_from": {
@@ -97,11 +71,11 @@
           }
         },
         {
-          "id": "superpowers-plans-2026-06-01-lore-init",
-          "title": "/lore:init Implementation Plan",
+          "id": "superpowers-plans-2026-06-05-lore-docs-ingestion",
+          "title": "lore docs 摄取 Implementation Plan",
           "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-06-01",
-          "path": "docs/superpowers-plans-2026-06-01-lore-init.md",
+          "last_updated": "2026-06-05",
+          "path": "docs/superpowers-plans-2026-06-05-lore-docs-ingestion.md",
           "stale": 0,
           "code_sha": "",
           "synthesized_from": {
@@ -110,11 +84,37 @@
           }
         },
         {
-          "id": "superpowers-plans-2026-06-01-lore-journal-mine",
-          "title": "journal + /lore:mine Implementation Plan",
+          "id": "superpowers-specs-2026-06-05-lore-docs-axis-v2-design",
+          "title": "lore docs 轴 v2 + mermaid 懒加载 —— 设计",
+          "summary": "- 日期：2026-06-05 - 状态：设计已批，待写实施计划 - 前置：`docs/superpowers/specs/2026-06-05-lore-docs-ingestion-design.md`（v1 docs 轴） - 北极星：人读友好 wiki（本轮主攻）+ agent 友好 wiki+graph（`docs/ROADMAP.md` 北极星节）",
+          "last_updated": "2026-06-05",
+          "path": "docs/superpowers-specs-2026-06-05-lore-docs-axis-v2-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-05-lore-docs-ingestion-design",
+          "title": "lore docs 摄取 → docs 轴 —— 设计",
+          "summary": "- 日期：2026-06-05 - 状态：设计已批，待写实施计划 - 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§4 捕获、§5 呈现） - ROADMAP：`docs/ROADMAP.md` →「文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源）」",
+          "last_updated": "2026-06-05",
+          "path": "docs/superpowers-specs-2026-06-05-lore-docs-ingestion-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-04-lore-mermaid-diagrams",
+          "title": "lore mermaid 图 Implementation Plan",
           "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-06-01",
-          "path": "docs/superpowers-plans-2026-06-01-lore-journal-mine.md",
+          "last_updated": "2026-06-04",
+          "path": "docs/superpowers-plans-2026-06-04-lore-mermaid-diagrams.md",
           "stale": 0,
           "code_sha": "",
           "synthesized_from": {
@@ -123,37 +123,11 @@
           }
         },
         {
-          "id": "superpowers-plans-2026-06-01-lore-sync",
-          "title": "/lore:sync Implementation Plan",
-          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-06-01",
-          "path": "docs/superpowers-plans-2026-06-01-lore-sync.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-plans-2026-06-02-lore-hook",
-          "title": "post-commit hook Implementation Plan",
-          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax.",
-          "last_updated": "2026-06-02",
-          "path": "docs/superpowers-plans-2026-06-02-lore-hook.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-plans-2026-06-02-lore-sync-journal-fold",
-          "title": "sync folds journal Implementation Plan",
-          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-06-02",
-          "path": "docs/superpowers-plans-2026-06-02-lore-sync-journal-fold.md",
+          "id": "superpowers-specs-2026-06-04-lore-mermaid-diagrams-design",
+          "title": "lore mermaid 图 —— 设计",
+          "summary": "- 日期：2026-06-04 - 状态：设计已批，待写实施计划 - 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§4 合成、§5 呈现） - ROADMAP：`docs/ROADMAP.md` →「呈现（wiki 渲染）→ mermaid 架构图 + 数据流图」",
+          "last_updated": "2026-06-04",
+          "path": "docs/superpowers-specs-2026-06-04-lore-mermaid-diagrams-design.md",
           "stale": 0,
           "code_sha": "",
           "synthesized_from": {
@@ -227,110 +201,6 @@
           }
         },
         {
-          "id": "superpowers-plans-2026-06-04-lore-mermaid-diagrams",
-          "title": "lore mermaid 图 Implementation Plan",
-          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-06-04",
-          "path": "docs/superpowers-plans-2026-06-04-lore-mermaid-diagrams.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-plans-2026-06-05-lore-docs-ingestion",
-          "title": "lore docs 摄取 Implementation Plan",
-          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
-          "last_updated": "2026-06-05",
-          "path": "docs/superpowers-plans-2026-06-05-lore-docs-ingestion.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-specs-2026-05-31-lore-repo-wiki-design",
-          "title": "Lore — 面向 AI Agent + 开发者的代码仓库活文档 / 决策历史框架",
-          "summary": "> 设计文档 (spec) · 2026-05-31 · 工作名 **`lore`**（可改名）· 状态: 已评审，待转实施计划",
-          "last_updated": "2026-05-31",
-          "path": "docs/superpowers-specs-2026-05-31-lore-repo-wiki-design.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-specs-2026-06-01-lore-init-design",
-          "title": "/lore:init — 仓库引导（脚手架 + 拷壳 + 组件自动发现）",
-          "summary": "> 设计文档 (spec) · 2026-06-01 · 子项目 **`/lore:init`（v1，第一刀）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§3 config.yml / §5.5 serve / §6 通用引擎内...",
-          "last_updated": "2026-06-01",
-          "path": "docs/superpowers-specs-2026-06-01-lore-init-design.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-specs-2026-06-01-lore-journal-mine-design",
-          "title": "journal 基座 + `/lore:mine` — 捕获生产者（commits）",
-          "summary": "> 设计文档 (spec) · 2026-06-01 · 子项目 **journal 基座 + `/lore:mine`（v1，commits-only）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md` §4（捕获：3 源 + 原子 ...",
-          "last_updated": "2026-06-01",
-          "path": "docs/superpowers-specs-2026-06-01-lore-journal-mine-design.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-specs-2026-06-01-lore-sync-design",
-          "title": "/lore:sync — 合成 component 页（v1 MVP：code → wiki，LLM 架构 prose）",
-          "summary": "> 设计文档 (spec) · 2026-06-01 · 子项目 **`/lore:sync`（v1 MVP，第一刀）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§4 journal / §5 合成 / §5.5 manifes...",
-          "last_updated": "2026-06-01",
-          "path": "docs/superpowers-specs-2026-06-01-lore-sync-design.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-specs-2026-06-02-lore-hook-design",
-          "title": "post-commit hook — 耐久捕获地板（§4①）",
-          "summary": "> 设计文档 (spec) · 2026-06-02 · 子项目 **post-commit hook（§4① 捕获源）** · 已 brainstorm 收敛，待转计划 > > 母 spec: `2026-05-31-lore-repo-wiki-design.md` §4①（hook）/ §6 line 359（零侵入唯一例外）/ §7（init 装 hook） > 前置: journa...",
-          "last_updated": "2026-06-02",
-          "path": "docs/superpowers-specs-2026-06-02-lore-hook-design.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
-          "id": "superpowers-specs-2026-06-02-lore-sync-journal-fold-design",
-          "title": "sync 折叠 journal — 决策历史机械渲染 + token 注入",
-          "summary": "> 设计文档 (spec) · 2026-06-02 · 子项目 **sync 折叠 journal（消费者侧）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md` §5（合成，line 200「决策历史段多为机械拼装」） > 前置: `...",
-          "last_updated": "2026-06-02",
-          "path": "docs/superpowers-specs-2026-06-02-lore-sync-journal-fold-design.md",
-          "stale": 0,
-          "code_sha": "",
-          "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
-          }
-        },
-        {
           "id": "superpowers-specs-2026-06-03-lore-ask-design",
           "title": "/lore:ask — wiki 消费（§5，resident-mode payoff）",
           "summary": "> 设计文档 · 2026-06-03 · 子项目 **/lore:ask v1** · 母 spec §5（消费：agent 从 wiki 答，不读 raw 代码）。前置：sync 产页 + manifest 全已合并。",
@@ -396,11 +266,11 @@
           }
         },
         {
-          "id": "superpowers-specs-2026-06-04-lore-mermaid-diagrams-design",
-          "title": "lore mermaid 图 —— 设计",
-          "summary": "- 日期：2026-06-04 - 状态：设计已批，待写实施计划 - 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§4 合成、§5 呈现） - ROADMAP：`docs/ROADMAP.md` →「呈现（wiki 渲染）→ mermaid 架构图 + 数据流图」",
-          "last_updated": "2026-06-04",
-          "path": "docs/superpowers-specs-2026-06-04-lore-mermaid-diagrams-design.md",
+          "id": "superpowers-notes-2026-06-02-codegraph-integration-roadmap",
+          "title": "Roadmap note: codegraph integration + adjacent ideas",
+          "summary": "> 2026-06-02 · 非 spec/plan，是路线图记录。来源：用户提供参考项目 [codegraph](https://github.com/colbymchenry/codegraph)（[docs](https://colbymchenry.github.io/codegraph/getting-started/introduction/)）。**当前不实施**——记录想法 ...",
+          "last_updated": "2026-06-02",
+          "path": "docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap.md",
           "stale": 0,
           "code_sha": "",
           "synthesized_from": {
@@ -409,11 +279,167 @@
           }
         },
         {
-          "id": "superpowers-specs-2026-06-05-lore-docs-ingestion-design",
-          "title": "lore docs 摄取 → docs 轴 —— 设计",
-          "summary": "- 日期：2026-06-05 - 状态：设计已批，待写实施计划 - 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§4 捕获、§5 呈现） - ROADMAP：`docs/ROADMAP.md` →「文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源）」",
-          "last_updated": "2026-06-05",
-          "path": "docs/superpowers-specs-2026-06-05-lore-docs-ingestion-design.md",
+          "id": "superpowers-plans-2026-06-02-lore-hook",
+          "title": "post-commit hook Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax.",
+          "last_updated": "2026-06-02",
+          "path": "docs/superpowers-plans-2026-06-02-lore-hook.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-02-lore-sync-journal-fold",
+          "title": "sync folds journal Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-02",
+          "path": "docs/superpowers-plans-2026-06-02-lore-sync-journal-fold.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-02-lore-hook-design",
+          "title": "post-commit hook — 耐久捕获地板（§4①）",
+          "summary": "> 设计文档 (spec) · 2026-06-02 · 子项目 **post-commit hook（§4① 捕获源）** · 已 brainstorm 收敛，待转计划 > > 母 spec: `2026-05-31-lore-repo-wiki-design.md` §4①（hook）/ §6 line 359（零侵入唯一例外）/ §7（init 装 hook） > 前置: journa...",
+          "last_updated": "2026-06-02",
+          "path": "docs/superpowers-specs-2026-06-02-lore-hook-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-02-lore-sync-journal-fold-design",
+          "title": "sync 折叠 journal — 决策历史机械渲染 + token 注入",
+          "summary": "> 设计文档 (spec) · 2026-06-02 · 子项目 **sync 折叠 journal（消费者侧）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md` §5（合成，line 200「决策历史段多为机械拼装」） > 前置: `...",
+          "last_updated": "2026-06-02",
+          "path": "docs/superpowers-specs-2026-06-02-lore-sync-journal-fold-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-01-lore-init",
+          "title": "/lore:init Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-01",
+          "path": "docs/superpowers-plans-2026-06-01-lore-init.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-01-lore-journal-mine",
+          "title": "journal + /lore:mine Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-01",
+          "path": "docs/superpowers-plans-2026-06-01-lore-journal-mine.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-01-lore-sync",
+          "title": "/lore:sync Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-01",
+          "path": "docs/superpowers-plans-2026-06-01-lore-sync.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-01-lore-init-design",
+          "title": "/lore:init — 仓库引导（脚手架 + 拷壳 + 组件自动发现）",
+          "summary": "> 设计文档 (spec) · 2026-06-01 · 子项目 **`/lore:init`（v1，第一刀）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§3 config.yml / §5.5 serve / §6 通用引擎内...",
+          "last_updated": "2026-06-01",
+          "path": "docs/superpowers-specs-2026-06-01-lore-init-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-01-lore-journal-mine-design",
+          "title": "journal 基座 + `/lore:mine` — 捕获生产者（commits）",
+          "summary": "> 设计文档 (spec) · 2026-06-01 · 子项目 **journal 基座 + `/lore:mine`（v1，commits-only）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md` §4（捕获：3 源 + 原子 ...",
+          "last_updated": "2026-06-01",
+          "path": "docs/superpowers-specs-2026-06-01-lore-journal-mine-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-01-lore-sync-design",
+          "title": "/lore:sync — 合成 component 页（v1 MVP：code → wiki，LLM 架构 prose）",
+          "summary": "> 设计文档 (spec) · 2026-06-01 · 子项目 **`/lore:sync`（v1 MVP，第一刀）** · 状态: 已 brainstorm 收敛，待转实施计划 > > 母 spec: `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`（§4 journal / §5 合成 / §5.5 manifes...",
+          "last_updated": "2026-06-01",
+          "path": "docs/superpowers-specs-2026-06-01-lore-sync-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-05-31-lore-serve",
+          "title": "/lore:serve Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-05-31",
+          "path": "docs/superpowers-plans-2026-05-31-lore-serve.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-05-31-lore-repo-wiki-design",
+          "title": "Lore — 面向 AI Agent + 开发者的代码仓库活文档 / 决策历史框架",
+          "summary": "> 设计文档 (spec) · 2026-05-31 · 工作名 **`lore`**（可改名）· 状态: 已评审，待转实施计划",
+          "last_updated": "2026-05-31",
+          "path": "docs/superpowers-specs-2026-05-31-lore-repo-wiki-design.md",
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "ROADMAP",
+          "title": "lore 路线图",
+          "summary": "> v0.1.0 = 捕获三源 + journal + 三轴合成 + lint + serve + ask（核心闭环完整）。 > 下面是后续迭代，按价值/依赖排序。每项仍走 spec → plan → TDD → 审查 → 合并。 > 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`。",
+          "last_updated": "",
+          "path": "docs/ROADMAP.md",
           "stale": 0,
           "code_sha": "",
           "synthesized_from": {

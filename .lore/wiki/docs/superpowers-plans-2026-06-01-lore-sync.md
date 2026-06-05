@@ -4,8 +4,769 @@ summary: > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent
 source_path: docs/superpowers/plans/2026-06-01-lore-sync.md
 last_updated: 2026-06-01
 ---
-# docs: /lore:sync Implementation Plan
+> 源文档：`docs/superpowers/plans/2026-06-01-lore-sync.md`
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...
+# /lore:sync Implementation Plan
 
-源文档：[docs/superpowers/plans/2026-06-01-lore-sync.md](../../../docs/superpowers/plans/2026-06-01-lore-sync.md)
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build `/lore:sync` v1 MVP — synthesize one `component/<name>.md` wiki page per `config.yml` code_root (LLM writes the "current architecture" prose; deterministic Node stamps front-matter, builds INDEX, emits manifest), closing the `init → sync → serve` loop with real content.
+
+**Architecture:** One module `lib/sync.js` holds the deterministic, node:test-able functions (`parseConfigCodeRoots`, `planSync`, `stampFrontmatter`, `buildIndex`, `finalizeSync`) plus a CLI with `plan` / `finalize` subcommands. The slash command `commands/lore-sync.md` orchestrates the O1 two-phase flow: Node `plan` emits a worklist → the agent reads each code_root's source and writes the page body → Node `finalize` stamps mechanical front-matter, builds `INDEX.md`, and emits `.manifest.json`. Reuses `lib/manifest.js` (`parseFrontmatter`, `runManifestCli`). The LLM prose step is agent-driven and not auto-tested; everything deterministic is.
+
+**Tech Stack:** Node.js (ESM, `type: module`), `node:test` built-in runner (zero external deps), `node:fs`/`node:path`/`node:child_process`. No YAML library — `config.yml` is read with a tiny hand-rolled subset parser.
+
+**Spec:** `docs/superpowers/specs/2026-06-01-lore-sync-design.md`. **Parent spec:** `docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md` §4/§5/§5.5/§6.
+
+**Branch:** `lore-sync` (already created off `main`).
+
+**Refinements vs spec wording** (preserve intent):
+- `finalizeSync` computes its own short HEAD sha (small `headShortSha` helper) for page stamping, then calls the existing `runManifestCli` for the manifest step (which re-derives the sha internally). Two cheap `git rev-parse` calls; avoids exporting `manifest.js` internals.
+- Front-matter is serialized in a fixed key order: `title, summary, last_updated, code_sha, atoms, commits` (matches the fixture page shape `test/fixtures/wiki/component/m3_nlp.md`).
+
+---
+
+## File Structure
+
+```
+D:\workspace\lore\
+├── lib/
+│   └── sync.js              # NEW — parseConfigCodeRoots, planSync, stampFrontmatter, buildIndex, finalizeSync, CLI
+├── commands/
+│   └── lore-sync.md         # NEW — /lore:sync slash command (orchestrates plan → agent → finalize)
+├── test/
+│   └── sync.test.js         # NEW — unit tests + one serve integration test
+└── README.md                # MODIFY — add /lore:sync section
+```
+
+**Reuses (do not modify):** `lib/manifest.js` exports `parseFrontmatter(text) -> {data, body}` and `runManifestCli(loreDir, nowIso) -> manifestPath`. `lib/serve.js` exports `start({loreDir, port, canRun, now}) -> {url, ...}` and `stop({loreDir})`. `lib/init.js` exports `init({repoRoot, srcSiteDir})`.
+
+**Module API contract (locked — later tasks must match exactly):**
+
+`lib/sync.js`:
+- `parseConfigCodeRoots(configText) -> string[]` — extract `code_roots: [a, b]` (init's single-line flow form, dequoted); `[]` if absent/malformed.
+- `planSync(loreDir) -> { codeRoots: string[], worklist: Array<{component, codeRoot, path, priorExists}> }`.
+- `stampFrontmatter(pageText, { codeSha, lastUpdated, commits, atoms }) -> string` — merge mechanical fields into the agent's front-matter (preserve `title`/`summary`), body unchanged.
+- `buildIndex(pages) -> string` — `pages = [{id, title}]` → INDEX.md with half front-matter + `## Component` `[[id]]` list.
+- `finalizeSync(loreDir, now) -> { stamped: string[], indexWritten: boolean, manifestPath: string }`.
+
+Internal (not exported): `headShortSha(repoRoot)`. Constant: `FM_ORDER`.
+
+---
+
+## Task 1: parseConfigCodeRoots
+
+**Files:**
+- Create: `lib/sync.js`
+- Test: `test/sync.test.js`
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// test/sync.test.js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { parseConfigCodeRoots } from '../lib/sync.js';
+
+function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-sync-')); }
+
+test('parseConfigCodeRoots: single-line list', () => {
+  assert.deepEqual(
+    parseConfigCodeRoots('axes:\n  component:\n    code_roots: [lib, site]\n'),
+    ['lib', 'site']
+  );
+});
+
+test('parseConfigCodeRoots: dequotes entries with special chars', () => {
+  assert.deepEqual(
+    parseConfigCodeRoots("    code_roots: ['a b', m1, \"x\"]\n"),
+    ['a b', 'm1', 'x']
+  );
+});
+
+test('parseConfigCodeRoots: empty list', () => {
+  assert.deepEqual(parseConfigCodeRoots('    code_roots: []\n'), []);
+});
+
+test('parseConfigCodeRoots: missing line yields []', () => {
+  assert.deepEqual(parseConfigCodeRoots('axes: {}\n'), []);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test test/sync.test.js`
+Expected: FAIL — `parseConfigCodeRoots` not exported (import error).
+
+- [ ] **Step 3: Write minimal implementation**
+
+```js
+// lib/sync.js
+
+export function parseConfigCodeRoots(configText) {
+  const m = configText.match(/^\s*code_roots:\s*\[([^\]]*)\]/m);
+  if (!m) return [];
+  return m[1]
+    .split(',')
+    .map(s => s.trim().replace(/^['"]|['"]$/g, '').trim())
+    .filter(Boolean);
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS (4 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/sync.js test/sync.test.js
+git commit -m "feat(sync): parseConfigCodeRoots (zero-dep YAML subset)"
+```
+
+---
+
+## Task 2: planSync
+
+**Files:**
+- Modify: `lib/sync.js` (add `planSync`)
+- Test: `test/sync.test.js` (append)
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// append to test/sync.test.js
+import { planSync } from '../lib/sync.js';
+
+test('planSync builds worklist from config code_roots', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'component'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib, src/pkg]\n');
+    writeFileSync(join(lore, 'wiki', 'component', 'lib.md'), 'x');   // makes priorExists true for lib
+    const { codeRoots, worklist } = planSync(lore);
+    assert.deepEqual(codeRoots, ['lib', 'src/pkg']);
+    assert.deepEqual(worklist, [
+      { component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true },
+      { component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false },
+    ]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('planSync returns empty when config missing', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    assert.deepEqual(planSync(lore), { codeRoots: [], worklist: [] });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test test/sync.test.js`
+Expected: FAIL — `planSync` undefined.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```js
+// append to lib/sync.js
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export function planSync(loreDir) {
+  const configPath = join(loreDir, 'config.yml');
+  const codeRoots = existsSync(configPath)
+    ? parseConfigCodeRoots(readFileSync(configPath, 'utf8'))
+    : [];
+  const worklist = codeRoots.map(codeRoot => {
+    const component = codeRoot.split('/').pop();
+    const path = `component/${component}.md`;
+    return { component, codeRoot, path, priorExists: existsSync(join(loreDir, 'wiki', path)) };
+  });
+  return { codeRoots, worklist };
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS (6 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/sync.js test/sync.test.js
+git commit -m "feat(sync): planSync builds component worklist from config"
+```
+
+---
+
+## Task 3: stampFrontmatter
+
+**Files:**
+- Modify: `lib/sync.js` (add `stampFrontmatter`)
+- Test: `test/sync.test.js` (append)
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// append to test/sync.test.js
+import { stampFrontmatter } from '../lib/sync.js';
+
+test('stampFrontmatter merges mechanical fields, preserves title/summary + body', () => {
+  const page =
+    '---\ntitle: M3 NLP\nsummary: entity extraction\n---\n' +
+    '# component: m3_nlp\n\n## Current architecture\n\nprose\n';
+  const out = stampFrontmatter(page, { codeSha: 'abc1234', lastUpdated: '2026-06-01', commits: 0, atoms: 0 });
+  assert.match(out, /^---\n/);
+  assert.match(out, /title: M3 NLP/);
+  assert.match(out, /summary: entity extraction/);
+  assert.match(out, /last_updated: 2026-06-01/);
+  assert.match(out, /code_sha: abc1234/);
+  assert.match(out, /atoms: 0/);
+  assert.match(out, /commits: 0/);
+  // body preserved
+  assert.match(out, /# component: m3_nlp/);
+  assert.match(out, /## Current architecture/);
+  assert.match(out, /prose/);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test test/sync.test.js`
+Expected: FAIL — `stampFrontmatter` undefined.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```js
+// append to lib/sync.js
+import { parseFrontmatter } from './manifest.js';
+
+const FM_ORDER = ['title', 'summary', 'last_updated', 'code_sha', 'atoms', 'commits'];
+
+export function stampFrontmatter(pageText, { codeSha, lastUpdated, commits = 0, atoms = 0 }) {
+  const { data, body } = parseFrontmatter(pageText);
+  const merged = {
+    title: data.title ?? '',
+    summary: data.summary ?? '',
+    last_updated: lastUpdated,
+    code_sha: codeSha,
+    atoms,
+    commits,
+  };
+  const fm = FM_ORDER.map(k => `${k}: ${merged[k]}`).join('\n');
+  return `---\n${fm}\n---\n${body}`;
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS (7 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/sync.js test/sync.test.js
+git commit -m "feat(sync): stampFrontmatter merges mechanical fields (reuses manifest.parseFrontmatter)"
+```
+
+---
+
+## Task 4: buildIndex
+
+**Files:**
+- Modify: `lib/sync.js` (add `buildIndex`)
+- Test: `test/sync.test.js` (append)
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// append to test/sync.test.js
+import { buildIndex } from '../lib/sync.js';
+
+test('buildIndex renders TOC with half front-matter and component links', () => {
+  const out = buildIndex([{ id: 'm3_nlp', title: 'M3 NLP' }, { id: 'lib', title: 'Lib' }]);
+  assert.match(out, /title: Index/);
+  assert.match(out, /summary: table of contents/);
+  assert.match(out, /# lore wiki — index/);
+  assert.match(out, /## Component/);
+  assert.match(out, /- \[\[m3_nlp\]\]/);
+  assert.match(out, /- \[\[lib\]\]/);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test test/sync.test.js`
+Expected: FAIL — `buildIndex` undefined.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```js
+// append to lib/sync.js
+export function buildIndex(pages) {
+  const links = pages.map(p => `- [[${p.id}]]`).join('\n');
+  return `---
+title: Index
+summary: table of contents
+---
+# lore wiki — index
+
+## Component
+${links}
+`;
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS (8 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/sync.js test/sync.test.js
+git commit -m "feat(sync): buildIndex renders mechanical component TOC"
+```
+
+---
+
+## Task 5: finalizeSync
+
+**Files:**
+- Modify: `lib/sync.js` (add `headShortSha` + `finalizeSync`)
+- Test: `test/sync.test.js` (append; needs a temp git repo)
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// append to test/sync.test.js
+import { finalizeSync } from '../lib/sync.js';
+
+function gitRepo() {
+  const root = tmpDir();
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  writeFileSync(join(root, 'f.txt'), 'x');
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return root;
+}
+
+function agentPage(title, summary) {
+  return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
+    `## Current architecture\n\narch prose\n\n## Decision history\n\n暂无 journal 原子。\n\n` +
+    `## Cross-links\n\n- [[other]]\n`;
+}
+
+test('finalizeSync stamps pages, writes INDEX + manifest', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'm3_nlp.md'), agentPage('M3 NLP', 'entity extraction'));
+    writeFileSync(join(compDir, 'lib.md'), agentPage('Lib', 'core lib'));
+
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    const r = finalizeSync(lore, '2026-06-01T08:00:00Z');
+
+    assert.deepEqual(r.stamped.slice().sort(), ['component/lib.md', 'component/m3_nlp.md']);
+    assert.equal(r.indexWritten, true);
+
+    // pages stamped, body preserved
+    const page = readFileSync(join(compDir, 'm3_nlp.md'), 'utf8');
+    assert.match(page, new RegExp('code_sha: ' + sha));
+    assert.match(page, /last_updated: 2026-06-01/);
+    assert.match(page, /atoms: 0/);
+    assert.match(page, /title: M3 NLP/);
+    assert.match(page, /## Current architecture/);
+
+    // INDEX
+    const index = readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8');
+    assert.match(index, /- \[\[m3_nlp\]\]/);
+    assert.match(index, /- \[\[lib\]\]/);
+    assert.match(index, new RegExp('code_sha: ' + sha));
+
+    // manifest
+    const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
+    const comp = manifest.axes.find(a => a.id === 'component');
+    assert.equal(comp.pages.length, 2);
+    assert.deepEqual(comp.pages.map(p => p.id).slice().sort(), ['lib', 'm3_nlp']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test test/sync.test.js`
+Expected: FAIL — `finalizeSync` undefined.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```js
+// append to lib/sync.js
+import { readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { basename } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { runManifestCli } from './manifest.js';
+
+function headShortSha(repoRoot) {
+  return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot }).toString().trim();
+}
+
+export function finalizeSync(loreDir, now) {
+  const repoRoot = join(loreDir, '..');
+  const wikiDir = join(loreDir, 'wiki');
+  const compDir = join(wikiDir, 'component');
+  const codeSha = headShortSha(repoRoot);
+  const lastUpdated = now.slice(0, 10);
+  const fields = { codeSha, lastUpdated, commits: 0, atoms: 0 };
+
+  let files = [];
+  try {
+    files = readdirSync(compDir, { withFileTypes: true })
+      .filter(e => e.isFile() && e.name.endsWith('.md'))
+      .map(e => e.name)
+      .sort();
+  } catch { files = []; }
+
+  const stamped = [];
+  const pages = [];
+  for (const f of files) {
+    const p = join(compDir, f);
+    const text = stampFrontmatter(readFileSync(p, 'utf8'), fields);
+    writeFileSync(p, text);
+    const { data } = parseFrontmatter(text);
+    const id = basename(f, '.md');
+    stamped.push(`component/${f}`);
+    pages.push({ id, title: data.title ?? id });
+  }
+
+  if (!existsSync(wikiDir)) mkdirSync(wikiDir, { recursive: true });
+  writeFileSync(join(wikiDir, 'INDEX.md'), stampFrontmatter(buildIndex(pages), fields));
+
+  const manifestPath = runManifestCli(loreDir, now);
+  return { stamped, indexWritten: true, manifestPath };
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS (9 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/sync.js test/sync.test.js
+git commit -m "feat(sync): finalizeSync stamps pages + builds INDEX + emits manifest"
+```
+
+---
+
+## Task 6: CLI (plan / finalize subcommands)
+
+**Files:**
+- Modify: `lib/sync.js` (add CLI guard block)
+- Test: `test/sync.test.js` (append CLI smoke)
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// append to test/sync.test.js
+test('CLI plan prints worklist JSON', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib, site]\n');
+    const out = execFileSync('node', ['lib/sync.js', 'plan', lore], { cwd: process.cwd() }).toString();
+    const parsed = JSON.parse(out);
+    assert.deepEqual(parsed.codeRoots, ['lib', 'site']);
+    assert.equal(parsed.worklist.length, 2);
+    assert.equal(parsed.worklist[0].component, 'lib');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI without args exits non-zero', () => {
+  assert.throws(() => execFileSync('node', ['lib/sync.js'], { cwd: process.cwd(), stdio: 'pipe' }));
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test test/sync.test.js`
+Expected: FAIL — `node lib/sync.js plan ...` prints nothing (no CLI block yet), so `JSON.parse('')` throws.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```js
+// append to lib/sync.js
+import { fileURLToPath } from 'node:url';
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const sub = process.argv[2];
+  const loreDir = process.argv[3];
+  if (!sub || !loreDir) {
+    console.error('usage: node lib/sync.js <plan|finalize> <loreDir>');
+    process.exit(1);
+  }
+  if (sub === 'plan') {
+    console.log(JSON.stringify(planSync(loreDir), null, 2));
+  } else if (sub === 'finalize') {
+    const r = finalizeSync(loreDir, new Date().toISOString());
+    console.log(`✓ sync finalized: stamped ${r.stamped.length} page(s), INDEX + manifest written`);
+    console.log(`  manifest: ${r.manifestPath}`);
+    console.log('  next: /lore:serve');
+  } else {
+    console.error(`unknown subcommand: ${sub} (expected plan|finalize)`);
+    process.exit(1);
+  }
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS (11 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/sync.js test/sync.test.js
+git commit -m "feat(sync): CLI plan/finalize subcommands"
+```
+
+---
+
+## Task 7: /lore:sync slash command definition
+
+**Files:**
+- Create: `commands/lore-sync.md`
+
+- [ ] **Step 1: Write the command file**
+
+Create `commands/lore-sync.md` with EXACTLY this content (the ```bash fences are REAL triple-backtick code blocks):
+
+````markdown
+---
+description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root 产一页 component/<name>.md（LLM 写架构），建 INDEX + emit manifest
+---
+
+# /lore:sync
+
+把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由你读源码写），再机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme/journal 折叠推迟）。
+
+## 用法
+
+- `/lore:sync` —— 在当前仓库根目录合成 wiki
+
+## 行为（O1 两阶段）
+
+本命令编排 `lib/sync.js`：
+
+1. **plan**（机械）：
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" plan "$(pwd)/.lore"
+   ```
+   输出 worklist JSON：`{ codeRoots, worklist:[{component, codeRoot, path, priorExists}] }`。
+   worklist 空 → 提示先 `/lore:init`（或编辑 `.lore/config.yml` 填 `code_roots`），停止。
+
+2. **合成**（你来，逐 worklist 项）：读该 `codeRoot` 的实际源码，写 `.lore/wiki/<path>`，格式：
+   ```markdown
+   ---
+   title: <组件显示名>
+   summary: <一行语义摘要>
+   ---
+   # component: <name>
+
+   ## Current architecture
+
+   <读源码写当前真实架构：入口、关键模块、数据流、职责。非泛词。>
+
+   ## Decision history
+
+   暂无 journal 原子（跑 /lore:mine 或 /lore:note 后再 sync 补全）。
+
+   ## Cross-links
+
+   - [[<相关 sibling 组件>]]
+   ```
+
+3. **finalize**（机械）：
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" finalize "$(pwd)/.lore"
+   ```
+   盖机械 front-matter（`code_sha`/`last_updated`/`atoms`/`commits`）+ 建 `INDEX.md` + 写 `.manifest.json`。
+
+## 给 agent 的提示
+
+- 只写 `title` + `summary` 半 front-matter；**别手写 `code_sha`/计数/日期** —— finalize 自动盖。
+- 「当前架构」段读真实源码写，别套泛词。
+- 「决策历史」段本版填占位（journal 未接）。
+- 「交叉链接」段用 worklist 的全组件列表，链相关 sibling。
+- 跑完提示 `/lore:serve` 浏览。
+- 零侵入：只写 `.lore/wiki/`，绝不改业务源码。
+````
+
+> Note: in the actual file, the two `bash` fences and the `markdown` page-shape fence use real triple backticks (escaped here only to keep this plan's outer code block intact). The file starts with the YAML frontmatter `---`.
+
+- [ ] **Step 2: Sanity check the file**
+
+Run: `node -e "const s=require('fs').readFileSync('commands/lore-sync.md','utf8'); if(!s.includes('lib/sync.js')||!s.startsWith('---')) process.exit(1); console.log('ok')"`
+Expected: prints `ok`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add commands/lore-sync.md
+git commit -m "feat(command): /lore:sync slash command definition"
+```
+
+---
+
+## Task 8: Integration — init → agent pages → sync finalize → serve
+
+**Files:**
+- Modify: `test/sync.test.js` (append integration test; reuses `gitRepo`/`agentPage` from Task 5)
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// append to test/sync.test.js
+import { init } from '../lib/init.js';
+import { start, stop } from '../lib/serve.js';
+
+test('integration: init -> agent page -> sync finalize -> serve renders', async () => {
+  const root = gitRepo();
+  try {
+    // a discoverable code dir so init writes code_roots: [lib]
+    mkdirSync(join(root, 'lib'));
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    const lore = join(root, '.lore');
+
+    // plan sees the component
+    const plan = JSON.parse(execFileSync('node', ['lib/sync.js', 'plan', lore], { cwd: process.cwd() }).toString());
+    assert.ok(plan.worklist.some(w => w.component === 'lib'));
+
+    // simulate the agent synthesis step
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), agentPage('Lib', 'core lib'));
+
+    // real finalize via CLI
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+
+    // serve (force node fallback for determinism) + fetch
+    const info = await start({ loreDir: lore, port: 0, canRun: () => false, now: 't' });
+    try {
+      assert.equal((await fetch(info.url + '../wiki/INDEX.md')).status, 200);
+      const page = await fetch(info.url + '../wiki/component/lib.md');
+      assert.equal(page.status, 200);
+      assert.match(await page.text(), /Current architecture/);
+      assert.equal((await fetch(info.url + '../wiki/.manifest.json')).status, 200);
+    } finally {
+      await stop({ loreDir: lore });
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails (or passes) for the right reason**
+
+Run: `node --test test/sync.test.js`
+Expected: PASS — all of `init`, `lib/sync.js` (plan + finalize), and `serve` already exist by now, so this integration test should pass on first run. If it fails, the failure must point at a real wiring bug (e.g. manifest not written, page 404) — fix that before continuing. (This test adds coverage of the full chain; it has no separate "implementation" step.)
+
+- [ ] **Step 3: Run the full suite**
+
+Run: `node --test`
+Expected: PASS — every test file green (manifest, server, serve, shell, init, sync, integration).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add test/sync.test.js
+git commit -m "test(sync): integration init -> agent page -> finalize -> serve"
+```
+
+---
+
+## Task 9: README
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: Add a `/lore:sync` section between the `/lore:init` and `/lore:serve` sections**
+
+Insert this block immediately before the line `## \`/lore:serve\`（已实现）`:
+
+```markdown
+## `/lore:sync`（已实现）
+
+把代码合成进 wiki：每个 `config.yml` 的 `code_root` 产一页 `component/<name>.md`（「当前架构」段由 agent 读源码 LLM 写），机械建 `INDEX.md` + `.manifest.json`。本版只产 component 页（flow/theme/journal 折叠推迟）。
+
+\`\`\`bash
+node lib/sync.js plan <.lore目录>       # 出 worklist（agent 据此逐页合成）
+node lib/sync.js finalize <.lore目录>   # 盖 front-matter + INDEX + manifest
+\`\`\`
+
+O1 两阶段：`plan`（Node 出 worklist）→ agent 读源码写页正文 → `finalize`（Node 盖机械 front-matter + INDEX + emit manifest，复用 `lib/manifest.js`）。引导链：`/lore:init` → `/lore:sync` → `/lore:serve` 浏览真内容。
+```
+
+> Note: the inner bash fence uses real triple backticks in the actual file (escaped here only to preserve this plan's formatting).
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add README.md
+git commit -m "docs: README with /lore:sync usage"
+```
+
+---
+
+## Self-Review
+
+**1. Spec coverage** (spec §-by-§ → task):
+- §1 scope (component-only, LLM arch prose, full rebuild, O1) → Tasks 1-8.
+- §2 architecture (lib/sync.js + command + tests) → Tasks 1-9. Reuse manifest.js → Tasks 3, 5.
+- §3 API contract: `parseConfigCodeRoots` → Task 1; `planSync` → Task 2; `stampFrontmatter` → Task 3; `buildIndex` → Task 4; `finalizeSync` → Task 5; CLI → Task 6.
+- §4 data flow (plan → agent → finalize) → command Task 7 + integration Task 8.
+- §5 page output contract (half front-matter + 3 sections; Node stamps mechanical) → Tasks 3, 5, 7; fixture `agentPage` in Task 5 matches the shape.
+- §6 config reader (single-line `code_roots`, dequote, last-segment component name) → Task 1 + Task 2.
+- §7 INDEX (Node mechanical, half front-matter, `[[id]]`) → Task 4 + stamped in Task 5.
+- §8 code_sha = current HEAD short, stamped on every page → Task 5 (`headShortSha`).
+- §9 precheck/errors/idempotency: empty worklist → command precheck (Task 7); missing wiki dir → `mkdir` in finalize (Task 5); git error → reused manifest.js error; full rebuild → finalize overwrites (Task 5).
+- §10 testing → Tasks 1-6 unit, Task 8 integration; LLM prose not auto-tested (documented in Task 7).
+- §11 command def → Task 7.
+- §12 acceptance: #1 end-to-end loop → Task 8; #2 page structure → Tasks 3/5/7; #3 INDEX+manifest+serve → Tasks 4/5/8; #4 config respected → Tasks 1/2; #5 full-rebuild idempotent → Task 5; #6 zero-dep/zero-intrusion → all (no new deps; only `.lore/wiki/` written); #7 deterministic tests → Tasks 1-6/8.
+- §13 out of scope (journal folding, flow/theme, incremental, grouping, lint, ask) → not built (correct).
+
+No gaps.
+
+**2. Placeholder scan:** No TBD/TODO. Every code step shows full code. Task 7 (command) + Task 9 (README) include complete file content with an explicit note about backtick escaping. Task 8 has no separate "implement" step because all its dependencies were built in Tasks 1-7 and `init`/`serve` pre-exist — its Step 2 states the pass/fix expectation explicitly.
+
+**3. Type consistency:**
+- `planSync` returns `{codeRoots, worklist}`; worklist items `{component, codeRoot, path, priorExists}` — used identically in Task 2 test, Task 6 CLI, Task 8 integration.
+- `stampFrontmatter(pageText, {codeSha, lastUpdated, commits, atoms})` — same signature in Task 3 (def), Task 5 (called with `fields = {codeSha, lastUpdated, commits:0, atoms:0}`).
+- `buildIndex(pages)` with `pages=[{id, title}]` — Task 4 (def) and Task 5 (called with `{id, title}` objects).
+- `finalizeSync(loreDir, now) -> {stamped, indexWritten, manifestPath}` — Task 5 (def + test asserts all three fields), Task 6 CLI (uses `r.stamped.length`, `r.manifestPath`).
+- Reused `manifest.js`: `parseFrontmatter(text) -> {data, body}` (Tasks 3, 5) and `runManifestCli(loreDir, now) -> path` (Task 5) — signatures match the actual `lib/manifest.js`.
+- Reused `serve.js`: `start({loreDir, port, canRun, now}) -> {url}` and `stop({loreDir})` — Task 8 matches `test/integration.test.js` usage exactly (`port:0, canRun:()=>false, now:'t'`; `info.url + '../wiki/...'`).
+- Front-matter key order `FM_ORDER` defined once (Task 3), used by both page stamping and INDEX stamping (Task 5).
+
+Fixed inline during review: none needed.
+

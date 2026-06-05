@@ -170,6 +170,26 @@ test('buildDocsAxis: writes wiki/docs pages; nuke-rebuild drops removed docs', (
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('docsExtractor: spec carries body (front-matter stripped)', () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'a.md'), '---\ntitle: A\n---\n# A\n\npara body\n');
+    const s = docsExtractor(root, 'docs/**/*.md')[0];
+    assert.equal(s.body, '# A\n\npara body\n');   // FM stripped, rest verbatim
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('changelogExtractor: spec carries CHANGELOG body', () => {
+  const root = tmp();
+  try {
+    writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n\n## [0.1.0] — 2026-06-03\n- x\n');
+    const s = changelogExtractor(root)[0];
+    assert.match(s.body, /# Changelog/);
+    assert.match(s.body, /## \[0\.1\.0\]/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('buildDocsAxis: no source docs → no empty wiki/docs dir', () => {
   const root = tmp();
   try {

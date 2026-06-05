@@ -507,3 +507,33 @@ test('integration: config flow → mine tags it → sync folds into flow page', 
     assert.match(readFileSync(join(flowDir, 'pipe.md'), 'utf8'), /touch lib pipeline/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('finalizeSync builds docs axis from config + files (INDEX + manifest)', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-sync-docs-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'init'], { cwd: root,
+      env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
+    const lore = join(root, '.lore');
+    // a component page so the journal-fold (SYNC_AXES) path also runs alongside the docs axis
+    mkdirSync(join(lore, 'wiki', 'component'), { recursive: true });
+    mkdirSync(join(lore, 'journal'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [lib]\n  docs:\n    sources: [docs, changelog]\n    docs_glob: docs/**/*.md\n');
+    writeFileSync(join(lore, 'wiki', 'component', 'lib.md'), '---\ntitle: lib\nsummary: s\n---\n# component: lib\n## Decision history\n{{LORE_JOURNAL}}\n');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'design.md'), '# Design\n\nthe design.\n');
+    writeFileSync(join(root, 'CHANGELOG.md'), '## [0.1.0] — 2026-06-03\n- x\n');
+
+    finalizeSync(lore, '2026-06-05T00:00:00Z', { warn() {} });
+
+    assert.ok(existsSync(join(lore, 'wiki', 'docs', 'design.md')));
+    assert.ok(existsSync(join(lore, 'wiki', 'docs', 'changelog.md')));
+    assert.match(readFileSync(join(lore, 'wiki', 'docs', 'changelog.md'), 'utf8'), /0\.1\.0/);
+    const index = readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8');
+    assert.match(index, /## Docs/);
+    assert.match(index, /\[\[design\]\]/);
+    const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
+    assert.ok(manifest.axes.some(a => a.id === 'docs' && a.pages.some(p => p.id === 'design')));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

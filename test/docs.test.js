@@ -169,3 +169,15 @@ test('buildDocsAxis: writes wiki/docs pages; nuke-rebuild drops removed docs', (
     assert.ok(exists(join(lore, 'wiki', 'docs', 'a.md')));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('buildDocsAxis: no source docs → no empty wiki/docs dir', () => {
+  const root = tmp();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    // no docs/, no CHANGELOG.md
+    const pages = buildDocsAxis(lore, root, { sources: ['docs', 'changelog'], docsGlob: 'docs/**/*.md' });
+    assert.deepEqual(pages, []);
+    assert.ok(!exists(join(lore, 'wiki', 'docs')));   // dir not left behind → no empty axis in manifest
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

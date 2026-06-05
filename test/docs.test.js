@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { docsExtractor, changelogExtractor } from '../lib/docs.js';
+import { docsExtractor, changelogExtractor, pitfallsExtractor } from '../lib/docs.js';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-docs-')); }
 
@@ -89,5 +89,31 @@ test('changelogExtractor: file with no version headings → []', () => {
   try {
     writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n\njust prose, no versions\n');
     assert.deepEqual(changelogExtractor(root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('pitfallsExtractor: Problem/Fix/Prevention blocks → single folded spec', () => {
+  const root = tmp();
+  try {
+    writeFileSync(join(root, 'CLAUDE.md'),
+      'project notes\n\n**Problem**: tokens leak\n**Fix**: escape them\n**Prevention**: add a test\n\n' +
+      '**问题**：超时\n**修复**：加重试\n**预防**：监控\n');
+    const specs = pitfallsExtractor(root);
+    assert.equal(specs.length, 1);
+    assert.equal(specs[0].id, 'pitfalls');
+    assert.equal(specs[0].entries.length, 2);
+    assert.equal(specs[0].entries[0].problem, 'tokens leak');
+    assert.equal(specs[0].entries[0].fix, 'escape them');
+    assert.equal(specs[0].entries[0].prevention, 'add a test');
+    assert.equal(specs[0].entries[1].problem, '超时');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('pitfallsExtractor: no CLAUDE.md or no markers → []', () => {
+  const root = tmp();
+  try {
+    assert.deepEqual(pitfallsExtractor(root), []);              // no file
+    writeFileSync(join(root, 'CLAUDE.md'), 'just prose, no pitfalls\n');
+    assert.deepEqual(pitfallsExtractor(root), []);              // no markers
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

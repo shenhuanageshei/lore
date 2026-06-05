@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-04T09:34:36.860Z",
-  "current_code_sha": "f3578a0",
+  "generated": "2026-06-05T06:12:52.113Z",
+  "current_code_sha": "648ccd0",
   "axes": [
     {
       "id": "INDEX",
@@ -10,10 +10,10 @@
           "id": "INDEX",
           "title": "Index",
           "summary": "table of contents",
-          "last_updated": "2026-06-04",
+          "last_updated": "2026-06-05",
           "path": "INDEX.md",
           "stale": 0,
-          "code_sha": "f3578a0",
+          "code_sha": "648ccd0",
           "synthesized_from": {
             "atoms": 132,
             "commits": 131
@@ -27,12 +27,12 @@
       "pages": [
         {
           "id": "lib",
-          "title": "lib — lore 引擎",
-          "summary": "零依赖 Node 确定性核心，跑「捕获 → 合成 → 消费」全闭环，唯一例外把 prose 交给 agent。",
-          "last_updated": "2026-06-04",
+          "title": "lib —— lore 引擎核心",
+          "summary": "零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程",
+          "last_updated": "2026-06-05",
           "path": "component/lib.md",
           "stale": 0,
-          "code_sha": "f3578a0",
+          "code_sha": "648ccd0",
           "synthesized_from": {
             "atoms": 73,
             "commits": 72

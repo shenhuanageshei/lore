@@ -1,8 +1,8 @@
 ---
-title: lib — lore 引擎
-summary: 零依赖 Node 确定性核心，跑「捕获 → 合成 → 消费」全闭环，唯一例外把 prose 交给 agent。
-last_updated: 2026-06-04
-code_sha: f3578a0
+title: lib —— lore 引擎核心
+summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程
+last_updated: 2026-06-05
+code_sha: 648ccd0
 atoms: 73
 commits: 72
 ---
@@ -10,31 +10,31 @@ commits: 72
 
 ## Current architecture
 
-`lib/` 是 lore 的整个引擎：纯 Node 内置模块、零外部依赖、每个文件兼作可 `import` 的库 + `import.meta.url` 守卫的 CLI。按数据流分四层。
+```mermaid
+flowchart TD
+  hook[hook.js post-commit] --> J[(journal ndjson)]
+  mine[mine.js git-log 回填] --> J
+  note[note.js agent 决策] --> J
+  config[config.js code_roots/themes/flows] --> sync[sync.js plan / finalize]
+  J --> sync
+  sync --> manifest[manifest.js .manifest.json]
+  sync --> wiki[wiki 三轴页]
+  manifest --> serve[serve.js + server.js]
+  manifest --> ask[ask.js 检索]
+  wiki --> serve
+  manifest --> lint[lint.js 漂移]
+  wiki --> lint
+  init[init.js 脚手架] -. 装 .-> hook
+```
 
-### 基座（durable 存储 + 配置）
-- **`journal.js`** —— append-only ndjson 原子层（唯一耐久知识源）。`atomPath` 按 `YYYY/MM/YYYY-MM-DD.ndjson` 分片；`appendAtom` 单行追加（永不覆写）；`readAllAtoms` 递归读全树；`existingIds` 做幂等去重。原子 schema：`{id, ts, kind(commit|decision), commit, title, why, what_changed, facets{component,flow,theme}, refs{files,pitfall,related}, source, enriched, confidence}`。
-- **`config.js`** —— 手写 YAML 子集解析器（撑零依赖不变量）。`parseConfigCodeRoots`（`axes.component.code_roots`）/ `parseConfigThemes`（`match:` 关键词）/ `parseConfigFlows`（`spans:` 组件列表）。`.lore/config.yml` 是唯一存放 repo 特定信息处。
+`lib/` 是 lore 的全部引擎，纯 Node 内置、零依赖。按数据流分四层：
 
-### 捕获（三源 → journal）
-- **`hook.js`** —— `captureHead` 读 HEAD commit 机械产骨架原子，`source:'hook'`。post-commit 自动触发、零 LLM、<50ms；CLI 全程 try/catch + 无条件 `process.exit(0)` → best-effort，绝不阻断 commit。
-- **`mine.js`** —— `git log` 全历史回填。`commitAtom(raw, codeRoots, source, themes, flows)` 机械算三轴 facet：component = 变更路径前缀匹配 `code_roots`；`tagThemes` = `title+why` 子串命中（大小写无关）；`tagFlows` = 原子 component ∈ flow 的 `spans`。按 `commit:<sha>` id 去重 → 幂等。`source:'miner:commits'`。
-- **`note.js`** —— agent 决策当下手记 `kind:'decision'`、`source:'agent'` 原子（补 hook/mine 取不到的「为什么」）。
+- **捕获（写 journal 原子）**：`hook.js`（post-commit 自动、机械、<50ms、永不阻断 commit）、`mine.js`（`git log` 全历史回填，按 sha 幂等）、`note.js`（agent 决策当下记 `kind:decision`）。三源都经 `journal.js`（append-only ndjson，按日分片、去重）落地。
+- **合成（journal + 代码 → wiki）**：`sync.js` 两阶段——`plan` 出 worklist、agent 写页正文、`finalize` 机械盖 front-matter + 折决策历史（journal 占位符）+ 建 INDEX + emit `.manifest.json`（`manifest.js`）。`config.js` 解析 `code_roots` / theme `match` / flow `spans`，驱动三轴打标。
+- **消费**：`serve.js`（探测 python→内置 `server.js` 兜底，哑静态服务器 + 浏览器壳）、`ask.js`（按 manifest title+summary 检索，agent 从 wiki 答）。
+- **检查**：`lint.js` 只读报漂移（stale / orphan / missing），不自动改。
 
-### 合成（code + journal → 多轴 wiki）
-- **`sync.js`** —— O1 两阶段编排。`planSync` 读 config 出 worklist（`SYNC_AXES=['component','theme','flow']` 各轴一份）；agent 据此写页正文「当前架构」段 + 决策历史占位符；`finalizeSync` 逐轴过滤原子（`facets[axis]` 命中页 id）、ts 倒序、**函数式** `.replace(…, () => md)` 注入决策历史（防 commit 文里 `$&`/`$$` 腐蚀），再 `buildIndex` + emit。`renderDecisionHistory` 出 ts 倒序 bullet（有 sha 显 `(sha, date)`，否则 `(date)`）。
-- **`manifest.js`** —— `emitManifest` 扫 wiki 页 `parseFrontmatter` → `.manifest.json`（壳 + ask 的机读投影）。`gitCurrentSha` / `makeCountCommitsSince` 算鲜度（页 `code_sha` 落后 HEAD 几个 commit）。`AXIS_ORDER` 定轴展示序。
-
-### 消费 + 检查
-- **`serve.js`**（+ `server.js` 兜底）—— 哑静态服务器，探测 `python3`→`python`→内置 Node。只绑 `127.0.0.1`、只读 `.lore/`。配 `site/` 免构建浏览器壳。
-- **`ask.js`** —— `searchPages(manifest, query)` 按 query 词在 page title+summary 的命中数排序（跳过 INDEX 轴），agent 读 top 页从 wiki 答而非重 grep（省 token）。纯函数 + 读 `.manifest.json` 的 CLI。
-- **`lint.js`** —— 只读漂移报告：`lintStale`（页落后 HEAD N commit）/ `lintOrphans`（页无对应 code_root）/ `lintMissing`（code_root 无页）。检测与修复分离，CLI `exit 0`。
-
-### 脚手架
-- **`init.js`** —— `scaffold` 建 `.lore/{journal,wiki,site,.state}`；`discoverComponents` 三策略（顶层代码目录兜底 + Python 包 `__init__.py` + JS workspaces）；`renderConfigYaml` 写自动发现的 `code_roots`；`copyShell` 拷浏览器壳；`installHook` 装 post-commit（worktree-safe `git rev-parse --git-common-dir`；已有 hook / 设了 `core.hooksPath` / 非 git → 优雅跳过，不抢你的 hook 管理器）；`ensureGitignore` 忽略 `.state/`。
-
-### 不变量（测试显式守）
-零侵入（只写 `.lore/` + 一个 post-commit hook）；物化视图（nuke `wiki/` 重 sync → 字节一致）；journal append-only；best-effort hook。确定性活全 `node --test` 覆盖，只有「当前架构」prose 交给 agent。
+`init.js` 是一次性脚手架：搭 `.lore/`、自动发现组件写 `config.yml`、拷浏览器壳（含 `mermaid.min.js`）、装 post-commit hook。
 
 ## Decision history
 
@@ -114,5 +114,4 @@ commits: 72
 
 ## Cross-links
 
-- [[INDEX]] —— 全轴目录
-- 本 repo 单组件（`code_roots:[lib]`）；flow/theme 轴待 `config.yml` 声明后由 `/lore:sync` 自动出页。
+- 唯一组件；横切主线见 INDEX 的 theme / flow 轴（按需在 `config.yml` 声明）。

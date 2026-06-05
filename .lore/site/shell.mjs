@@ -36,9 +36,17 @@ export function renderMarkdown(src) {
       html += buf; continue;
     }
     if (/^```/.test(ln)) {
+      const lang = ln.slice(3).trim();                 // info-string after ```
       let buf = ''; i++;
       while (i < lines.length && !/^```/.test(lines[i])) { buf += lines[i] + '\n'; i++; }
-      i++; html += `<pre><code>${esc(buf)}</code></pre>`; continue;
+      i++;
+      // mermaid source is HTML-escaped into the div; the browser decodes entities
+      // via textContent before mermaid parses, so A--&gt;B → A-->B. Escaping also
+      // prevents raw < / & in diagram labels from breaking the page HTML.
+      html += lang === 'mermaid'
+        ? `<div class="mermaid">${esc(buf)}</div>`
+        : `<pre><code>${esc(buf)}</code></pre>`;
+      continue;
     }
     if (/^### /.test(ln)) { html += `<h3>${inline(ln.slice(4))}</h3>`; i++; continue; }
     if (/^## /.test(ln))  { html += `<h2>${inline(ln.slice(3))}</h2>`; i++; continue; }

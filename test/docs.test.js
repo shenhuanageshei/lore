@@ -198,3 +198,17 @@ test('buildDocsAxis: no source docs → no empty wiki/docs dir', () => {
     assert.ok(!exists(join(lore, 'wiki', 'docs')));   // dir not left behind → no empty axis in manifest
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('buildDocsAxis: returns specs sorted by date desc (tiebreak id)', () => {
+  const root = tmp();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', '2026-06-01-old.md'), '# Old\n\nx\n');
+    writeFileSync(join(root, 'docs', '2026-06-10-new.md'), '# New\n\nx\n');
+    writeFileSync(join(root, 'docs', '2026-06-05-mid.md'), '# Mid\n\nx\n');
+    const pages = buildDocsAxis(lore, root, { sources: ['docs'], docsGlob: 'docs/**/*.md' });
+    assert.deepEqual(pages.map(p => p.id), ['2026-06-10-new', '2026-06-05-mid', '2026-06-01-old']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

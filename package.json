@@ -1,6 +1,6 @@
 {
   "name": "lore",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Repo living-docs / decision-history framework — capture (hook/mine/note) → synthesize (3-axis wiki) → consume (ask/serve)",

@@ -3,10 +3,15 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
-## [Unreleased]
+## [0.2.0] — 2026-06-04
+
+### 新增
+- **mermaid 架构图 / 数据流图** — component 页可含架构图、flow 页可含数据流图，作为页内 ` ```mermaid ` 文本块（git 可 diff、随历史演进，胜过二进制 PNG），浏览器壳客户端渲染。交付：vendored mermaid@11.15.0 全量 UMD（`site/mermaid.min.js`，sha256 记于 commit），由 init 随 shell 拷进 `.lore/site/`；`securityLevel:'strict'`、仅 `127.0.0.1`、不连 CDN——守住零运行时依赖 + 离线两不变量。改动面：壳 `renderMarkdown` 识别 ` ```mermaid ` fence → `<div class="mermaid">`（`site/shell.mjs`）、`index.html` 加载 mermaid + 每次路由后渲染 + 主题联动、`SHELL_FILES` 含 mermaid（`lib/init.js`）、`/lore:sync` 引导 agent 出图（`commands/sync.md`）。向后兼容：旧壳或缺资产时 ` ```mermaid ` 降级为代码块、无报错。设计/计划见 `docs/superpowers/{specs,plans}/2026-06-04-lore-mermaid-diagrams*`。
+- **可安装为 Claude Code 插件** — 插件清单 + 本地 marketplace，`/lore:*` 命名空间命令经 `${CLAUDE_PLUGIN_ROOT}` 定位 bundled `lib/`。
 
 ### 修复
 - **`installHook` 默认 hooksPath 不再误跳过** — 当 `core.hooksPath` 解析后等于仓库默认 hooks 目录（`<git-common-dir>/hooks`）时，照常安装 post-commit hook；仅在指向**不同**目录（真 hook 管理器如 Husky）才跳过返回 `hookspath-set`。修复 lore 自身与 threat-intel 因 `core.hooksPath` 指向默认 `.git/hooks` 而静默无自动捕获 hook 的问题（`lib/init.js`）。
+- **`/lore:sync` journal 折叠 exactly-once** — `{{LORE_JOURNAL}}` 占位符精确折叠一次，`/lore:lint` 兜底标记任何残留未替换的 token（`lib/sync.js`、`lib/lint.js`）。
 
 ## [0.1.0] — 2026-06-03
 

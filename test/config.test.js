@@ -38,6 +38,7 @@ test('parseConfigThemes: ignores flow items (spans, no match)', () => {
 });
 
 import { parseConfigFlows } from '../lib/config.js';
+import { parseConfigDocsAxis } from '../lib/config.js';
 
 test('parseConfigFlows: commented example → []', () => {
   assert.deepEqual(parseConfigFlows('  flow:\n    values: []\n    # - { id: article-pipeline, spans: [lib] }\n'), []);
@@ -53,4 +54,30 @@ test('parseConfigFlows: uncommented flows (field order independent)', () => {
 
 test('parseConfigFlows: ignores theme items (match, no spans)', () => {
   assert.deepEqual(parseConfigFlows('    - { id: quality, match: [a] }\n    - { id: f1, spans: [lib] }\n'), [{ id: 'f1', spans: ['lib'] }]);
+});
+
+test('parseConfigDocsAxis reads sources + docs_glob', () => {
+  const cfg = `axes:\n  docs:\n    sources: [docs, changelog, claude_md_pitfalls]\n    docs_glob: docs/**/*.md\n`;
+  const r = parseConfigDocsAxis(cfg);
+  assert.deepEqual(r.sources, ['docs', 'changelog', 'claude_md_pitfalls']);
+  assert.equal(r.docsGlob, 'docs/**/*.md');
+});
+
+test('parseConfigDocsAxis defaults docs_glob when omitted', () => {
+  const r = parseConfigDocsAxis(`axes:\n  docs:\n    sources: [docs]\n`);
+  assert.deepEqual(r.sources, ['docs']);
+  assert.equal(r.docsGlob, 'docs/**/*.md');
+});
+
+test('parseConfigDocsAxis returns null when axes.docs absent', () => {
+  assert.equal(parseConfigDocsAxis(`axes:\n  component:\n    code_roots: [lib]\n`), null);
+});
+
+test('parseConfigDocsAxis dequotes quoted source entries', () => {
+  const r = parseConfigDocsAxis(`axes:\n  docs:\n    sources: ['docs', "changelog"]\n`);
+  assert.deepEqual(r.sources, ['docs', 'changelog']);
+});
+
+test('parseConfigDocsAxis returns null for empty sources list', () => {
+  assert.equal(parseConfigDocsAxis(`axes:\n  docs:\n    sources: []\n`), null);
 });

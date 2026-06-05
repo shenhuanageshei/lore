@@ -93,3 +93,28 @@ test('buildMeta produces freshness chips (stale and fresh)', () => {
   assert.equal(fresh.chips.some(c => c.kind === 'fresh'), true);
   assert.equal(fresh.chips.some(c => /14 atoms/.test(c.text)), true);
 });
+
+test('renderMarkdown renders ```mermaid as <div class="mermaid">, escaped not <pre>', () => {
+  const html = renderMarkdown('```mermaid\nflowchart TD\nA-->B\n```');
+  assert.match(html, /<div class="mermaid">/);
+  assert.match(html, /A--&gt;B/);           // escaped; browser textContent decodes back to A-->B
+  assert.doesNotMatch(html, /<pre>/);       // mermaid is NOT a code block
+});
+
+test('renderMarkdown still renders non-mermaid fences as <pre><code>', () => {
+  const html = renderMarkdown('```js\nconst x = 1;\n```');
+  assert.match(html, /<pre><code>const x = 1;/);
+  assert.doesNotMatch(html, /class="mermaid"/);
+});
+
+test('renderMarkdown escapes < and & inside mermaid source', () => {
+  const html = renderMarkdown('```mermaid\ngraph LR\nA["a<b & c"]-->B\n```');
+  assert.match(html, /&lt;b &amp; c/);
+  assert.match(html, /<div class="mermaid">/);
+});
+
+test('renderMarkdown bare ``` (no lang) stays a code block', () => {
+  const html = renderMarkdown('```\nplain\n```');
+  assert.match(html, /<pre><code>plain/);
+  assert.doesNotMatch(html, /class="mermaid"/);
+});

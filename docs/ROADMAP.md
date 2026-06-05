@@ -6,14 +6,15 @@
 
 ## 近期（高价值、自洽）
 
-### 文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源，⭐ 当前最大缺口）
-- **现状**：journal 只来自 commits（hook/mine）+ agent note。`docs/` 下的设计文档/ADR/spec/runbook、`CHANGELOG.md`、`CLAUDE.md` 踩坑 —— 全部不进 wiki（只在 commit message 间接反映）。threat-intel 的 `docs/` + 186KB `CLAUDE.md`、lore 自己的 `docs/superpowers/specs` 都是金矿却隐形。
-- **做**：加可插拔 doc extractor（config `journal.mine` gate）：
-  - `docs/**/*.md` → 每文档（或每 H2 段）一条 `kind:decision`/`kind:doc` 原子，facet 按路径/关键词标，`refs.files` 指原文档。
-  - `CHANGELOG.md`（Keep-a-Changelog `## [x.y.z] - date` 段）→ `kind:decision`。半通用。
-  - `CLAUDE.md` 结构化踩坑（Problem/Fix/Prevention）→ `kind:incident` 富 why。格式特定（threat-intel 金矿）。
-- **难点**：去重（文档常复述 commit 已说的）、增量（文档改了重摄取）、facet 归属（跨多组件的设计文档）。
-- 价值：把团队已写的知识一夜变成可导航 wiki —— 用户明确点的缺口。config `journal.mine: [commits, docs, changelog, claude_md_pitfalls]` gate 哪些源跑。
+### 文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源，🚧 进行中 v0.2.x）
+- **缺口**：journal 只来自 commits + agent note；`docs/` 设计文档/spec/plan、`CHANGELOG`、`CLAUDE.md` 踩坑全不进 wiki。用户明确点的最大缺口。
+- **本轮做（Y · 物化视图）**：spec/plan `docs/superpowers/{specs,plans}/2026-06-05-lore-docs-ingestion*`。新 **docs 轴** + `lib/docs.js` 三 extractor（`docs/**/*.md` 每文件一页、`CHANGELOG`/`CLAUDE.md` 踩坑各折一页）→ `buildDocsAxis` nuke-rebuild `wiki/docs/`。**机械薄页、零 LLM、无 journal、永远当前**；config `axes.docs` opt-in。
+- **本轮推迟（后续迭代）**：
+  - **X · journal 原子 + 跨轴折叠**：让 doc 决策按 facet 露在相关 component/theme 页决策史。依赖下面的 `journal fold-by-id`。
+  - **agent 摘要页**：每文档 LLM 写 2-3 行抽象（比机械薄页丰富）。
+  - **增量指纹**：现每 sync 全量 nuke-rebuild docs 页；大 `docs/` 时加每页指纹、只重建变动页。
+  - **docs 页 chips**：`buildMeta` 区分 docs 页，去掉「0 atoms · code_sha —」的怪显示。
+  - **小项**：折叠页 id 碰撞前缀（doc 名撞 `changelog`/`pitfalls`）、源链本地壳可点（现仅 github 仓库浏览可点）、pitfalls 标签集对齐 threat-intel 实测格式。
 
 ### per-facet confidence 显示（母 §4 line 190）
 - 现 commit 原子整体 `confidence:'EXTRACTED'`。母 spec：component=EXTRACTED、flow/theme=INFERRED（机械推断）。

@@ -21,18 +21,23 @@ export function createServer(rootDir) {
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
 
-    let rel = pathname.replace(/^\/+/, '');
-    if (rel === '' || rel.endsWith('/')) rel += 'site/index.html';
-    const full = normalize(join(root, rel));
+    const rel = pathname.replace(/^\/+/, '');
+    let full = normalize(join(root, rel));
 
     // traversal guard: resolved path must stay within root.
-    // (full === root is unreachable today — empty paths get site/index.html appended —
-    //  but kept as defense-in-depth.)
+    // (full === root is reachable for a bare "/" request, which the dir→index
+    //  step below resolves to <root>/index.html.)
     if (full !== root && !full.startsWith(root + sep)) {
       res.writeHead(403); return res.end('forbidden');
     }
     let st;
     try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
+    // directory request → serve its index.html, mirroring python http.server.
+    // covers paths ending in "/" (e.g. the advertised /site/) and bare dir names.
+    if (st.isDirectory()) {
+      full = join(full, 'index.html');
+      try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
+    }
     if (st.isDirectory()) { res.writeHead(404); return res.end('not found'); }
 
     const stream = createReadStream(full);

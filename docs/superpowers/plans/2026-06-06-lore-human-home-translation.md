@@ -75,6 +75,11 @@ test('parseConfigLanguage: invalid default falls back to en', () => {
     available: ['en'],
   });
 });
+
+test('parseConfigLanguage: only reads the language block, not stray default: keys', () => {
+  const cfg = 'axes:\n  component:\n    default: en\nlanguage:\n  default: zh\n  available: [zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
+});
 ```
 
 - [ ] **Step 2: Run the failing tests**
@@ -104,11 +109,16 @@ function validLang(s) {
 }
 
 export function parseConfigLanguage(configText) {
-  const defM = configText.match(/^\s*default:\s*([^\n#]+)/m);
+  // Scope to the `language:` block so a stray `default:`/`available:` in another
+  // axis can't leak in (same single-block discipline as parseConfigDocsAxis).
+  const blockM = configText.match(/^language:[ \t]*\n((?:[ \t]+.*\n?)*)/m);
+  const block = blockM ? blockM[1] : '';
+
+  const defM = block.match(/^\s*default:\s*([^\n#]+)/m);
   let defaultLang = defM ? defM[1].trim().replace(/^['"]|['"]$/g, '').trim() : 'en';
   if (!validLang(defaultLang)) defaultLang = 'en';
 
-  const availM = configText.match(/^\s*available:\s*\[([^\]]*)\]/m);
+  const availM = block.match(/^\s*available:\s*\[([^\]]*)\]/m);
   const rawAvailable = availM ? parseList(availM[1]).filter(validLang) : [defaultLang];
   const available = [];
   for (const lang of [defaultLang, ...rawAvailable]) {
@@ -541,6 +551,15 @@ test('finalizeHomeText replaces the token once and leaves prose intact', () => {
   assert.match(out, /## Status/);
   assert.doesNotMatch(out, /\{\{LORE_HOME_STATUS\}\}/);
 });
+
+test('finalizeHomeText is idempotent: re-finalize swaps the region, no duplicate Status', () => {
+  const once = finalizeHomeText('# Home\n\nintro\n\n{{LORE_HOME_STATUS}}\n', '## Status\n\n- a');
+  const twice = finalizeHomeText(once, '## Status\n\n- b');
+  assert.equal((twice.match(/## Status/g) || []).length, 1);   // exactly one block
+  assert.match(twice, /- b/);                                   // refreshed
+  assert.doesNotMatch(twice, /- a/);                            // stale values gone
+  assert.doesNotMatch(twice, /\{\{LORE_HOME_STATUS\}\}/);
+});
 ```
 
 - [ ] **Step 2: Run failing tests**
@@ -559,9 +578,19 @@ Create `lib/home.js`:
 
 ```js
 export const HOME_STATUS_TOKEN = '{{LORE_HOME_STATUS}}';
+const STATUS_START = '<!-- LORE_HOME_STATUS:START -->';
+const STATUS_END = '<!-- LORE_HOME_STATUS:END -->';
 
-export function defaultHomePage({ title = 'lore' } = {}) {
-  return `---\ntitle: Home\nsummary: human-readable orientation map for this repository\n---\n# ${title}\n\nThis repository is documented as a living wiki: code, docs, decisions, and flows are folded into pages humans and agents can both use.\n\n${HOME_STATUS_TOKEN}\n\n## Knowledge flow\n\n\`\`\`mermaid\nflowchart LR\n  repo["Repo code/docs"] --> capture["Capture"]\n  capture --> journal[".lore/journal"]\n  journal --> sync["Sync"]\n  sync --> wiki[".lore/wiki"]\n  wiki --> human["Human reading"]\n  wiki --> agent["Agent retrieval"]\n\`\`\`\n\n## Understand the project\n\n- [[lib]]\n- [[changelog]]\n\n## Debug a problem\n\n- [[pitfalls]]\n- [[ROADMAP]]\n\n## Decisions and timeline\n\n- [[changelog]]\n`;
+export function defaultHomePage({ title = 'lore', axisPages = {} } = {}) {
+  const ids = axis => (axisPages[axis] ?? []).map(p => p.id);
+  const docs = ids('docs');
+  // Only link pages that exist; fall back to INDEX (always present post-finalize)
+  // so the mechanical scaffold never ships dangling wikilinks.
+  const bullets = arr => (arr.length ? arr : ['INDEX']).map(id => `- [[${id}]]`).join('\n');
+  const understand = bullets(ids('component').slice(0, 3));
+  const debug = bullets(['pitfalls', 'ROADMAP', 'troubleshooting'].filter(id => docs.includes(id)));
+  const decisions = bullets(docs.includes('changelog') ? ['changelog'] : []);
+  return `---\ntitle: Home\nsummary: human-readable orientation map for this repository\n---\n# ${title}\n\nThis repository is documented as a living wiki: code, docs, decisions, and flows are folded into pages humans and agents can both use.\n\n${HOME_STATUS_TOKEN}\n\n## Knowledge flow\n\n\`\`\`mermaid\nflowchart LR\n  repo["Repo code/docs"] --> capture["Capture"]\n  capture --> journal[".lore/journal"]\n  journal --> sync["Sync"]\n  sync --> wiki[".lore/wiki"]\n  wiki --> human["Human reading"]\n  wiki --> agent["Agent retrieval"]\n\`\`\`\n\n## Understand the project\n\n${understand}\n\n## Debug a problem\n\n${debug}\n\n## Decisions and timeline\n\n${decisions}\n`;
 }
 
 export function buildHomeStatus({ version, codeSha, lastUpdated, axisPages, language, translationStats }) {
@@ -573,10 +602,15 @@ export function buildHomeStatus({ version, codeSha, lastUpdated, axisPages, lang
   return `## Status\n\n- Version: \`${version}\`\n- Code: \`${codeSha}\`\n- Updated: \`${lastUpdated}\`\n- Axes: \`${axisLine}\`\n- Language: \`${language.default}\` default · \`${langs}\` available\n- Translations: \`${translationStats.ready} ready\` · \`${translationStats.stale} stale\` · \`${translationStats.missing} missing\``;
 }
 
+// Idempotent: the status lives inside a sentinel-delimited region so re-running
+// sync swaps it in place. The {{LORE_HOME_STATUS}} token only exists on a freshly
+// authored page (first finalize); after that the region carries the marker pair.
 export function finalizeHomeText(text, statusMarkdown) {
-  return text.includes(HOME_STATUS_TOKEN)
-    ? text.replace(HOME_STATUS_TOKEN, () => statusMarkdown)
-    : `${text.replace(/\s+$/, '')}\n\n${statusMarkdown}\n`;
+  const block = `${STATUS_START}\n${statusMarkdown}\n${STATUS_END}`;
+  const re = new RegExp(`${STATUS_START}[\\s\\S]*?${STATUS_END}`);
+  if (re.test(text)) return text.replace(re, () => block);
+  if (text.includes(HOME_STATUS_TOKEN)) return text.replace(HOME_STATUS_TOKEN, () => block);
+  return `${text.replace(/\s+$/, '')}\n\n${block}\n`;
 }
 ```
 
@@ -616,6 +650,12 @@ test('finalizeSync writes HOME before manifest and keeps INDEX', () => {
 });
 ```
 
+Then update the three existing `planSync` tests in `test/sync.test.js` — HOME is now the first work item, so their exact-array/length assertions must change:
+
+- `planSync builds worklist from config code_roots`: prepend `{ axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false }` as `worklist[0]` in the expected array (the two component items follow).
+- `planSync returns empty when config missing`: expected `worklist` is now `[{ axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false }]` (HOME is always planned, even on a bare `.lore`).
+- `CLI plan prints worklist JSON`: `parsed.worklist.length` is now `3`; assert `parsed.worklist[0].axis === 'HOME'` and `parsed.worklist[1].component === 'lib'`.
+
 - [ ] **Step 5: Run failing sync tests**
 
 Run:
@@ -632,46 +672,57 @@ Modify imports in `lib/sync.js`:
 
 ```js
 import { parseConfigCodeRoots, parseConfigThemes, parseConfigFlows, parseConfigDocsAxis, parseConfigLanguage } from './config.js';
+import { discoverTranslations } from './i18n.js';
 import { buildHomeStatus, defaultHomePage, finalizeHomeText } from './home.js';
 ```
 
-Add the HOME work item at the start of `planSync` after `worklist` is declared:
+Add the HOME work item as the **first** entry in `planSync`, right after `const worklist = []`:
 
 ```js
-worklist.push({
-  axis: 'HOME',
-  id: 'HOME',
-  path: 'HOME.md',
-  priorExists: existsSync(join(wikiDir, 'HOME.md')),
-});
+worklist.push({ axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: existsSync(join(wikiDir, 'HOME.md')) });
 ```
 
-Add helper inside `lib/sync.js`:
+Add a disk-scanning translation-stats helper inside `lib/sync.js`. The sidecars live on disk, not on the lightweight `{id,title}` `axisPages` entries, so re-derive counts here; `missing` = an available non-default language with no sidecar on disk:
 
 ```js
-function translationStats(axisPages) {
+function translationStats({ wikiDir, axisPages, language }) {
+  const others = language.available.filter(l => l !== language.default);
+  if (!others.length) return { ready: 0, stale: 0, missing: 0 };
   let ready = 0, stale = 0, missing = 0;
-  for (const pages of Object.values(axisPages)) {
+  for (const [axis, pages] of Object.entries(axisPages)) {
     for (const p of pages) {
-      const translations = p.translations ?? [];
-      ready += translations.filter(t => !t.stale).length;
-      stale += translations.filter(t => t.stale).length;
-      missing += 0;
+      const rel = `${axis}/${p.id}.md`;
+      const abs = join(wikiDir, rel);
+      if (!existsSync(abs)) continue;
+      const found = discoverTranslations({
+        wikiDir, pagePath: rel, pageText: readFileSync(abs, 'utf8'),
+        available: language.available, defaultLang: language.default,
+      });
+      const byLang = new Map(found.map(t => [t.lang, t]));
+      for (const lang of others) {
+        const t = byLang.get(lang);
+        if (!t) missing++; else if (t.stale) stale++; else ready++;
+      }
     }
   }
   return { ready, stale, missing };
 }
 ```
 
-In `finalizeSync`, read language config:
+In `finalizeSync`, collapse the existing docs-only config read into **one** `configText` read that feeds both docs and language. This REPLACES the current `const docsConfig = existsSync(configPath) ? parseConfigDocsAxis(readFileSync(...)) : null;` block — do **not** add a second `configPath`/`configText` declaration or the module fails to parse with `Identifier 'configPath' has already been declared`:
 
 ```js
 const configPath = join(loreDir, 'config.yml');
 const configText = existsSync(configPath) ? readFileSync(configPath, 'utf8') : '';
+const docsConfig = parseConfigDocsAxis(configText);
 const language = parseConfigLanguage(configText);
+if (docsConfig) {
+  const docsPages = buildDocsAxis(loreDir, repoRoot, docsConfig);
+  if (docsPages.length) axisPages.docs = docsPages;
+}
 ```
 
-Before writing `INDEX.md`, write HOME:
+Then, after `if (!existsSync(wikiDir)) mkdirSync(...)` and **before** writing `INDEX.md`, write HOME:
 
 ```js
 const pkgPath = join(repoRoot, 'package.json');
@@ -679,16 +730,12 @@ let version = 'unknown';
 try { version = JSON.parse(readFileSync(pkgPath, 'utf8')).version ?? 'unknown'; } catch {}
 
 const homePath = join(wikiDir, 'HOME.md');
-const existingHome = existsSync(homePath) ? readFileSync(homePath, 'utf8') : defaultHomePage({ title: 'lore' });
+const existingHome = existsSync(homePath) ? readFileSync(homePath, 'utf8') : defaultHomePage({ title: 'lore', axisPages });
 const homeStatus = buildHomeStatus({
-  version,
-  codeSha,
-  lastUpdated,
-  axisPages,
-  language,
-  translationStats: translationStats(axisPages),
+  version, codeSha, lastUpdated, axisPages, language,
+  translationStats: translationStats({ wikiDir, axisPages, language }),
 });
-writeFileSync(join(wikiDir, 'HOME.md'), stampFrontmatter(finalizeHomeText(existingHome, homeStatus), {
+writeFileSync(homePath, stampFrontmatter(finalizeHomeText(existingHome, homeStatus), {
   codeSha,
   lastUpdated,
   atoms: allAtoms.length,
@@ -696,7 +743,7 @@ writeFileSync(join(wikiDir, 'HOME.md'), stampFrontmatter(finalizeHomeText(existi
 }));
 ```
 
-When calling manifest, pass language in Task 6. This task may keep `runManifestCli` unchanged until Task 6.
+`runManifestCli(loreDir, now)` stays as the last call — Task 6 makes it re-read config + preferences itself, so no extra argument is needed here. HOME.md is on disk before the manifest is emitted, so the `HOME` axis lands first.
 
 - [ ] **Step 7: Run tests**
 
@@ -783,8 +830,9 @@ git commit -m "feat(init): include language defaults"
 
 **Files:**
 - Modify: `lib/manifest.js`
-- Modify: `lib/sync.js`
 - Modify: `test/manifest.test.js`
+
+> The single `configText` read in `finalizeSync` was already established in Task 4, so this task only touches `runManifestCli` in `lib/manifest.js` — no `lib/sync.js` edit.
 
 - [ ] **Step 1: Write failing test**
 
@@ -859,18 +907,7 @@ export function runManifestCli(loreDir, nowIso) {
 }
 ```
 
-- [ ] **Step 4: Remove duplicate config reads in `finalizeSync`**
-
-Keep one `configText` variable in `finalizeSync` and use it for docs and language:
-
-```js
-const configPath = join(loreDir, 'config.yml');
-const configText = existsSync(configPath) ? readFileSync(configPath, 'utf8') : '';
-const docsConfig = parseConfigDocsAxis(configText);
-const language = parseConfigLanguage(configText);
-```
-
-- [ ] **Step 5: Run tests**
+- [ ] **Step 4: Run tests**
 
 Run:
 
@@ -878,12 +915,12 @@ Run:
 node --test test/manifest.test.js test/sync.test.js
 ```
 
-Expected: selected tests pass.
+Expected: selected tests pass. (`finalizeSync` already reads a single `configText` from Task 4; this task only changed `runManifestCli`.)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add lib/manifest.js lib/sync.js test/manifest.test.js
+git add lib/manifest.js test/manifest.test.js
 git commit -m "feat(manifest): read language and preferences"
 ```
 
@@ -1023,6 +1060,13 @@ Add a translation action container inside `#meta` rendering by route:
 ```
 
 If placing inside `#meta` conflicts with current structure, render the action as the last chip in `#meta`.
+
+Also add explicit sidebar dot colors for the root axes in the `<style>` block — the existing `.dot.*` rules are keyed by lowercase axis id, but the `HOME`/`INDEX` axis ids are uppercase, so without these their nav dots render blank:
+
+```css
+.dot.HOME { background: var(--accent); }
+.dot.INDEX { background: var(--fg-dim); }
+```
 
 - [ ] **Step 2: Update imports**
 
@@ -1333,12 +1377,24 @@ Create `test/translate.test.js`:
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { planTranslation, finalizeTranslation } from '../lib/translate.js';
 import { translationSourceHash } from '../lib/i18n.js';
 
-function tmp() { return mkdtempSync(join(tmpdir(), 'lore-translate-')); }
+// finalizeTranslation regenerates the manifest, which needs a real git sha,
+// so each fixture is a tiny git repo (mirrors test/sync.test.js gitRepo()).
+function tmp() {
+  const root = mkdtempSync(join(tmpdir(), 'lore-translate-'));
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  writeFileSync(join(root, 'f.txt'), 'x');
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return root;
+}
 
 test('planTranslation returns source, target path, and hash', () => {
   const root = tmp();
@@ -1554,13 +1610,23 @@ function nodeRuntime() {
 }
 ```
 
-In `start`, call:
+Add an import at the top of `lib/serve.js`:
 
 ```js
-const rt = probeRuntime(canRun, { preferNode: true });
+import { parseConfigLanguage } from './config.js';
 ```
 
-This keeps API support available for all `lore serve` sessions.
+In `start`, prefer the Node server **only when the repo is bilingual** — the preferences + translation-request APIs only matter when `available` has more than one language. Replace `const runtime = probeRuntime(can);` with:
+
+```js
+const cfgPath = join(loreDir, 'config.yml');
+const language = existsSync(cfgPath)
+  ? parseConfigLanguage(readFileSync(cfgPath, 'utf8'))
+  : { default: 'en', available: ['en'] };
+const runtime = probeRuntime(can, { preferNode: language.available.length > 1 });
+```
+
+Monolingual repos keep using the Python static server when present; only bilingual repos force Node so the local write APIs are available. (`lib/serve.js` already imports `readFileSync`, `existsSync`, and `join`.)
 
 - [ ] **Step 4: Run tests**
 
@@ -1657,29 +1723,25 @@ Expected: all tests pass.
 
 - [ ] **Step 2: Run sync on this repo**
 
-Run:
+Run (this repo dogfoods its own `.lore`, so use the worktree-relative path; the shell here is bash):
 
 ```bash
-node lib/sync.js finalize G:\Code\lore\.lore
+node lib/sync.js finalize .lore
 ```
 
 Expected:
 
 ```text
-sync finalized: ...
-next: /lore:serve
+✓ sync finalized: ...
+  next: /lore:serve
 ```
 
-Also verify:
+Also verify HOME exists and that re-syncing does **not** stack duplicate status blocks (proves the sentinel region is idempotent):
 
 ```bash
-Test-Path G:\Code\lore\.lore\wiki\HOME.md
-```
-
-Expected:
-
-```text
-True
+test -f .lore/wiki/HOME.md && echo "HOME ok"
+node lib/sync.js finalize .lore            # run a second time
+grep -c '## Status' .lore/wiki/HOME.md     # expect: 1
 ```
 
 - [ ] **Step 3: Start server**
@@ -1687,7 +1749,7 @@ True
 Run:
 
 ```bash
-node lib/serve.js start --lore G:\Code\lore\.lore --port 7842
+node lib/serve.js start --lore .lore --port 7842
 ```
 
 Expected: output includes `http://127.0.0.1:7842/site/`.
@@ -1714,7 +1776,7 @@ Verify:
 Run:
 
 ```bash
-node lib/lint.js G:\Code\lore\.lore
+node lib/lint.js .lore
 ```
 
 Expected: no new HOME/translation-specific lint errors. Existing stale/unfolded warnings can be handled separately if they predate this work.
@@ -1737,4 +1799,4 @@ If `.lore/wiki` changes are not intended for the implementation branch, leave th
 - Spec coverage: HOME first page, HOME order, repo/user language config, persistent switching, page-triggered translation requests, sidecar persistence, manifest language metadata, and graph-friendly metadata are covered by tasks.
 - Placeholder scan: no empty tasks or vague test-only steps remain.
 - Type consistency: `language.default`, `language.available`, `translations[].source_hash`, `translation_source_hash`, `target_lang`, and `HOME_STATUS_TOKEN` names are consistent across tasks.
-- Risk note: Task 4 and Task 6 both touch `finalizeSync`; implement them in order and keep a single `configText` read to avoid drift.
+- Risk note: Task 4 owns the single `configText` read in `finalizeSync` (docs + language from one read); Task 6 only changes `runManifestCli`. HOME status lives inside a sentinel-delimited region (`<!-- LORE_HOME_STATUS:START/END -->`) so re-sync swaps it in place instead of stacking duplicate `## Status` blocks. `finalizeTranslation` regenerates the manifest, so its tests run inside a git repo. Adding HOME as the first `planSync` work item requires updating three existing `planSync` tests (folded into Task 4). `translationStats` is computed by scanning sidecars on disk, not from `axisPages` entries, so the HOME counts are real.

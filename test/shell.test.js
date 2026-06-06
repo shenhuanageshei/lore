@@ -118,3 +118,49 @@ test('renderMarkdown bare ``` (no lang) stays a code block', () => {
   assert.match(html, /<pre><code>plain/);
   assert.doesNotMatch(html, /class="mermaid"/);
 });
+
+import { chooseInitialLanguage, resolveLocalizedPage } from '../site/shell.mjs';
+
+test('chooseInitialLanguage prefers saved language when available', () => {
+  const manifest = { language: { default: 'zh', available: ['zh', 'en'] }, user_preferences: { language: 'zh' } };
+  assert.equal(chooseInitialLanguage(manifest, 'en'), 'en');
+  assert.equal(chooseInitialLanguage(manifest, 'ja'), 'zh');
+  assert.equal(chooseInitialLanguage(manifest, null), 'zh');
+});
+
+test('resolveLocalizedPage returns base page for default language', () => {
+  const page = { path: 'component/lib.md', lang: 'zh', translations: [{ lang: 'en', path: 'component/lib.en.md', stale: false }] };
+  assert.deepEqual(resolveLocalizedPage(page, 'zh'), {
+    path: 'component/lib.md',
+    lang: 'zh',
+    missing: false,
+    stale: false,
+  });
+});
+
+test('resolveLocalizedPage returns ready translation for selected language', () => {
+  const page = { path: 'component/lib.md', lang: 'zh', translations: [{ lang: 'en', path: 'component/lib.en.md', stale: false }] };
+  assert.deepEqual(resolveLocalizedPage(page, 'en'), {
+    path: 'component/lib.en.md',
+    lang: 'en',
+    missing: false,
+    stale: false,
+  });
+});
+
+test('resolveLocalizedPage falls back to base page when translation is missing or stale', () => {
+  const missing = { path: 'component/lib.md', lang: 'zh', translations: [] };
+  assert.deepEqual(resolveLocalizedPage(missing, 'en'), {
+    path: 'component/lib.md',
+    lang: 'en',
+    missing: true,
+    stale: false,
+  });
+  const stale = { path: 'component/lib.md', lang: 'zh', translations: [{ lang: 'en', path: 'component/lib.en.md', stale: true }] };
+  assert.deepEqual(resolveLocalizedPage(stale, 'en'), {
+    path: 'component/lib.md',
+    lang: 'en',
+    missing: false,
+    stale: true,
+  });
+});

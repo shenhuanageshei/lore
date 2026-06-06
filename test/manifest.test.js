@@ -233,3 +233,66 @@ test('gitCurrentSha + makeCountCommitsSince are exported and work', () => {
     assert.equal(makeCountCommitsSince(root)(sha1), 1);   // 1 commit (c2) since c1
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('emitManifest includes HOME before INDEX when HOME.md exists', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-home-mf-'));
+  try {
+    const wiki = join(root, 'wiki');
+    mkdirSync(wiki, { recursive: true });
+    writeFileSync(join(wiki, 'HOME.md'), '---\ntitle: Home\nsummary: orient\n---\n# Home');
+    writeFileSync(join(wiki, 'INDEX.md'), '---\ntitle: Index\nsummary: toc\n---\n# Index');
+    const m = emitManifest({ wikiDir: wiki, currentSha: 'abc', countCommitsSince: () => 0, now: 'now' });
+    assert.deepEqual(m.axes.slice(0, 2).map(a => a.id), ['HOME', 'INDEX']);
+    assert.equal(m.axes[0].pages[0].path, 'HOME.md');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('emitManifest attaches language metadata and hides translation sidecars', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-lang-mf-'));
+  try {
+    const wiki = join(root, 'wiki');
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    const source = '---\ntitle: Lib\nsummary: core\n---\n# Lib\n正文';
+    writeFileSync(join(wiki, 'component', 'lib.md'), source);
+    writeFileSync(join(wiki, 'component', 'lib.en.md'),
+      '---\nlang: en\ntranslation_of: component/lib.md\ntranslation_source_hash: sha256:bad\n---\n# Lib\nEnglish');
+    const m = emitManifest({
+      wikiDir: wiki,
+      currentSha: 'abc',
+      countCommitsSince: () => 0,
+      now: 'now',
+      language: { default: 'zh', available: ['zh', 'en'] },
+      preferences: { language: 'en' },
+    });
+    assert.deepEqual(m.language, { default: 'zh', available: ['zh', 'en'] });
+    assert.deepEqual(m.user_preferences, { language: 'en' });
+    const comp = m.axes.find(a => a.id === 'component');
+    assert.deepEqual(comp.pages.map(p => p.id), ['lib']);
+    assert.equal(comp.pages[0].lang, 'zh');
+    assert.equal(comp.pages[0].translations[0].lang, 'en');
+    assert.equal(comp.pages[0].translations[0].path, 'component/lib.en.md');
+    assert.equal(comp.pages[0].translations[0].stale, true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runManifestCli reads language config and user preferences', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mf-lang-cli-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    mkdirSync(join(root, '.lore', 'wiki'), { recursive: true });
+    mkdirSync(join(root, '.lore', '.state'), { recursive: true });
+    writeFileSync(join(root, '.lore', 'config.yml'), 'language:\n  default: zh\n  available: [zh, en]\n');
+    writeFileSync(join(root, '.lore', '.state', 'preferences.json'), '{"language":"en"}\n');
+    writeFileSync(join(root, '.lore', 'wiki', 'HOME.md'), '---\ntitle: Home\nsummary: h\n---\n# Home');
+    writeFileSync(join(root, 'f.txt'), 'hi');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+
+    runManifestCli(join(root, '.lore'), 'now');
+    const m = JSON.parse(readFileSync(join(root, '.lore', 'wiki', '.manifest.json'), 'utf8'));
+    assert.deepEqual(m.language, { default: 'zh', available: ['zh', 'en'] });
+    assert.deepEqual(m.user_preferences, { language: 'en' });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

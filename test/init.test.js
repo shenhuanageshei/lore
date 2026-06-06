@@ -151,6 +151,13 @@ test('renderConfigYaml quotes only roots with YAML-special chars', () => {
   assert.match(yaml, /code_roots: \[m1, 'a b', src\/pkg\]/);
 });
 
+test('renderConfigYaml includes language defaults', () => {
+  const out = renderConfigYaml(['lib']);
+  assert.match(out, /language:/);
+  assert.match(out, /default: en/);
+  assert.match(out, /available: \[en\]/);
+});
+
 function fakeSrcSite() {
   const src = mkdtempSync(join(tmpdir(), 'lore-srcsite-'));
   writeFileSync(join(src, 'index.html'), '<!doctype html>shell');

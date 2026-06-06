@@ -90,6 +90,21 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 
    finalize 折标了该 flow 的原子（原子的 component ∈ flow 的 spans → 自动标）。
 
+对 `axis:'HOME'` 的 worklist 项，写 `.lore/wiki/HOME.md` —— 全仓库的人读「认知入口」（不是目录；目录仍是 `INDEX`）。
+
+   ### HOME page
+
+   When the worklist contains `{ "axis": "HOME", "id": "HOME" }`, write `.lore/wiki/HOME.md` in this order:
+
+   1. One-sentence repository positioning.
+   2. `{{LORE_HOME_STATUS}}` on its own line.
+   3. A `## Knowledge flow` section with a Mermaid diagram.
+   4. A `## Understand the project` section with wikilinks.
+   5. A `## Debug a problem` section with wikilinks.
+   6. A `## Decisions and timeline` section with wikilinks.
+
+   Do not write mechanical status values by hand; finalize replaces the `{{LORE_HOME_STATUS}}` token and refreshes it in place on every re-sync via a sentinel region.
+
 3. **finalize**（机械）：
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" finalize "$(pwd)/.lore"

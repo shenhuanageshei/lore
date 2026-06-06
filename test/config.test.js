@@ -81,3 +81,41 @@ test('parseConfigDocsAxis dequotes quoted source entries', () => {
 test('parseConfigDocsAxis returns null for empty sources list', () => {
   assert.equal(parseConfigDocsAxis(`axes:\n  docs:\n    sources: []\n`), null);
 });
+
+import { parseConfigLanguage } from '../lib/config.js';
+
+test('parseConfigLanguage: defaults to English when block is absent', () => {
+  assert.deepEqual(parseConfigLanguage('axes:\n  component:\n    code_roots: [lib]\n'), {
+    default: 'en',
+    available: ['en'],
+  });
+});
+
+test('parseConfigLanguage: reads default and available languages', () => {
+  const cfg = 'language:\n  default: zh\n  available: [zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), {
+    default: 'zh',
+    available: ['zh', 'en'],
+  });
+});
+
+test('parseConfigLanguage: dequotes, dedupes, and keeps default available', () => {
+  const cfg = 'language:\n  default: "zh"\n  available: [en, zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), {
+    default: 'zh',
+    available: ['zh', 'en'],
+  });
+});
+
+test('parseConfigLanguage: invalid default falls back to en', () => {
+  const cfg = 'language:\n  default: ???\n  available: []\n';
+  assert.deepEqual(parseConfigLanguage(cfg), {
+    default: 'en',
+    available: ['en'],
+  });
+});
+
+test('parseConfigLanguage: only reads the language block, not stray default: keys', () => {
+  const cfg = 'axes:\n  component:\n    default: en\nlanguage:\n  default: zh\n  available: [zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
+});

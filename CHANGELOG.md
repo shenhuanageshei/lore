@@ -3,6 +3,17 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.5.0] — 2026-06-06
+
+### 新增
+- **人读 HOME 首页** — 新增 `HOME` 轴（排在 INDEX 前），`/site/` 默认首屏从目录变为「认知入口」：一句话定位 + 机械状态块（版本/sha/轴数/语言/翻译进度，由 finalize 在 `{{LORE_HOME_STATUS}}` 槽位机械替换）+ 核心知识流 mermaid 图 + 理解项目/排查问题/决策时间线入口。INDEX 收窄为完整目录。（`lib/home.js`、`lib/sync.js`、`lib/manifest.js`）
+- **持久化双语层（i18n）** — repo 级语言配置（`config.yml` 的 `language: {default, available}`）、用户级偏好（`.lore/.state/preferences.json` + 浏览器 localStorage）、页面级翻译 **sidecar**（`<page>.<lang>.md`，带 `translation_of` + `translation_source_hash` 防陈旧）。manifest 暴露每页 `lang` + `translations[]`（sidecar 不进侧栏）。壳加 `#language` 切换器：当前语言无 sidecar 时回退源页并显示「translation missing/stale」。（`lib/i18n.js`、`lib/config.js`、`lib/manifest.js`、`site/{index.html,shell.mjs}`）
+- **页面触发翻译（两段式，agent 可审）** — `/lore:translate` 命令（`lib/translate.js` plan/finalize）：plan 出源正文+目标路径+hash，agent 写 sidecar，finalize 校验并更新 manifest。浏览器「翻译本页」经本地 Node server 写 `.lore/.state/translation-requests.ndjson`（不让浏览器直连 LLM）。翻译**不在 sync 自动跑**——保持确定性核心，LLM 仅此一处且 gated。
+- **本地 wiki state API** — 内置 Node `server.js` 新增 `POST /api/preferences` 与 `POST /api/translation-requests`，仅写 `.lore/.state/`；`lore serve` 在启用双语时优先用 Node server（python 静态 server 无 API）。
+
+### 安全
+- API 仅绑 `127.0.0.1`、路径白名单防穿越、`Host` 头 loopback 校验防 DNS-rebind 请求伪造；浏览器永不直接写 `.lore/wiki`。
+
 ## [0.4.1] — 2026-06-05
 
 ### 修复

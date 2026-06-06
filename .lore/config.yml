@@ -1,5 +1,8 @@
 # .lore/config.yml —— lore 引擎配置（唯一存放本 repo 特定信息处）
 # component 由 /lore:init 自动发现。请按需改：重命名 / 分组 / 删 / 增。
+language:                    # wiki 语言（人读首页 + 双语 sidecar）
+  default: zh                # repo 主语言（本仓库 wiki 内容为中文）
+  available: [zh, en]        # 开了 en → 显示语言切换器 + 每页可触发翻译
 axes:
   component:                 # 内置轴 + 自动发现
     discover: auto
@@ -10,6 +13,9 @@ axes:
   theme:                     # 自定义横切轴 — "这条长期主线怎么演进"（示例，按需填）
     values: []
     # - { id: quality, desc: "质量保证", match: [质量, accuracy, 误报] }
+  docs:                      # 文档轴 — docs/ + CHANGELOG + CLAUDE.md 收进 wiki（机械、物化视图）
+    sources: [docs, changelog]
+    docs_glob: docs/**/*.md
 journal:
   hook: true                 # post-commit hook 已装（每 commit 写 journal 骨架原子）
   mine: [commits, changelog, claude_md_pitfalls]

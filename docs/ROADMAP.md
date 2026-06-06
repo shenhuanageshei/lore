@@ -4,14 +4,43 @@
 > 下面是后续迭代，按价值/依赖排序。每项仍走 spec → plan → TDD → 审查 → 合并。
 > 母 spec：`docs/superpowers/specs/2026-05-31-lore-repo-wiki-design.md`。
 
+## 北极星（项目目标 —— 缺一不可）
+
+lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同时推进这两端」排优先级：
+
+1. **人读友好的代码仓库 wiki** —— 一眼看懂：为什么这么设计、关键决策怎么来的、**时间线**（演进顺序）、**最新架构**、**各类数据流**。读文档像读一本活的项目史，不用 grep 源码。
+2. **agent 友好的 wiki + graph** —— 不只是给人看的页面，还是机器可遍历的**结构**：节点（页 / 原子 / 组件）+ 边（wikilink / facet / refs / 决策关系），让 agent 检索、问答、顺图谱推理，而非重读代码。
+
+## 已完成（v0.2 → v0.5，均 spec→plan→TDD→两段审查→opus 终审→合并）
+
+- **v0.2.0** mermaid 架构/数据流图（vendored、客户端渲染、securityLevel strict）· 可安装为 Claude Code 插件 · installHook hooksPath 修复 · sync token exactly-once。
+- **v0.3.0** docs 轴 —— 文档摄取（`docs/` + CHANGELOG + CLAUDE.md 踩坑 → 物化视图，零 LLM）。
+- **v0.4.0 / 0.4.1** docs 页嵌入文档全文（消 404）· docs 时间降序（侧栏显日期）· mermaid 懒加载 · server 目录索引修复。
+- **v0.5.0** 人读 **HOME 首页**（HOME 轴）· 持久化**双语层 i18n**（语言配置 + 翻译 sidecar + `/lore:translate` 命令 + 语言切换器 + 本地 state API + Host-guard 安全）。注：翻译**按需生成**（非 sync 自动），未译时回退源页显「missing」。
+
+## 待修复（known issues）
+
+- **journal fold-by-id（决策史重复）⭐ 已实测 biting** —— amend 的 commit 在 journal 留 pre/post 两条 sha 原子 → 决策史出现重复条目（dogfood `component/lib` 页可见）。按 id 折叠取最新即修（见下「note enrich + fold-by-id」）。
+- **HOME 翻译过度 stale** —— `translation_source_hash` 含机械状态块 → 每次 sync 状态变都让 HOME 翻译 stale。应把状态块排除出 hash。
+- **defaultHomePage 空段** —— 无 pitfalls/ROADMAP/changelog 的 repo，HOME「排查/决策」段空标题无 bullet。条件渲染。
+- **docs 页 chips** —— 「0 atoms · code_sha —」对文档页怪（`buildMeta` 区分 docs 页）。
+- **server 堆积** —— 每 repo 独立 server 占端口、易堆（见中期「单机共享 server」+ `serve --list/--stop-all`）。
+
+## 待办（北极星 agent 端 —— 还没动的另一半）
+
+- **agent 友好 graph + MCP 暴露** —— 把 wiki 变机器可遍历结构（节点：页/原子/组件；边：wikilink/facet/refs/translation_of），`lore_ask`/`lore_page`/`lore_stale` MCP 工具让 agent 顺图谱检索/推理。v0.5 的 manifest `translations[]`/`lang` 已留边接口。**北极星两端目前只打磨了人读端。**
+
 ## 近期（高价值、自洽）
 
-### changelog / pitfalls miner（母 §4③ 另两源）
-- `/lore:mine` 现只挖 commits。加两个可插拔 source extractor：
-  - **changelog**：解析 `CHANGELOG.md`（Keep-a-Changelog `## [x.y.z] - date` 段）→ `kind:decision` 原子。半通用。
-  - **pitfalls**：解析 CLAUDE.md 的 Problem/Fix/Prevention 结构化踩坑 → `kind:incident` 富 why 原子。格式特定（试验田 threat-intel 的金矿）。
-- config `journal.mine: [commits, changelog, claude_md_pitfalls]` 已声明哪些源跑；按 config gate。
-- 触发：想把现有产物（CHANGELOG / 踩坑）一夜变成可导航原子流时。
+### 文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源，🚧 进行中 v0.2.x）
+- **缺口**：journal 只来自 commits + agent note；`docs/` 设计文档/spec/plan、`CHANGELOG`、`CLAUDE.md` 踩坑全不进 wiki。用户明确点的最大缺口。
+- **本轮做（Y · 物化视图）**：spec/plan `docs/superpowers/{specs,plans}/2026-06-05-lore-docs-ingestion*`。新 **docs 轴** + `lib/docs.js` 三 extractor（`docs/**/*.md` 每文件一页、`CHANGELOG`/`CLAUDE.md` 踩坑各折一页）→ `buildDocsAxis` nuke-rebuild `wiki/docs/`。**机械薄页、零 LLM、无 journal、永远当前**；config `axes.docs` opt-in。
+- **本轮推迟（后续迭代）**：
+  - **X · journal 原子 + 跨轴折叠**：让 doc 决策按 facet 露在相关 component/theme 页决策史。依赖下面的 `journal fold-by-id`。
+  - **agent 摘要页**：每文档 LLM 写 2-3 行抽象（比机械薄页丰富）。
+  - **增量指纹**：现每 sync 全量 nuke-rebuild docs 页；大 `docs/` 时加每页指纹、只重建变动页。
+  - **docs 页 chips**：`buildMeta` 区分 docs 页，去掉「0 atoms · code_sha —」的怪显示。
+  - **小项**：折叠页 id 碰撞前缀（doc 名撞 `changelog`/`pitfalls`）、源链本地壳可点（现仅 github 仓库浏览可点）、pitfalls 标签集对齐 threat-intel 实测格式。
 
 ### per-facet confidence 显示（母 §4 line 190）
 - 现 commit 原子整体 `confidence:'EXTRACTED'`。母 spec：component=EXTRACTED、flow/theme=INFERRED（机械推断）。
@@ -22,6 +51,20 @@
 - `/lore:note` 现只产新 decision 原子。加 **enrich 已有 commit 骨架**：同 `commit:<hash>` append 新行补 `why`（append-only 神圣，不改旧行）。
 - 配套 **journal fold-by-id**：`readAllAtoms` 之上加按 id 折叠（取并集/最新）；sync / ask / lint 消费 folded 原子。保留 骨架→enriched 演化轨迹，审计友好。
 - 中等：碰 journal 读层 + 所有消费者。
+
+## 呈现（wiki 渲染，⭐ 用户明确要）
+
+### mermaid 架构图 + 数据流图
+- **现状**：页「当前架构」全文字；壳 `renderMarkdown`（site/shell.mjs）把 ```mermaid``` 当普通代码块渲染（纯文本）。
+- **做**：(a) 壳 `renderMarkdown` 识别 ```mermaid``` → `<div class="mermaid">`；vendored `mermaid.min.js` 随 `site/` 由 init 拷入。**不破零依赖**——零依赖是 Node runtime 不变量，静态壳资产不算；vendor 而非 CDN → 保持离线 + 127-only。(b) `/lore:sync` 指引 agent：component 页出架构图、flow 页出数据流图、theme 页涉及流程时也出图。
+- **为什么好**：mermaid 是文本 → git 可 diff、随 journal/commit 一起演进（远胜二进制 PNG），完全契合 lore git-native 哲学。flow 轴（m1→m5）天然就是 flowchart。
+- 高价值、接缝干净（壳 + sync 命令层，lib 几乎不动）。
+
+### 双语切换（中/EN）
+- **现状**：壳有主题切换（暗/亮/护眼）但无语言概念；页是单语（agent 写啥语言就啥）。
+- **做**：(a) 壳加 `#lang` 选择器（localStorage，同 `wireTheme` 模式）。(b) agent 写页时出双语 prose —— 配对段（`## Current architecture` + `## 当前架构`）或配对文件（`lib.md`/`lib.en.md`），壳按 lang 切显。
+- **诚实约束**：决策历史是 journal 折叠 = commit message 原文（不可变事实），不机械翻译 → 决策史保持源语言（或未来 LLM 翻译折叠，贵）。双语只覆盖 agent 写的「当前架构/状态」prose。
+- 中等：agent 2× prose 成本（sync 时）；壳 + sync 模板改。
 
 ## 中期（消费纪律 + 质量）
 

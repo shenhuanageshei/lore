@@ -26,14 +26,16 @@ test('copyShell copies index.html + shell.mjs, overwriting stale', () => {
     mkdirSync(src, { recursive: true });
     writeFileSync(join(src, 'index.html'), '<!doctype html>NEW');
     writeFileSync(join(src, 'shell.mjs'), 'export const v = 2;');
+    writeFileSync(join(src, 'mermaid.min.js'), 'window.mermaid={};');
     const lore = join(root, '.lore');
     mkdirSync(join(lore, 'site'), { recursive: true });
     writeFileSync(join(lore, 'site', 'index.html'), 'OLD');   // stale — must be overwritten
 
     const copied = copyShell(src, lore);
-    assert.deepEqual(copied, ['index.html', 'shell.mjs']);
+    assert.deepEqual(copied, ['index.html', 'shell.mjs', 'mermaid.min.js']);
     assert.equal(readFileSync(join(lore, 'site', 'index.html'), 'utf8'), '<!doctype html>NEW');
     assert.equal(readFileSync(join(lore, 'site', 'shell.mjs'), 'utf8'), 'export const v = 2;');
+    assert.equal(readFileSync(join(lore, 'site', 'mermaid.min.js'), 'utf8'), 'window.mermaid={};');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -149,10 +151,18 @@ test('renderConfigYaml quotes only roots with YAML-special chars', () => {
   assert.match(yaml, /code_roots: \[m1, 'a b', src\/pkg\]/);
 });
 
+test('renderConfigYaml includes language defaults', () => {
+  const out = renderConfigYaml(['lib']);
+  assert.match(out, /language:/);
+  assert.match(out, /default: en/);
+  assert.match(out, /available: \[en\]/);
+});
+
 function fakeSrcSite() {
   const src = mkdtempSync(join(tmpdir(), 'lore-srcsite-'));
   writeFileSync(join(src, 'index.html'), '<!doctype html>shell');
   writeFileSync(join(src, 'shell.mjs'), 'export const x = 1;');
+  writeFileSync(join(src, 'mermaid.min.js'), 'window.mermaid={};');
   return src;
 }
 
@@ -168,7 +178,7 @@ test('init scaffolds, copies shell, writes config, sets gitignore', () => {
     assert.equal(existsSync(join(lore, 'site', 'index.html')), true);
     assert.equal(existsSync(join(lore, 'site', 'shell.mjs')), true);
     assert.equal(existsSync(join(lore, 'config.yml')), true);
-    assert.deepEqual(r.copied, ['index.html', 'shell.mjs']);
+    assert.deepEqual(r.copied, ['index.html', 'shell.mjs', 'mermaid.min.js']);
     assert.deepEqual(r.codeRoots, ['lib']);
     assert.equal(r.configWritten, true);
     assert.equal(r.gitignore, 'created');
@@ -202,7 +212,7 @@ test('CLI: node lib/init.js <repo> initializes and prints summary', () => {
   try {
     const out = execFileSync('node', ['lib/init.js', root], { cwd: process.cwd() }).toString();
     assert.match(out, /lore initialized/);
-    assert.match(out, /shell copied: index\.html, shell\.mjs/);
+    assert.match(out, /shell copied: index\.html, shell\.mjs, mermaid\.min\.js/);
     // uses the REAL plugin site/ (self-located) — both shell files land in the temp repo
     assert.equal(existsSync(join(root, '.lore', 'site', 'index.html')), true);
     assert.equal(existsSync(join(root, '.lore', 'site', 'shell.mjs')), true);
@@ -242,6 +252,25 @@ test('installHook: warns when core.hooksPath set', () => {
   try {
     execFileSync('git', ['config', 'core.hooksPath', '.husky'], { cwd: root });
     assert.equal(installHook(root), 'hookspath-set');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('installHook: core.hooksPath at a DIFFERENT dir → skips, writes no hook', () => {
+  const root = bareGitRepo();
+  try {
+    execFileSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: root });
+    assert.equal(installHook(root), 'hookspath-set');
+    assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), false);  // untouched
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('installHook: core.hooksPath at the repo default .git/hooks → installs', () => {
+  const root = bareGitRepo();
+  try {
+    execFileSync('git', ['config', 'core.hooksPath', '.git/hooks'], { cwd: root });   // resolves equal to default
+    assert.equal(installHook(root), 'installed');
+    const hook = readFileSync(join(root, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.match(hook, /# lore:post-commit/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

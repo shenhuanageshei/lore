@@ -38,6 +38,7 @@ test('parseConfigThemes: ignores flow items (spans, no match)', () => {
 });
 
 import { parseConfigFlows } from '../lib/config.js';
+import { parseConfigDocsAxis } from '../lib/config.js';
 
 test('parseConfigFlows: commented example → []', () => {
   assert.deepEqual(parseConfigFlows('  flow:\n    values: []\n    # - { id: article-pipeline, spans: [lib] }\n'), []);
@@ -53,4 +54,74 @@ test('parseConfigFlows: uncommented flows (field order independent)', () => {
 
 test('parseConfigFlows: ignores theme items (match, no spans)', () => {
   assert.deepEqual(parseConfigFlows('    - { id: quality, match: [a] }\n    - { id: f1, spans: [lib] }\n'), [{ id: 'f1', spans: ['lib'] }]);
+});
+
+test('parseConfigDocsAxis reads sources + docs_glob', () => {
+  const cfg = `axes:\n  docs:\n    sources: [docs, changelog, claude_md_pitfalls]\n    docs_glob: docs/**/*.md\n`;
+  const r = parseConfigDocsAxis(cfg);
+  assert.deepEqual(r.sources, ['docs', 'changelog', 'claude_md_pitfalls']);
+  assert.equal(r.docsGlob, 'docs/**/*.md');
+});
+
+test('parseConfigDocsAxis defaults docs_glob when omitted', () => {
+  const r = parseConfigDocsAxis(`axes:\n  docs:\n    sources: [docs]\n`);
+  assert.deepEqual(r.sources, ['docs']);
+  assert.equal(r.docsGlob, 'docs/**/*.md');
+});
+
+test('parseConfigDocsAxis returns null when axes.docs absent', () => {
+  assert.equal(parseConfigDocsAxis(`axes:\n  component:\n    code_roots: [lib]\n`), null);
+});
+
+test('parseConfigDocsAxis dequotes quoted source entries', () => {
+  const r = parseConfigDocsAxis(`axes:\n  docs:\n    sources: ['docs', "changelog"]\n`);
+  assert.deepEqual(r.sources, ['docs', 'changelog']);
+});
+
+test('parseConfigDocsAxis returns null for empty sources list', () => {
+  assert.equal(parseConfigDocsAxis(`axes:\n  docs:\n    sources: []\n`), null);
+});
+
+import { parseConfigLanguage } from '../lib/config.js';
+
+test('parseConfigLanguage: defaults to English when block is absent', () => {
+  assert.deepEqual(parseConfigLanguage('axes:\n  component:\n    code_roots: [lib]\n'), {
+    default: 'en',
+    available: ['en'],
+  });
+});
+
+test('parseConfigLanguage: reads default and available languages', () => {
+  const cfg = 'language:\n  default: zh\n  available: [zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), {
+    default: 'zh',
+    available: ['zh', 'en'],
+  });
+});
+
+test('parseConfigLanguage: dequotes, dedupes, and keeps default available', () => {
+  const cfg = 'language:\n  default: "zh"\n  available: [en, zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), {
+    default: 'zh',
+    available: ['zh', 'en'],
+  });
+});
+
+test('parseConfigLanguage: invalid default falls back to en', () => {
+  const cfg = 'language:\n  default: ???\n  available: []\n';
+  assert.deepEqual(parseConfigLanguage(cfg), {
+    default: 'en',
+    available: ['en'],
+  });
+});
+
+test('parseConfigLanguage: only reads the language block, not stray default: keys', () => {
+  const cfg = 'axes:\n  component:\n    default: en\nlanguage:\n  default: zh\n  available: [zh, en]\n';
+  assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
+});
+
+test('parseConfigLanguage: tolerates a trailing comment and CRLF on the language: line', () => {
+  // init-generated configs put a comment after `language:`; Windows checkouts use CRLF.
+  const cfg = 'language:                # wiki language (human home + sidecars)\r\n  default: zh\r\n  available: [zh, en]\r\n';
+  assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
 });

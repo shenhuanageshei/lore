@@ -11,7 +11,7 @@
     --accent: #7aa2f7; --accent-dim: #3d59a1;
     --green: #9ece6a; --yellow: #e0af68; --red: #f7768e;
     --border: #2a2e42; --code-bg: #1e202e;
-    --comp: #7dcfff; --flow: #bb9af7; --theme: #ff9e64;
+    --comp: #7dcfff; --flow: #bb9af7; --theme: #ff9e64; --docs: var(--green);
   }
   :root[data-theme="light"] {
     --bg:#ffffff; --sidebar:#f4f5f8; --panel:#eef0f4; --fg:#24283b; --fg-dim:#787c99;
@@ -39,9 +39,9 @@
   #search input { width: 100%; background: var(--panel); border: 1px solid var(--border);
     color: var(--fg); padding: 7px 12px; border-radius: 7px; font-size: 13px; }
   #search input:focus { outline: none; border-color: var(--accent); }
-  #theme { background: var(--panel); border: 1px solid var(--border); color: var(--fg);
+  #theme, #language { background: var(--panel); border: 1px solid var(--border); color: var(--fg);
     padding: 6px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; }
-  #theme:focus { outline: none; border-color: var(--accent); }
+  #theme:focus, #language:focus { outline: none; border-color: var(--accent); }
   #serve-badge { margin-left: auto; font-size: 11px; color: var(--green);
     background: rgba(158,206,106,.12); padding: 4px 10px; border-radius: 12px; }
 
@@ -59,12 +59,16 @@
   .dot.component { background: var(--comp); }
   .dot.flow { background: var(--flow); }
   .dot.theme { background: var(--theme); }
+  .dot.docs { background: var(--docs); }
   .dot.index { background: var(--fg-dim); }
-  .links a { display: flex; align-items: center; gap: 8px; padding: 5px 16px 5px 30px;
+  .dot.HOME { background: var(--accent); }
+  .dot.INDEX { background: var(--fg-dim); }
+  .links a { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 5px 16px 5px 30px;
     color: var(--fg); text-decoration: none; font-size: 13px; border-left: 2px solid transparent; }
   .links a:hover { background: var(--panel); }
   .links a.active { background: var(--panel); border-left-color: var(--accent); color: var(--fg-bright); }
   .links a .stale { margin-left: auto; font-size: 10px; color: var(--yellow); }
+  .links a .when { flex-basis: 100%; font-size: 10px; color: var(--fg-dim); }
   .links a.hidden { display: none; }
 
   /* main */
@@ -75,6 +79,8 @@
   #meta .chip b { color: var(--fg); font-weight: 500; }
   #meta .chip.stale { color: var(--yellow); }
   #meta .chip.fresh { color: var(--green); }
+  #meta button.chip { font: inherit; cursor: pointer; border: 1px solid currentColor;
+    background: transparent; border-radius: 6px; padding: 2px 8px; }
   #content { padding: 28px 36px 80px; max-width: 860px; }
   #content h1 { font-size: 28px; color: var(--fg-bright); margin: 8px 0 18px; padding-bottom: 10px;
     border-bottom: 1px solid var(--border); }
@@ -118,6 +124,7 @@
   <div id="topbar">
     <div id="brand">lore <span class="dim">// .lore/wiki</span></div>
     <div id="search"><input id="q" placeholder="🔍 搜索页面 (title + 摘要)..." autocomplete="off"></div>
+    <select id="language" title="Language"></select>
     <select id="theme" title="主题">
       <option value="dark">🌙 暗</option>
       <option value="light">☀ 亮</option>
@@ -135,21 +142,64 @@
 <script type="module">
 import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
-  buildNavModel, buildMeta,
+  buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
 } from './shell.mjs';
 
-let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {};
+const mapMermaidTheme = t => (t === 'dark' ? 'dark' : 'default');
+
+let mermaidLoad = null;   // Promise once mermaid.min.js has been injected + initialized
+function ensureMermaid() {
+  if (!mermaidLoad) {
+    mermaidLoad = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = './mermaid.min.js';
+      s.onload = () => {
+        try {
+          window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(document.documentElement.getAttribute('data-theme')) });
+          resolve();
+        } catch (e) { mermaidLoad = null; reject(e); }
+      };
+      s.onerror = (e) => { mermaidLoad = null; reject(e); };
+      document.head.appendChild(s);
+    });
+  }
+  return mermaidLoad;
+}
+
+let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';
 
 async function boot() {
   MANIFEST = await (await fetch('../wiki/.manifest.json')).json();
   PAGE_INDEX = buildPageIndex(MANIFEST);
   FLAT = {};
   for (const ax of MANIFEST.axes) for (const p of ax.pages) FLAT[`${ax.id}/${p.id}`] = p;
+  SELECTED_LANG = chooseInitialLanguage(MANIFEST, localStorage.getItem('lore-language'));
   buildSidebar();
   wireSearch();
   wireTheme();
+  wireLanguage();
   window.addEventListener('hashchange', route);
   route();
+}
+
+function wireLanguage() {
+  const sel = document.getElementById('language');
+  const cfg = MANIFEST.language ?? { default: 'en', available: ['en'] };
+  sel.innerHTML = cfg.available.map(lang => `<option value="${lang}">${lang}</option>`).join('');
+  sel.value = SELECTED_LANG;
+  sel.style.display = cfg.available.length > 1 ? '' : 'none';
+  sel.addEventListener('change', async () => {
+    SELECTED_LANG = sel.value;
+    localStorage.setItem('lore-language', SELECTED_LANG);
+    try {
+      await fetch('../api/preferences', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ language: SELECTED_LANG }),
+      });
+    } catch { /* static (python) server has no API; localStorage still persists */ }
+    route();
+  });
 }
 
 function buildSidebar() {
@@ -160,7 +210,7 @@ function buildSidebar() {
       <div class="links">
         ${ax.pages.map(p => `<a href="#${ax.id}/${p.id}" data-key="${ax.id}/${p.id}"
            data-search="${(p.title + ' ' + (p.summary||'')).toLowerCase()}">
-          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}</a>`).join('')}
+          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}${ax.id === 'docs' && p.last_updated ? `<span class="when">📅 ${p.last_updated}</span>` : ''}</a>`).join('')}
       </div>
     </div>`).join('');
   nav.querySelectorAll('.axis-h').forEach(h =>
@@ -173,6 +223,12 @@ function renderMeta(page) {
     `<span class="${cls[c.kind]}">${c.icon} ${c.text}</span>`).join('');
 }
 
+function renderTranslateState(page, localized) {
+  if (!localized.missing && !localized.stale) return '';
+  const text = localized.stale ? `translation stale: ${localized.lang}` : `translation missing: ${localized.lang}`;
+  return `<button id="translate-page" class="chip stale" data-page="${page.path}" data-lang="${localized.lang}">🌐 ${text}</button>`;
+}
+
 async function route() {
   const hash = location.hash.slice(1) || firstPageKey();
   const page = FLAT[hash];
@@ -183,10 +239,32 @@ async function route() {
     document.getElementById('content').innerHTML = `<h1>404</h1><p>无此页：<code>${hash}</code></p>`;
     return;
   }
-  const raw = await (await fetch('../wiki/' + page.path)).text();
+  const localized = resolveLocalizedPage(page, SELECTED_LANG);
+  const raw = await (await fetch('../wiki/' + localized.path)).text();
   const html = preprocessWikilinks(renderMarkdown(stripFrontmatter(raw)), PAGE_INDEX);
-  document.getElementById('meta').innerHTML = renderMeta(page);
+  document.getElementById('meta').innerHTML = renderMeta(page) + renderTranslateState(page, localized);
   document.getElementById('content').innerHTML = html;
+  const mNodes = document.querySelectorAll('#content .mermaid');
+  if (mNodes.length) {
+    try { await ensureMermaid(); await window.mermaid.run({ nodes: mNodes }); }
+    catch { /* missing asset or bad diagram: leave source text visible, page stays usable */ }
+  }
+  const translateBtn = document.getElementById('translate-page');
+  if (translateBtn) {
+    translateBtn.onclick = async () => {
+      translateBtn.disabled = true;
+      translateBtn.textContent = '🌐 translation requested';
+      try {
+        await fetch('../api/translation-requests', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ page: translateBtn.dataset.page, target_lang: translateBtn.dataset.lang }),
+        });
+      } catch {
+        translateBtn.textContent = `run: node lib/translate.js plan .lore ${translateBtn.dataset.page} ${translateBtn.dataset.lang}`;
+      }
+    };
+  }
   document.getElementById('main').scrollTop = 0;
 }
 
@@ -215,6 +293,10 @@ function wireTheme() {
   sel.addEventListener('change', () => {
     document.documentElement.setAttribute('data-theme', sel.value);
     localStorage.setItem('lore-theme', sel.value);
+    if (mermaidLoad) {   // mermaid already on this page → re-theme + re-render its diagrams
+      window.mermaid?.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mapMermaidTheme(sel.value) });
+      route();
+    }
   });
 }
 

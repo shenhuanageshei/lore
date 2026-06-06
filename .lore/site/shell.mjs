@@ -36,9 +36,17 @@ export function renderMarkdown(src) {
       html += buf; continue;
     }
     if (/^```/.test(ln)) {
+      const lang = ln.slice(3).trim();                 // info-string after ```
       let buf = ''; i++;
       while (i < lines.length && !/^```/.test(lines[i])) { buf += lines[i] + '\n'; i++; }
-      i++; html += `<pre><code>${esc(buf)}</code></pre>`; continue;
+      i++;
+      // mermaid source is HTML-escaped into the div; the browser decodes entities
+      // via textContent before mermaid parses, so A--&gt;B → A-->B. Escaping also
+      // prevents raw < / & in diagram labels from breaking the page HTML.
+      html += lang === 'mermaid'
+        ? `<div class="mermaid">${esc(buf)}</div>`
+        : `<pre><code>${esc(buf)}</code></pre>`;
+      continue;
     }
     if (/^### /.test(ln)) { html += `<h3>${inline(ln.slice(4))}</h3>`; i++; continue; }
     if (/^## /.test(ln))  { html += `<h2>${inline(ln.slice(3))}</h2>`; i++; continue; }
@@ -89,6 +97,28 @@ export function matchesSearch(page, term) {
   if (!term) return true;
   const t = term.toLowerCase();
   return (page.title + ' ' + (page.summary ?? '')).toLowerCase().includes(t);
+}
+
+export function chooseInitialLanguage(manifest, saved) {
+  const cfg = manifest.language ?? { default: 'en', available: ['en'] };
+  if (saved && cfg.available.includes(saved)) return saved;
+  const preferred = manifest.user_preferences?.language;
+  if (preferred && cfg.available.includes(preferred)) return preferred;
+  return cfg.default;
+}
+
+// Pick the file to fetch for a page given the selected language. Falls back to the
+// base (default-language) page when a translation is missing or stale, signalling
+// which via the missing/stale flags so the shell can offer a "translate" action.
+export function resolveLocalizedPage(page, selectedLang) {
+  if (!page) return null;
+  if (!selectedLang || selectedLang === page.lang) {
+    return { path: page.path, lang: page.lang, missing: false, stale: false };
+  }
+  const found = (page.translations ?? []).find(t => t.lang === selectedLang);
+  if (!found) return { path: page.path, lang: selectedLang, missing: true, stale: false };
+  if (found.stale) return { path: page.path, lang: selectedLang, missing: false, stale: true };
+  return { path: found.path, lang: selectedLang, missing: false, stale: false };
 }
 
 export function buildMeta(page) {

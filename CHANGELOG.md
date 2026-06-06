@@ -3,6 +3,54 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.5.1] — 2026-06-06
+
+### 修复
+- **`parseConfigLanguage` 容忍 `language:` 行的注释 + CRLF** —— v0.5.0 的块正则 `^language:[ \t]*\n` 要求该行仅空白结尾，但 init 生成的 config 在该行带注释、Windows checkout 用 CRLF（`\r\n`）→ 解析失败、**静默退回 `default: en`**，双语 + 语言 sidecar 全失效。修正：尾注释 + `\r` 容忍；块体逐行也加 `\r?`（否则 CRLF 下 JS `.` 不匹配 `\r`，只读到首行、丢失 `available`）。lore 自身（CRLF）与 threat-intel 的 wiki 现正确识别 `default: zh`。v0.5.0 双语在真实 config 上的隐藏 regression（229 测试因都用裸 `language:\n` 未覆盖；dogfood threat-intel 时实测暴露）。
+
+## [0.5.0] — 2026-06-06
+
+### 新增
+- **人读 HOME 首页** — 新增 `HOME` 轴（排在 INDEX 前），`/site/` 默认首屏从目录变为「认知入口」：一句话定位 + 机械状态块（版本/sha/轴数/语言/翻译进度，由 finalize 在 `{{LORE_HOME_STATUS}}` 槽位机械替换）+ 核心知识流 mermaid 图 + 理解项目/排查问题/决策时间线入口。INDEX 收窄为完整目录。（`lib/home.js`、`lib/sync.js`、`lib/manifest.js`）
+- **持久化双语层（i18n）** — repo 级语言配置（`config.yml` 的 `language: {default, available}`）、用户级偏好（`.lore/.state/preferences.json` + 浏览器 localStorage）、页面级翻译 **sidecar**（`<page>.<lang>.md`，带 `translation_of` + `translation_source_hash` 防陈旧）。manifest 暴露每页 `lang` + `translations[]`（sidecar 不进侧栏）。壳加 `#language` 切换器：当前语言无 sidecar 时回退源页并显示「translation missing/stale」。（`lib/i18n.js`、`lib/config.js`、`lib/manifest.js`、`site/{index.html,shell.mjs}`）
+- **页面触发翻译（两段式，agent 可审）** — `/lore:translate` 命令（`lib/translate.js` plan/finalize）：plan 出源正文+目标路径+hash，agent 写 sidecar，finalize 校验并更新 manifest。浏览器「翻译本页」经本地 Node server 写 `.lore/.state/translation-requests.ndjson`（不让浏览器直连 LLM）。翻译**不在 sync 自动跑**——保持确定性核心，LLM 仅此一处且 gated。
+- **本地 wiki state API** — 内置 Node `server.js` 新增 `POST /api/preferences` 与 `POST /api/translation-requests`，仅写 `.lore/.state/`；`lore serve` 在启用双语时优先用 Node server（python 静态 server 无 API）。
+
+### 安全
+- API 仅绑 `127.0.0.1`、路径白名单防穿越、`Host` 头 loopback 校验防 DNS-rebind 请求伪造；浏览器永不直接写 `.lore/wiki`。
+
+## [0.4.1] — 2026-06-05
+
+### 修复
+- **docs 侧栏显示日期** — docs 轴侧栏每条链接下显示 `📅 last_updated`，让 v0.4.0 的时间降序**可见**（此前只排序不显示日期，肉眼分不出新旧）。仅 docs 轴（其他轴页日期同质、显示无意义）；无日期文档不显示日期。纯壳改动（`site/index.html`：`.links a` flex-wrap + `.when` 行 + 侧栏模板）。
+
+## [0.4.0] — 2026-06-05
+
+### 变更
+- **docs 轴页嵌入文档全文** — docs 轴页从 v0.3 的「机械薄页（标题+摘要+链）」改为**嵌入源文档完整正文**，经壳渲染（mermaid / 表格 / `[[wikilink]]` 全活）。从此在 wiki 里直接读全文，无需跳出。源文档引用改为**纯文本** `> 源文档：\`path\``（非 markdown 链接）—— 彻底消除点击 404（旧链接 `../../../docs/X.md` 指向 server 不服务的 repo 根）。`renderDocsPage` 以 `spec.body !== undefined` 区分嵌入正文（docs/changelog）vs pitfalls 条目列表；extractor 携带 FM-stripped `body`。
+- **docs 轴按时间降序** — docs 侧栏与 INDEX「Docs」段按 `last_updated` 降序（最新文档置顶；无日期沉底，id 次序 tiebreak）。其他轴保持字母序。两处排序一致：`buildDocsAxis`（按 `spec.date`）+ `emitManifest`（docs 轴按 `last_updated`）。
+
+### 性能
+- **mermaid 懒加载** — 3.2MB `mermaid.min.js` 不再每页静态加载；壳改为按需注入：仅当渲染后的页面含 `.mermaid` 节点才动态加载（promise 缓存、`onerror`/`onload` 异常均重置可重试）。无图页（如纯文档页）秒开、零 mermaid 开销。
+
+## [0.3.0] — 2026-06-05
+
+### 新增
+- **docs 轴 —— 文档摄取（捕获第 4 源）** — `/lore:sync` 的 finalize 机械把当前 `docs/**/*.md` + `CHANGELOG.md` + `CLAUDE.md`(踩坑) 摄入一个新 **docs 轴**：每文档一页（标题 + 摘要 + repo 相对源链 + 日期），CHANGELOG / 踩坑各折一页。**零 LLM、无 journal、物化视图**——每 sync nuke-rebuild，删源文档则对应页消失，永远反映当前文件（架构 Y：直读文件而非 journal 原子）。新 `lib/docs.js`（`docsExtractor` / `changelogExtractor` / `pitfallsExtractor` + `renderDocsPage` + `buildDocsAxis`）；config `axes.docs` opt-in（`sources` + `docs_glob`）；接入 `finalizeSync` + manifest `AXIS_ORDER` + `buildIndex` + 壳配色，serve 零改（复用多轴机制）。dogfood：lore 自身 28 个 `docs/` 文件 + CHANGELOG → 29 个可导航 `wiki/docs` 页。设计/计划见 `docs/superpowers/{specs,plans}/2026-06-05-lore-docs-ingestion*`。
+
+### 修复
+- **INDEX / 侧栏轴序对齐** — `buildIndex` 的轴序（曾 theme 在 flow 之前）对齐 manifest `AXIS_ORDER`（component → flow → theme → docs），消除 INDEX 页与侧栏排序不一致（pre-existing）。
+
+## [0.2.0] — 2026-06-04
+
+### 新增
+- **mermaid 架构图 / 数据流图** — component 页可含架构图、flow 页可含数据流图，作为页内 ` ```mermaid ` 文本块（git 可 diff、随历史演进，胜过二进制 PNG），浏览器壳客户端渲染。交付：vendored mermaid@11.15.0 全量 UMD（`site/mermaid.min.js`，sha256 记于 commit），由 init 随 shell 拷进 `.lore/site/`；`securityLevel:'strict'`、仅 `127.0.0.1`、不连 CDN——守住零运行时依赖 + 离线两不变量。改动面：壳 `renderMarkdown` 识别 ` ```mermaid ` fence → `<div class="mermaid">`（`site/shell.mjs`）、`index.html` 加载 mermaid + 每次路由后渲染 + 主题联动、`SHELL_FILES` 含 mermaid（`lib/init.js`）、`/lore:sync` 引导 agent 出图（`commands/sync.md`）。向后兼容：旧壳或缺资产时 ` ```mermaid ` 降级为代码块、无报错。设计/计划见 `docs/superpowers/{specs,plans}/2026-06-04-lore-mermaid-diagrams*`。
+- **可安装为 Claude Code 插件** — 插件清单 + 本地 marketplace，`/lore:*` 命名空间命令经 `${CLAUDE_PLUGIN_ROOT}` 定位 bundled `lib/`。
+
+### 修复
+- **`installHook` 默认 hooksPath 不再误跳过** — 当 `core.hooksPath` 解析后等于仓库默认 hooks 目录（`<git-common-dir>/hooks`）时，照常安装 post-commit hook；仅在指向**不同**目录（真 hook 管理器如 Husky）才跳过返回 `hookspath-set`。修复 lore 自身与 threat-intel 因 `core.hooksPath` 指向默认 `.git/hooks` 而静默无自动捕获 hook 的问题（`lib/init.js`）。
+- **`/lore:sync` journal 折叠 exactly-once** — `{{LORE_JOURNAL}}` 占位符精确折叠一次，`/lore:lint` 兜底标记任何残留未替换的 token（`lib/sync.js`、`lib/lint.js`）。
+
 ## [0.1.0] — 2026-06-03
 
 First feature-complete v1: the full **capture → synthesize → consume** loop with

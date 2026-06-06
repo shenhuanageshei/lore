@@ -119,3 +119,11 @@ test('parseConfigLanguage: only reads the language block, not stray default: key
   const cfg = 'axes:\n  component:\n    default: en\nlanguage:\n  default: zh\n  available: [zh, en]\n';
   assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
 });
+
+test('parseConfigLanguage: handles CRLF + inline comments (real init-template shape on Windows)', () => {
+  // Windows config.yml is CRLF and the init template puts a comment on each line;
+  // JS `.` does not match `\r`, so the block capture must normalize CRLF first or it
+  // stops after `default:` and never sees `available:` → silent monolingual fallback.
+  const cfg = 'language:                # wiki language\r\n  default: en  # main\r\n  available: [en, zh]  # add zh\r\n';
+  assert.deepEqual(parseConfigLanguage(cfg), { default: 'en', available: ['en', 'zh'] });
+});

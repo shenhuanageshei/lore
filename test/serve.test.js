@@ -30,6 +30,12 @@ test('probeRuntime falls back to bundled node server when no python', () => {
   assert.deepEqual(args.slice(1), ['/x', '7842']);
 });
 
+test('probeRuntime can prefer node for local APIs', () => {
+  const r = probeRuntime(cmd => cmd === 'python3', { preferNode: true });
+  assert.equal(r.kind, 'node');
+  assert.equal(r.cmd, process.execPath);
+});
+
 test('writePid then readPid round-trips', () => {
   const state = mkdtempSync(pjoin(tmpdir(), 'lore-state-'));
   try {

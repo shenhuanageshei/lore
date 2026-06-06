@@ -1,6 +1,6 @@
 {
   "name": "lore",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "description": "Repo living-docs / decision-history framework — capture → synthesize (HOME + multi-axis wiki, bilingual) → consume (human read / agent retrieval)",

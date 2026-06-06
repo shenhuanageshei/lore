@@ -3,6 +3,11 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.5.1] — 2026-06-06
+
+### 修复
+- **`parseConfigLanguage` 容忍 `language:` 行的注释 + CRLF** —— v0.5.0 的块正则 `^language:[ \t]*\n` 要求该行仅空白结尾，但 init 生成的 config 在该行带注释、Windows checkout 用 CRLF（`\r\n`）→ 解析失败、**静默退回 `default: en`**，双语 + 语言 sidecar 全失效。修正：尾注释 + `\r` 容忍；块体逐行也加 `\r?`（否则 CRLF 下 JS `.` 不匹配 `\r`，只读到首行、丢失 `available`）。lore 自身（CRLF）与 threat-intel 的 wiki 现正确识别 `default: zh`。v0.5.0 双语在真实 config 上的隐藏 regression（229 测试因都用裸 `language:\n` 未覆盖；dogfood threat-intel 时实测暴露）。
+
 ## [0.5.0] — 2026-06-06
 
 ### 新增

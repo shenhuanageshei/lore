@@ -119,3 +119,9 @@ test('parseConfigLanguage: only reads the language block, not stray default: key
   const cfg = 'axes:\n  component:\n    default: en\nlanguage:\n  default: zh\n  available: [zh, en]\n';
   assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
 });
+
+test('parseConfigLanguage: tolerates a trailing comment and CRLF on the language: line', () => {
+  // init-generated configs put a comment after `language:`; Windows checkouts use CRLF.
+  const cfg = 'language:                # wiki language (human home + sidecars)\r\n  default: zh\r\n  available: [zh, en]\r\n';
+  assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
+});

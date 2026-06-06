@@ -21,6 +21,7 @@ test('planSync builds worklist from config code_roots', () => {
     const { codeRoots, worklist } = planSync(lore);
     assert.deepEqual(codeRoots, ['lib', 'src/pkg']);
     assert.deepEqual(worklist, [
+      { axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false },
       { axis: 'component', id: 'lib', component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true },
       { axis: 'component', id: 'pkg', component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false },
     ]);
@@ -32,7 +33,7 @@ test('planSync returns empty when config missing', () => {
   try {
     const lore = join(root, '.lore');
     mkdirSync(lore, { recursive: true });
-    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], flows: [], worklist: [] });
+    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], flows: [], worklist: [{ axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false }] });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -127,8 +128,9 @@ test('CLI plan prints worklist JSON', () => {
     const out = execFileSync('node', ['lib/sync.js', 'plan', lore], { cwd: process.cwd() }).toString();
     const parsed = JSON.parse(out);
     assert.deepEqual(parsed.codeRoots, ['lib', 'site']);
-    assert.equal(parsed.worklist.length, 2);
-    assert.equal(parsed.worklist[0].component, 'lib');
+    assert.equal(parsed.worklist.length, 3);
+    assert.equal(parsed.worklist[0].axis, 'HOME');
+    assert.equal(parsed.worklist[1].component, 'lib');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -458,6 +460,51 @@ test('integration: config theme → mine tags it → sync folds into theme page'
     execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
 
     assert.match(readFileSync(join(themeDir, 'quality.md'), 'utf8'), /improve accuracy/);   // theme page folds the commit
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('planSync includes HOME as the first work item', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n');
+    const r = planSync(lore);
+    assert.equal(r.worklist[0].axis, 'HOME');
+    assert.equal(r.worklist[0].path, 'HOME.md');
+    assert.equal(r.worklist[0].priorExists, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync writes HOME before manifest and keeps INDEX', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'language:\n  default: zh\n  available: [zh, en]\n');
+    finalizeSync(lore, '2026-06-06T00:00:00Z');
+    const home = readFileSync(join(lore, 'wiki', 'HOME.md'), 'utf8');
+    assert.match(home, /title: Home/);
+    assert.match(home, /## Status/);
+    assert.doesNotMatch(home, /\{\{LORE_HOME_STATUS\}\}/);
+    assert.equal(existsSync(join(lore, 'wiki', 'INDEX.md')), true);
+    const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
+    assert.deepEqual(manifest.axes.slice(0, 2).map(a => a.id), ['HOME', 'INDEX']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync HOME status is idempotent across re-syncs (no duplicate ## Status)', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'language:\n  default: zh\n  available: [zh, en]\n');
+    finalizeSync(lore, '2026-06-06T00:00:00Z');
+    finalizeSync(lore, '2026-06-07T00:00:00Z');
+    const home = readFileSync(join(lore, 'wiki', 'HOME.md'), 'utf8');
+    assert.equal((home.match(/## Status/g) || []).length, 1);   // sentinel region swapped, not appended
+    assert.doesNotMatch(home, /\{\{LORE_HOME_STATUS\}\}/);
+    assert.match(home, /Updated: `2026-06-07`/);                // status refreshed to the 2nd run
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

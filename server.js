@@ -1,8 +1,31 @@
 // server.js
 import http from 'node:http';
-import { createReadStream, statSync } from 'node:fs';
-import { join, normalize, sep, extname } from 'node:path';
+import { appendFileSync, createReadStream, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, normalize, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { translationSourceHash } from './lib/i18n.js';
+
+const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
+
+async function readJson(req) {
+  let body = '';
+  for await (const chunk of req) body += chunk;
+  return JSON.parse(body || '{}');
+}
+
+function sendJson(res, status, value) {
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(value) + '\n');
+}
+
+// Resolve a wiki-relative page path, refusing anything that escapes <root>/wiki.
+function safeWikiPage(root, rel) {
+  if (!/^[A-Za-z0-9_./-]+\.md$/.test(rel)) return null;
+  const full = normalize(join(root, 'wiki', rel));
+  const wikiRoot = normalize(join(root, 'wiki'));
+  if (full !== wikiRoot && full.startsWith(wikiRoot + sep)) return full;
+  return null;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -16,10 +39,49 @@ const MIME = {
 
 export function createServer(rootDir) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
-  return http.createServer((req, res) => {
+  return http.createServer(async (req, res) => {
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
+
+    // Local write APIs (only reachable on 127.0.0.1). Scoped to <root>/.state and
+    // a read of <root>/wiki; never write arbitrary paths.
+    if (req.method === 'POST' && pathname === '/api/preferences') {
+      try {
+        const body = await readJson(req);
+        const lang = String(body.language ?? '');
+        if (!LANG_RE.test(lang)) return sendJson(res, 400, { error: 'invalid language' });
+        const out = join(root, '.state', 'preferences.json');
+        mkdirSync(dirname(out), { recursive: true });
+        writeFileSync(out, JSON.stringify({ language: lang }, null, 2) + '\n');
+        return sendJson(res, 200, { ok: true });
+      } catch {
+        return sendJson(res, 400, { error: 'bad json' });
+      }
+    }
+
+    if (req.method === 'POST' && pathname === '/api/translation-requests') {
+      try {
+        const body = await readJson(req);
+        const page = String(body.page ?? '');
+        const targetLang = String(body.target_lang ?? '');
+        const wikiPage = safeWikiPage(root, page);
+        if (!wikiPage || !LANG_RE.test(targetLang)) return sendJson(res, 400, { error: 'invalid request' });
+        const text = readFileSync(wikiPage, 'utf8');
+        const request = {
+          ts: new Date().toISOString(),
+          page,
+          target_lang: targetLang,
+          source_hash: translationSourceHash(text),
+        };
+        const out = join(root, '.state', 'translation-requests.ndjson');
+        mkdirSync(dirname(out), { recursive: true });
+        appendFileSync(out, JSON.stringify(request) + '\n');
+        return sendJson(res, 200, { ok: true, request });
+      } catch {
+        return sendJson(res, 400, { error: 'bad request' });
+      }
+    }
 
     const rel = pathname.replace(/^\/+/, '');
     let full = normalize(join(root, rel));

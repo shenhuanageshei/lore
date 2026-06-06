@@ -61,11 +61,12 @@
   .dot.theme { background: var(--theme); }
   .dot.docs { background: var(--docs); }
   .dot.index { background: var(--fg-dim); }
-  .links a { display: flex; align-items: center; gap: 8px; padding: 5px 16px 5px 30px;
+  .links a { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 5px 16px 5px 30px;
     color: var(--fg); text-decoration: none; font-size: 13px; border-left: 2px solid transparent; }
   .links a:hover { background: var(--panel); }
   .links a.active { background: var(--panel); border-left-color: var(--accent); color: var(--fg-bright); }
   .links a .stale { margin-left: auto; font-size: 10px; color: var(--yellow); }
+  .links a .when { flex-basis: 100%; font-size: 10px; color: var(--fg-dim); }
   .links a.hidden { display: none; }
 
   /* main */
@@ -182,7 +183,7 @@ function buildSidebar() {
       <div class="links">
         ${ax.pages.map(p => `<a href="#${ax.id}/${p.id}" data-key="${ax.id}/${p.id}"
            data-search="${(p.title + ' ' + (p.summary||'')).toLowerCase()}">
-          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}</a>`).join('')}
+          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}${ax.id === 'docs' && p.last_updated ? `<span class="when">📅 ${p.last_updated}</span>` : ''}</a>`).join('')}
       </div>
     </div>`).join('');
   nav.querySelectorAll('.axis-h').forEach(h =>

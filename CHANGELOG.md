@@ -3,6 +3,11 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.4.1] — 2026-06-05
+
+### 修复
+- **docs 侧栏显示日期** — docs 轴侧栏每条链接下显示 `📅 last_updated`，让 v0.4.0 的时间降序**可见**（此前只排序不显示日期，肉眼分不出新旧）。仅 docs 轴（其他轴页日期同质、显示无意义）；无日期文档不显示日期。纯壳改动（`site/index.html`：`.links a` flex-wrap + `.when` 行 + 侧栏模板）。
+
 ## [0.4.0] — 2026-06-05
 
 ### 变更

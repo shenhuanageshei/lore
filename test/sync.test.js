@@ -463,6 +463,13 @@ test('integration: config theme → mine tags it → sync folds into theme page'
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('commands/sync.md documents HOME work item', () => {
+  const doc = readFileSync(join(process.cwd(), 'commands', 'sync.md'), 'utf8');
+  assert.match(doc, /HOME page/);
+  assert.match(doc, /\{\{LORE_HOME_STATUS\}\}/);
+  assert.match(doc, /Knowledge flow/);
+});
+
 test('planSync includes HOME as the first work item', () => {
   const root = tmpDir();
   try {

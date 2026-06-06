@@ -11,6 +11,25 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 1. **人读友好的代码仓库 wiki** —— 一眼看懂：为什么这么设计、关键决策怎么来的、**时间线**（演进顺序）、**最新架构**、**各类数据流**。读文档像读一本活的项目史，不用 grep 源码。
 2. **agent 友好的 wiki + graph** —— 不只是给人看的页面，还是机器可遍历的**结构**：节点（页 / 原子 / 组件）+ 边（wikilink / facet / refs / 决策关系），让 agent 检索、问答、顺图谱推理，而非重读代码。
 
+## 已完成（v0.2 → v0.5，均 spec→plan→TDD→两段审查→opus 终审→合并）
+
+- **v0.2.0** mermaid 架构/数据流图（vendored、客户端渲染、securityLevel strict）· 可安装为 Claude Code 插件 · installHook hooksPath 修复 · sync token exactly-once。
+- **v0.3.0** docs 轴 —— 文档摄取（`docs/` + CHANGELOG + CLAUDE.md 踩坑 → 物化视图，零 LLM）。
+- **v0.4.0 / 0.4.1** docs 页嵌入文档全文（消 404）· docs 时间降序（侧栏显日期）· mermaid 懒加载 · server 目录索引修复。
+- **v0.5.0** 人读 **HOME 首页**（HOME 轴）· 持久化**双语层 i18n**（语言配置 + 翻译 sidecar + `/lore:translate` 命令 + 语言切换器 + 本地 state API + Host-guard 安全）。注：翻译**按需生成**（非 sync 自动），未译时回退源页显「missing」。
+
+## 待修复（known issues）
+
+- **journal fold-by-id（决策史重复）⭐ 已实测 biting** —— amend 的 commit 在 journal 留 pre/post 两条 sha 原子 → 决策史出现重复条目（dogfood `component/lib` 页可见）。按 id 折叠取最新即修（见下「note enrich + fold-by-id」）。
+- **HOME 翻译过度 stale** —— `translation_source_hash` 含机械状态块 → 每次 sync 状态变都让 HOME 翻译 stale。应把状态块排除出 hash。
+- **defaultHomePage 空段** —— 无 pitfalls/ROADMAP/changelog 的 repo，HOME「排查/决策」段空标题无 bullet。条件渲染。
+- **docs 页 chips** —— 「0 atoms · code_sha —」对文档页怪（`buildMeta` 区分 docs 页）。
+- **server 堆积** —— 每 repo 独立 server 占端口、易堆（见中期「单机共享 server」+ `serve --list/--stop-all`）。
+
+## 待办（北极星 agent 端 —— 还没动的另一半）
+
+- **agent 友好 graph + MCP 暴露** —— 把 wiki 变机器可遍历结构（节点：页/原子/组件；边：wikilink/facet/refs/translation_of），`lore_ask`/`lore_page`/`lore_stale` MCP 工具让 agent 顺图谱检索/推理。v0.5 的 manifest `translations[]`/`lang` 已留边接口。**北极星两端目前只打磨了人读端。**
+
 ## 近期（高价值、自洽）
 
 ### 文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源，🚧 进行中 v0.2.x）

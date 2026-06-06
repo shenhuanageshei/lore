@@ -1,8 +1,8 @@
 ---
 title: Index
 summary: table of contents
-last_updated: 2026-06-05
-code_sha: 943b46a
+last_updated: 2026-06-06
+code_sha: e105652
 atoms: 148
 commits: 147
 ---
@@ -12,6 +12,8 @@ commits: 147
 - [[lib]]
 
 ## Docs
+- [[superpowers-plans-2026-06-06-lore-human-home-translation]]
+- [[superpowers-specs-2026-06-06-lore-human-home-translation-design]]
 - [[changelog]]
 - [[superpowers-plans-2026-06-05-lore-docs-axis-v2]]
 - [[superpowers-plans-2026-06-05-lore-docs-ingestion]]

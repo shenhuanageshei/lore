@@ -99,6 +99,28 @@ export function matchesSearch(page, term) {
   return (page.title + ' ' + (page.summary ?? '')).toLowerCase().includes(t);
 }
 
+export function chooseInitialLanguage(manifest, saved) {
+  const cfg = manifest.language ?? { default: 'en', available: ['en'] };
+  if (saved && cfg.available.includes(saved)) return saved;
+  const preferred = manifest.user_preferences?.language;
+  if (preferred && cfg.available.includes(preferred)) return preferred;
+  return cfg.default;
+}
+
+// Pick the file to fetch for a page given the selected language. Falls back to the
+// base (default-language) page when a translation is missing or stale, signalling
+// which via the missing/stale flags so the shell can offer a "translate" action.
+export function resolveLocalizedPage(page, selectedLang) {
+  if (!page) return null;
+  if (!selectedLang || selectedLang === page.lang) {
+    return { path: page.path, lang: page.lang, missing: false, stale: false };
+  }
+  const found = (page.translations ?? []).find(t => t.lang === selectedLang);
+  if (!found) return { path: page.path, lang: selectedLang, missing: true, stale: false };
+  if (found.stale) return { path: page.path, lang: selectedLang, missing: false, stale: true };
+  return { path: found.path, lang: selectedLang, missing: false, stale: false };
+}
+
 export function buildMeta(page) {
   const f = page.synthesized_from ?? { atoms: 0, commits: 0 };
   const chips = [

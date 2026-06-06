@@ -274,3 +274,25 @@ test('emitManifest attaches language metadata and hides translation sidecars', (
     assert.equal(comp.pages[0].translations[0].stale, true);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('runManifestCli reads language config and user preferences', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mf-lang-cli-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    mkdirSync(join(root, '.lore', 'wiki'), { recursive: true });
+    mkdirSync(join(root, '.lore', '.state'), { recursive: true });
+    writeFileSync(join(root, '.lore', 'config.yml'), 'language:\n  default: zh\n  available: [zh, en]\n');
+    writeFileSync(join(root, '.lore', '.state', 'preferences.json'), '{"language":"en"}\n');
+    writeFileSync(join(root, '.lore', 'wiki', 'HOME.md'), '---\ntitle: Home\nsummary: h\n---\n# Home');
+    writeFileSync(join(root, 'f.txt'), 'hi');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+
+    runManifestCli(join(root, '.lore'), 'now');
+    const m = JSON.parse(readFileSync(join(root, '.lore', 'wiki', '.manifest.json'), 'utf8'));
+    assert.deepEqual(m.language, { default: 'zh', available: ['zh', 'en'] });
+    assert.deepEqual(m.user_preferences, { language: 'en' });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

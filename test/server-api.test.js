@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import http from 'node:http';
 import { createServer } from '../server.js';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-api-')); }
@@ -63,6 +64,25 @@ test('POST /api/translation-requests rejects path traversal', async () => {
         body: JSON.stringify({ page: '../../etc/passwd.md', target_lang: 'en' }),
       });
       assert.equal(res.status, 400);
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/preferences rejects a non-loopback Host header (DNS-rebind guard)', async () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, 'site'), { recursive: true });
+    await withServer(root, async base => {
+      const port = Number(new URL(base).port);
+      const status = await new Promise((resolve, reject) => {
+        const r = http.request(
+          { host: '127.0.0.1', port, path: '/api/preferences', method: 'POST',
+            headers: { 'content-type': 'application/json', host: 'evil.example' } },
+          res => { res.resume(); resolve(res.statusCode); });
+        r.on('error', reject);
+        r.end(JSON.stringify({ language: 'zh' }));
+      });
+      assert.equal(status, 403);
     });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

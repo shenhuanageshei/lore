@@ -18,6 +18,13 @@ function sendJson(res, status, value) {
   res.end(JSON.stringify(value) + '\n');
 }
 
+// Only accept the local-loopback Host header on write APIs — blocks DNS-rebinding
+// (a remote page resolving a hostname to 127.0.0.1 to POST against this server).
+function localHost(req) {
+  const host = (req.headers.host || '').split(':')[0];
+  return host === '127.0.0.1' || host === 'localhost' || host === '[::1]';
+}
+
 // Resolve a wiki-relative page path, refusing anything that escapes <root>/wiki.
 function safeWikiPage(root, rel) {
   if (!/^[A-Za-z0-9_./-]+\.md$/.test(rel)) return null;
@@ -46,6 +53,9 @@ export function createServer(rootDir) {
 
     // Local write APIs (only reachable on 127.0.0.1). Scoped to <root>/.state and
     // a read of <root>/wiki; never write arbitrary paths.
+    if (req.method === 'POST' && pathname.startsWith('/api/') && !localHost(req)) {
+      return sendJson(res, 403, { error: 'forbidden host' });
+    }
     if (req.method === 'POST' && pathname === '/api/preferences') {
       try {
         const body = await readJson(req);

@@ -3,6 +3,15 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.4.0] — 2026-06-05
+
+### 变更
+- **docs 轴页嵌入文档全文** — docs 轴页从 v0.3 的「机械薄页（标题+摘要+链）」改为**嵌入源文档完整正文**，经壳渲染（mermaid / 表格 / `[[wikilink]]` 全活）。从此在 wiki 里直接读全文，无需跳出。源文档引用改为**纯文本** `> 源文档：\`path\``（非 markdown 链接）—— 彻底消除点击 404（旧链接 `../../../docs/X.md` 指向 server 不服务的 repo 根）。`renderDocsPage` 以 `spec.body !== undefined` 区分嵌入正文（docs/changelog）vs pitfalls 条目列表；extractor 携带 FM-stripped `body`。
+- **docs 轴按时间降序** — docs 侧栏与 INDEX「Docs」段按 `last_updated` 降序（最新文档置顶；无日期沉底，id 次序 tiebreak）。其他轴保持字母序。两处排序一致：`buildDocsAxis`（按 `spec.date`）+ `emitManifest`（docs 轴按 `last_updated`）。
+
+### 性能
+- **mermaid 懒加载** — 3.2MB `mermaid.min.js` 不再每页静态加载；壳改为按需注入：仅当渲染后的页面含 `.mermaid` 节点才动态加载（promise 缓存、`onerror`/`onload` 异常均重置可重试）。无图页（如纯文档页）秒开、零 mermaid 开销。
+
 ## [0.3.0] — 2026-06-05
 
 ### 新增

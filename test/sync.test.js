@@ -322,79 +322,6 @@ test('finalizeSync injects journal markdown literally — no $-pattern corruptio
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('foldJournal: single token folds journal md (regression), no warning', () => {
-  const warnings = [];
-  const text = '# C\n\n## Decision history\n\n{{LORE_JOURNAL}}\n';
-  const out = foldJournal(text, '- **x** (2026-06-01)', { page: 'component/c.md', warn: m => warnings.push(m) });
-  assert.match(out, /- \*\*x\*\* \(2026-06-01\)/);
-  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
-  assert.equal(warnings.length, 0);
-});
-
-test('foldJournal: zero tokens → text unchanged, no warning (own-history pages are a valid pattern)', () => {
-  const warnings = [];
-  const text = '# C\n\n## Decision history\n\n暂无 journal 原子。\n';
-  const out = foldJournal(text, '- **x**', { page: 'component/c.md', warn: m => warnings.push(m) });
-  assert.equal(out, text);                              // page untouched, no fold slot
-  assert.equal(warnings.length, 0);                     // 0 is silent; only >1 (corruption) warns
-});
-
-test('foldJournal: multiple tokens → folds into LAST, blanks earlier, warns, no literal token', () => {
-  const warnings = [];
-  const text =
-    '# C\n\n## Current architecture\n\nThe {{LORE_JOURNAL}} token marks history.\n\n' +
-    '## Decision history\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n';
-  const md = '- **real entry** (2026-06-01)';
-  const out = foldJournal(text, md, { page: 'component/c.md', warn: m => warnings.push(m) });
-  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);                                  // no literal token survives
-  assert.match(out, /## Decision history\n\n- \*\*real entry\*\* \(2026-06-01\)\n/); // folded into the LAST slot
-  assert.match(out, /The  token marks history\./);                                  // earlier prose token blanked
-  assert.equal((out.match(/real entry/g) || []).length, 1);                         // journal md inserted exactly once
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /component\/c\.md/);                                     // names the page
-  assert.match(warnings[0], /expected 1/);                                          // names the ambiguity
-});
-
-test('foldJournal: multi-token path inserts md literally — $-pattern safe', () => {
-  const text = 'a {{LORE_JOURNAL}} b {{LORE_JOURNAL}} c';
-  const out = foldJournal(text, 'fix $& and $$ and $1', { page: 'p', warn: () => {} });
-  assert.match(out, /fix \$& and \$\$ and \$1/);
-  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
-});
-
-// agent page that mentions the token in prose AND in the real Decision-history slot
-function twoTokenPage(title, summary) {
-  return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
-    `## Current architecture\n\nThe {{LORE_JOURNAL}} token marks where history goes.\n\n` +
-    `## Decision history\n\n{{LORE_JOURNAL}}\n\n` +
-    `## Cross-links\n\n- [[other]]\n`;
-}
-
-test('finalizeSync: duplicate {{LORE_JOURNAL}} tokens fold into the last, ship no literal token + warn', () => {
-  const root = gitRepo();
-  try {
-    const lore = join(root, '.lore');
-    const compDir = join(lore, 'wiki', 'component');
-    mkdirSync(compDir, { recursive: true });
-    writeFileSync(join(compDir, 'lib.md'), twoTokenPage('Lib', 'core'));
-    const sha = realSha(root, 'real fix');
-    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: sha, title: 'real fix', why: 'reason', facets: { component: ['lib'] } });
-
-    const warnings = [];
-    finalizeSync(lore, '2026-06-02T00:00:00Z', { warn: m => warnings.push(m) });
-
-    const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
-    assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);                 // no literal token shipped
-    assert.match(libPage, /## Decision history\n\n- \*\*real fix\*\*/);  // folded into the LAST (decision-history) slot
-    assert.match(libPage, /The  token marks where history goes\./);      // earlier prose token blanked
-    assert.equal((libPage.match(/real fix/g) || []).length, 1);          // journal injected exactly once
-    assert.match(libPage, /atoms: 1/);
-    assert.equal(warnings.length, 1);
-    assert.match(warnings[0], /component\/lib\.md/);
-    assert.match(warnings[0], /expected 1/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
 test('renderDecisionHistory: decision atom (no commit) omits sha', () => {
   const out = renderDecisionHistory([
     { title: 'use ZSET', why: 'range queries', commit: null, ts: '2026-06-03T08:00:00Z', kind: 'decision' },
@@ -644,5 +571,103 @@ test('finalizeSync folds amend orphans out of a component decision history', () 
     assert.match(page, /feat: widget bravo/);         // 重生在
     assert.doesNotMatch(page, /feat: widget alpha/);   // 孤儿被折掉
     assert.match(page, /\ncommits: 1\n/);             // 计数反映折叠后(1)，不是 2
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// --- foldJournal: H2-section rebuild + sentinel ---
+const DH = '## Decision history';
+const DH_START = '<!-- LORE_JOURNAL:START -->';
+const DH_END = '<!-- LORE_JOURNAL:END -->';
+
+test('foldJournal: heading + token → rebuild into sentinel region, token gone', () => {
+  const text = `# C\n\n${DH}\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`;
+  const out = foldJournal(text, '- **a** (2026-06-01)', { page: 'c.md', warn: () => {} });
+  assert.match(out, /- \*\*a\*\* \(2026-06-01\)/);
+  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
+  assert.match(out, /<!-- LORE_JOURNAL:START -->[\s\S]*<!-- LORE_JOURNAL:END -->/);
+  assert.match(out, /## Cross-links/);                                  // 下游 section 保留
+});
+
+test('foldJournal: heading + sentinel region → swap in place (idempotent)', () => {
+  const text = `# C\n\n${DH}\n\n${DH_START}\n- **old** (2026-05-01)\n${DH_END}\n\n## Cross-links\n`;
+  const out = foldJournal(text, '- **new** (2026-06-01)', { page: 'c.md', warn: () => {} });
+  assert.match(out, /- \*\*new\*\* \(2026-06-01\)/);
+  assert.doesNotMatch(out, /old/);                                      // 旧内容被换掉
+  assert.equal((out.match(/LORE_JOURNAL:START/g) || []).length, 1);     // 仍单区间
+});
+
+test('foldJournal: accumulated bullets + multiple tokens → single region, no residue (self-heal)', () => {
+  const text = `# C\n\n${DH}\n\n` +
+    `- **a** (aaaaaaa, 2026-06-01)\n- **a** (aaaaaaa, 2026-06-01)\n{{LORE_JOURNAL}}\n` +
+    `- **b** (bbbbbbb, 2026-05-01)\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`;
+  const out = foldJournal(text, '- **fresh** (2026-06-02)', { page: 'c.md', warn: () => {} });
+  assert.equal((out.match(/^- \*\*/gm) || []).length, 1);              // 只剩注入的一条
+  assert.match(out, /- \*\*fresh\*\*/);
+  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
+  assert.equal((out.match(/LORE_JOURNAL:START/g) || []).length, 1);
+  assert.match(out, /## Cross-links\n\n- \[\[x\]\]/);                   // 下游完整
+});
+
+test('foldJournal: no "## Decision history" heading → no-op', () => {
+  const text = '# C\n\n## Current architecture\n\nprose\n';
+  assert.equal(foldJournal(text, '- **a**', { page: 'c.md', warn: () => {} }), text);
+});
+
+test('foldJournal: heading + hand-written (no token/sentinel) → no-op (self-managed)', () => {
+  const text = `# C\n\n${DH}\n\n手写决策，sync 不要碰。\n\n## Cross-links\n`;
+  assert.equal(foldJournal(text, '- **a**', { page: 'c.md', warn: () => {} }), text);
+});
+
+test('foldJournal: md with $-patterns injected literally', () => {
+  const text = `# C\n\n${DH}\n\n{{LORE_JOURNAL}}\n`;
+  const out = foldJournal(text, '- **fix $& and $$ and $1**', { page: 'c.md', warn: () => {} });
+  assert.match(out, /- \*\*fix \$& and \$\$ and \$1\*\*/);
+});
+
+test('foldJournal: decision history is last section (no next H2) → replace to EOF, single trailing newline', () => {
+  const text = `# C\n\n${DH}\n\n{{LORE_JOURNAL}}\n`;
+  const out = foldJournal(text, '- **a** (2026-06-01)', { page: 'c.md', warn: () => {} });
+  assert.match(out, /- \*\*a\*\* \(2026-06-01\)\n<!-- LORE_JOURNAL:END -->\n$/);   // 末尾单换行
+});
+
+test('foldJournal: multiple tokens → warn once', () => {
+  const warnings = [];
+  const text = `# C\n\n${DH}\n\n{{LORE_JOURNAL}}\n{{LORE_JOURNAL}}\n\n## Cross-links\n`;
+  foldJournal(text, '- **a**', { page: 'component/c.md', warn: m => warnings.push(m) });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /component\/c\.md/);
+});
+
+test('finalizeSync: decision-history rebuild is idempotent across re-syncs (no accumulation)', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'), tokenPage('Lib', 'core'));
+    const journalDir = join(lore, 'journal');
+    const shaA = realSha(root, 'alpha');
+    const shaB = realSha(root, 'bravo');
+    const mk = (sha, title, ts) => ({
+      id: `commit:${sha}`, ts, kind: 'commit', commit: sha, title, why: '', what_changed: '',
+      facets: { component: ['lib'], flow: [], theme: [] },
+      refs: { files: ['lib/x.js'], pitfall: null, related: [] },
+      source: 'hook', enriched: false, confidence: 'EXTRACTED',
+    });
+    appendAtom(journalDir, mk(shaA, 'commit alpha', '2026-06-01T00:00:00Z'));
+    appendAtom(journalDir, mk(shaB, 'commit bravo', '2026-06-02T00:00:00Z'));
+
+    finalizeSync(lore, '2026-06-03T00:00:00Z', { warn() {} });
+    let page = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.doesNotMatch(page, /\{\{LORE_JOURNAL\}\}/);                              // token 被吞
+    assert.match(page, /<!-- LORE_JOURNAL:START -->/);                             // 落了哨兵
+    assert.equal((page.match(/commit alpha/g) || []).length, 1);
+    assert.equal((page.match(/commit bravo/g) || []).length, 1);
+
+    finalizeSync(lore, '2026-06-04T00:00:00Z', { warn() {} });                     // 再 sync
+    page = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.equal((page.match(/commit alpha/g) || []).length, 1);                  // 幂等：仍各一条
+    assert.equal((page.match(/commit bravo/g) || []).length, 1);
+    assert.equal((page.match(/LORE_JOURNAL:START/g) || []).length, 1);            // 仍单区间
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

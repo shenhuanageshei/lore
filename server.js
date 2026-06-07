@@ -44,6 +44,34 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
+// Serve <root>/<rel> as a static file: traversal guard, dir→index.html, stream + MIME.
+// Extracted so the per-repo server AND the portal share identical static semantics.
+export function serveStatic(rootDir, rel, res) {
+  const root = normalize(rootDir).replace(/[/\\]+$/, '');
+  let full = normalize(join(root, rel));
+  // traversal guard: resolved path must stay within root.
+  // (full === root is reachable for a bare "" rel, which the dir→index step resolves.)
+  if (full !== root && !full.startsWith(root + sep)) {
+    res.writeHead(403); return res.end('forbidden');
+  }
+  let st;
+  try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
+  // directory request → serve its index.html, mirroring python http.server.
+  if (st.isDirectory()) {
+    full = join(full, 'index.html');
+    try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
+  }
+  if (st.isDirectory()) { res.writeHead(404); return res.end('not found'); }
+
+  const stream = createReadStream(full);
+  stream.on('error', () => {
+    if (!res.headersSent) res.writeHead(500);
+    res.end();
+  });
+  res.writeHead(200, { 'content-type': MIME[extname(full)] ?? 'application/octet-stream' });
+  stream.pipe(res);
+}
+
 export function createServer(rootDir) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer(async (req, res) => {
@@ -94,31 +122,7 @@ export function createServer(rootDir) {
     }
 
     const rel = pathname.replace(/^\/+/, '');
-    let full = normalize(join(root, rel));
-
-    // traversal guard: resolved path must stay within root.
-    // (full === root is reachable for a bare "/" request, which the dir→index
-    //  step below resolves to <root>/index.html.)
-    if (full !== root && !full.startsWith(root + sep)) {
-      res.writeHead(403); return res.end('forbidden');
-    }
-    let st;
-    try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
-    // directory request → serve its index.html, mirroring python http.server.
-    // covers paths ending in "/" (e.g. the advertised /site/) and bare dir names.
-    if (st.isDirectory()) {
-      full = join(full, 'index.html');
-      try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
-    }
-    if (st.isDirectory()) { res.writeHead(404); return res.end('not found'); }
-
-    const stream = createReadStream(full);
-    stream.on('error', () => {
-      if (!res.headersSent) res.writeHead(500);
-      res.end();
-    });
-    res.writeHead(200, { 'content-type': MIME[extname(full)] ?? 'application/octet-stream' });
-    stream.pipe(res);
+    return serveStatic(root, rel, res);
   });
 }
 

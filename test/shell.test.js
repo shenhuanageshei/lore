@@ -164,3 +164,18 @@ test('resolveLocalizedPage falls back to base page when translation is missing o
     stale: true,
   });
 });
+
+test('buildMeta: docs page → only last-updated chip (no atoms/code_sha)', () => {
+  const chips = buildMeta({ axis: 'docs', last_updated: '2026-06-07', path: 'docs/x.md' }).chips;
+  const text = chips.map(c => c.text).join(' | ');
+  assert.match(text, /last-updated 2026-06-07/);
+  assert.doesNotMatch(text, /atoms/);
+  assert.doesNotMatch(text, /code_sha/);
+});
+
+test('buildMeta: component page keeps atoms + code_sha', () => {
+  const chips = buildMeta({ axis: 'component', last_updated: '2026-06-07', code_sha: 'abc', synthesized_from: { atoms: 3, commits: 2 } }).chips;
+  const text = chips.map(c => c.text).join(' | ');
+  assert.match(text, /3 atoms · 2 commits/);
+  assert.match(text, /code_sha abc/);
+});

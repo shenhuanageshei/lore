@@ -122,6 +122,9 @@ export function resolveLocalizedPage(page, selectedLang) {
 }
 
 export function buildMeta(page) {
+  if (page.axis === 'docs') {
+    return { chips: [{ icon: '📄', text: `last-updated ${page.last_updated ?? '—'}`, kind: 'plain' }] };
+  }
   const f = page.synthesized_from ?? { atoms: 0, commits: 0 };
   const chips = [
     { icon: '📅', text: `last-updated ${page.last_updated ?? '—'}`, kind: 'plain' },

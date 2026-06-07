@@ -2,9 +2,9 @@
 title: Index
 summary: table of contents
 last_updated: 2026-06-07
-code_sha: 43d4277
-atoms: 204
-commits: 203
+code_sha: e6a87e3
+atoms: 216
+commits: 215
 ---
 # lore wiki — index
 
@@ -12,6 +12,10 @@ commits: 203
 - [[lib]]
 
 ## Docs
+- [[superpowers-plans-2026-06-07-lore-mcp-server]]
+- [[superpowers-plans-2026-06-07-lore-roadmap-cleanup]]
+- [[superpowers-specs-2026-06-07-lore-mcp-server-design]]
+- [[superpowers-specs-2026-06-07-lore-roadmap-cleanup-design]]
 - [[changelog]]
 - [[superpowers-plans-2026-06-06-lore-agent-graph]]
 - [[superpowers-plans-2026-06-06-lore-decision-history-rebuild]]

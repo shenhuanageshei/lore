@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-07T06:45:03.413Z",
+  "generated": "2026-06-07T12:54:27.649Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -14,6 +14,34 @@
       "axis": "component",
       "title": "lib —— lore 引擎核心",
       "path": "component/lib.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-07-lore-mcp-server",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore MCP 接口层 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-07-lore-mcp-server.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-07-lore-roadmap-cleanup",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore roadmap 收尾 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-07-lore-roadmap-cleanup.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-07-lore-mcp-server-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore MCP 接口层（stdio server + lore_ask/page/neighbors）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-07-lore-mcp-server-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-07-lore-roadmap-cleanup-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore roadmap 收尾（#3 server 踏脚石 + #4/#5/#6 known issues）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-07-lore-roadmap-cleanup-design.md"
     },
     {
       "id": "page:docs/changelog",
@@ -1715,6 +1743,90 @@
       "kind": "commit",
       "title": "chore(lore): dogfood resync — decision history deduped (lib.md 639->146)",
       "ts": "2026-06-06T20:01:12-07:00"
+    },
+    {
+      "id": "commit:6e376a2647098d50fa466c8c09be82de1514437d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): MCP server — lore_ask/page/neighbors (zero-dep stdio JSON-RPC)",
+      "ts": "2026-06-07T04:35:53-07:00"
+    },
+    {
+      "id": "commit:01e5a792612e8cce1ea7b9e02786b893b86e9478",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): MCP server TDD plan",
+      "ts": "2026-06-07T04:41:35-07:00"
+    },
+    {
+      "id": "commit:939b9885db20137de6345d50ff02335540841673",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(graph): neighbors + resolvePagePath query helpers",
+      "ts": "2026-06-07T04:43:53-07:00"
+    },
+    {
+      "id": "commit:d3c3f903a20f9be284e7fa75e1580b49046cf6aa",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mcp): zero-dep stdio MCP server — lore_ask/page/neighbors",
+      "ts": "2026-06-07T04:46:27-07:00"
+    },
+    {
+      "id": "commit:459a12a9e71d1e73a43721d016af6151a8455b34",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(plugin): register lore MCP server (mcpServers)",
+      "ts": "2026-06-07T04:48:57-07:00"
+    },
+    {
+      "id": "commit:506f0dc9e0988db34d7529841df634022d9a45ca",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): roadmap cleanup — server stepping-stone + 3 known issues",
+      "ts": "2026-06-07T05:27:38-07:00"
+    },
+    {
+      "id": "commit:4d2a534752c1ee2361c225b8aee0c0ff9bb96d62",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): roadmap cleanup TDD plan (registry/serve/i18n/home/meta)",
+      "ts": "2026-06-07T05:32:54-07:00"
+    },
+    {
+      "id": "commit:cb31cf4532b8ac8e7a0293f62746f139b8f34303",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(registry): ~/.lore/servers.json server registry",
+      "ts": "2026-06-07T05:35:21-07:00"
+    },
+    {
+      "id": "commit:21e2bf75f87ee2adeec06d711a75a0e4663b64d1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): stable per-repo port + registry list/stop-all",
+      "ts": "2026-06-07T05:41:43-07:00"
+    },
+    {
+      "id": "commit:179ae87638421c7a5129a3771902e0e638959744",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(i18n): exclude sentinel regions from translation source hash",
+      "ts": "2026-06-07T05:43:43-07:00"
+    },
+    {
+      "id": "commit:88c05151934e1732e3bca82868f63968a08b7c6f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(home): omit empty HOME sections instead of INDEX fallback",
+      "ts": "2026-06-07T05:48:42-07:00"
+    },
+    {
+      "id": "commit:e6a87e38df886f416c833f00728089c7184f6d72",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(meta): docs pages show last-updated only (no atoms/code_sha chips)",
+      "ts": "2026-06-07T05:52:12-07:00"
     }
   ],
   "edges": [
@@ -2235,6 +2347,41 @@
     },
     {
       "from": "commit:43d4277795ebfb7a7b4a89c033078534030d6bed",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:939b9885db20137de6345d50ff02335540841673",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:d3c3f903a20f9be284e7fa75e1580b49046cf6aa",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:cb31cf4532b8ac8e7a0293f62746f139b8f34303",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:21e2bf75f87ee2adeec06d711a75a0e4663b64d1",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:179ae87638421c7a5129a3771902e0e638959744",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:88c05151934e1732e3bca82868f63968a08b7c6f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:e6a87e38df886f416c833f00728089c7184f6d72",
       "to": "page:component/lib",
       "type": "facet"
     }

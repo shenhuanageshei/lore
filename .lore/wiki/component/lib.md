@@ -2,9 +2,9 @@
 title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程
 last_updated: 2026-06-07
-code_sha: 43d4277
-atoms: 104
-commits: 103
+code_sha: e6a87e3
+atoms: 111
+commits: 110
 ---
 # component: lib
 
@@ -39,6 +39,13 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **fix(meta): docs pages show last-updated only (no atoms/code_sha chips)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (e6a87e3, 2026-06-07)
+- **fix(home): omit empty HOME sections instead of INDEX fallback** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (88c0515, 2026-06-07)
+- **fix(i18n): exclude sentinel regions from translation source hash** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (179ae87, 2026-06-07)
+- **feat(serve): stable per-repo port + registry list/stop-all** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (21e2bf7, 2026-06-07)
+- **feat(registry): ~/.lore/servers.json server registry** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (cb31cf4, 2026-06-07)
+- **feat(mcp): zero-dep stdio MCP server — lore_ask/page/neighbors** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (d3c3f90, 2026-06-07)
+- **feat(graph): neighbors + resolvePagePath query helpers** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (939b988, 2026-06-07)
 - **feat(sync): emit wiki/.graph.json (agent graph) in finalizeSync** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (43d4277, 2026-06-06)
 - **refactor(manifest): runManifestCli returns { manifestPath, manifest }** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (b219e9e, 2026-06-06)
 - **feat(graph): buildGraph — atom/page nodes + facet/refs_related edges** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (00251a1, 2026-06-06)

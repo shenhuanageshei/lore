@@ -48,3 +48,30 @@ test('foldAtoms: same id merges — ts earliest, why appended, files union, pitf
   assert.equal(m.refs.pitfall, 'watch the lock');          // 最后非 null
   assert.equal(m.enriched, true);                          // OR
 });
+
+test('foldAtoms: drops orphan commit atoms (sha not in reachable set)', () => {
+  const live = atom({ id: 'commit:live', commit: 'live' });
+  const orphan = atom({ id: 'commit:orphan', commit: 'orphan' });
+  const out = foldAtoms([live, orphan], { reachableShas: new Set(['live']) });
+  assert.deepEqual(out.map(x => x.id), ['commit:live']);
+});
+
+test('foldAtoms: no reachableShas (omitted / {} / null) → nothing dropped', () => {
+  const orphan = atom({ id: 'commit:orphan', commit: 'orphan' });
+  assert.equal(foldAtoms([orphan]).length, 1);
+  assert.equal(foldAtoms([orphan], {}).length, 1);
+  assert.equal(foldAtoms([orphan], { reachableShas: null }).length, 1);
+});
+
+test('foldAtoms: decision atoms (kind!=commit, commit=null) never dropped by reachability', () => {
+  const decision = atom({ id: 'note:1', kind: 'decision', commit: null, enriched: true });
+  const out = foldAtoms([decision], { reachableShas: new Set() });   // 空集 = 啥都不可达
+  assert.deepEqual(out.map(x => x.id), ['note:1']);
+});
+
+test('foldAtoms: amend biting — orphan(old) + reborn(new), same title diff id → only reborn survives', () => {
+  const oldA = atom({ id: 'commit:old', commit: 'old', title: 'feat: widget', ts: '2026-06-06T01:00:00-07:00' });
+  const reborn = atom({ id: 'commit:new', commit: 'new', title: 'feat: widget', ts: '2026-06-06T01:00:01-07:00' });
+  const out = foldAtoms([oldA, reborn], { reachableShas: new Set(['new']) });
+  assert.deepEqual(out.map(x => x.id), ['commit:new']);
+});

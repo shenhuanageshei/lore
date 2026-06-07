@@ -179,3 +179,20 @@ test('buildMeta: component page keeps atoms + code_sha', () => {
   assert.match(text, /3 atoms · 2 commits/);
   assert.match(text, /code_sha abc/);
 });
+
+import { baseFromPathname } from '../site/shell.mjs';
+
+test('baseFromPathname: per-repo serve (/site/...) → "/"', () => {
+  assert.equal(baseFromPathname('/site/'), '/');
+  assert.equal(baseFromPathname('/site/index.html'), '/');
+});
+
+test('baseFromPathname: portal (/<repo>/site/...) → "/<repo>/"', () => {
+  assert.equal(baseFromPathname('/lore/site/'), '/lore/');
+  assert.equal(baseFromPathname('/lore/site/index.html'), '/lore/');
+  assert.equal(baseFromPathname('/ti/site/'), '/ti/');
+});
+
+test('baseFromPathname: 无 /site 段 → "/" 兜底', () => {
+  assert.equal(baseFromPathname('/'), '/');
+});

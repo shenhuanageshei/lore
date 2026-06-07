@@ -136,3 +136,10 @@ export function buildMeta(page) {
     : { icon: '✓', text: '最新', kind: 'fresh' });
   return { chips };
 }
+
+// 壳被 serve 在 <base>site/(index.html)：per-repo 下 <base> 为 "/"，portal 下为 "/<repo>/"。
+// 从文档路径推断该前缀，让 wiki/api fetch 不写死、自动命中正确前缀。
+export function baseFromPathname(pathname) {
+  const i = pathname.lastIndexOf('/site');
+  return i >= 0 ? pathname.slice(0, i + 1) : '/';
+}

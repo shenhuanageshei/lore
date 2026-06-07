@@ -143,7 +143,11 @@
 import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
+  baseFromPathname,
 } from './shell.mjs';
+
+// per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
+const BASE = baseFromPathname(location.pathname);
 
 const mapMermaidTheme = t => (t === 'dark' ? 'dark' : 'default');
 
@@ -169,7 +173,7 @@ function ensureMermaid() {
 let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';
 
 async function boot() {
-  MANIFEST = await (await fetch('../wiki/.manifest.json')).json();
+  MANIFEST = await (await fetch(BASE + 'wiki/.manifest.json')).json();
   PAGE_INDEX = buildPageIndex(MANIFEST);
   FLAT = {};
   for (const ax of MANIFEST.axes) for (const p of ax.pages) FLAT[`${ax.id}/${p.id}`] = p;
@@ -192,7 +196,7 @@ function wireLanguage() {
     SELECTED_LANG = sel.value;
     localStorage.setItem('lore-language', SELECTED_LANG);
     try {
-      await fetch('../api/preferences', {
+      await fetch(BASE + 'api/preferences', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ language: SELECTED_LANG }),
@@ -240,7 +244,7 @@ async function route() {
     return;
   }
   const localized = resolveLocalizedPage(page, SELECTED_LANG);
-  const raw = await (await fetch('../wiki/' + localized.path)).text();
+  const raw = await (await fetch(BASE + 'wiki/' + localized.path)).text();
   const html = preprocessWikilinks(renderMarkdown(stripFrontmatter(raw)), PAGE_INDEX);
   document.getElementById('meta').innerHTML = renderMeta(page) + renderTranslateState(page, localized);
   document.getElementById('content').innerHTML = html;
@@ -255,7 +259,7 @@ async function route() {
       translateBtn.disabled = true;
       translateBtn.textContent = '🌐 translation requested';
       try {
-        await fetch('../api/translation-requests', {
+        await fetch(BASE + 'api/translation-requests', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ page: translateBtn.dataset.page, target_lang: translateBtn.dataset.lang }),

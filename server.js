@@ -126,6 +126,52 @@ export function createServer(rootDir) {
   });
 }
 
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function renderRepoList(names) {
+  const items = names.length
+    ? names.map(n => `<li><a href="/${encodeURIComponent(n)}/site/">${escHtml(n)}</a></li>`).join('')
+    : '<li class="empty">（暂无登记仓库：在某个 repo 跑 <code>/lore:init</code>）</li>';
+  return `<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>lore portal</title>
+<style>body{font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#1a1b26;color:#c0caf5;max-width:680px;margin:48px auto;padding:0 20px}
+h1{color:#fff;font-size:22px}a{color:#7aa2f7;text-decoration:none}a:hover{text-decoration:underline}
+ul{list-style:none;padding:0}li{margin:10px 0;font-size:16px}.empty{color:#565f89;font-size:13px}
+code{background:#1e202e;padding:2px 6px;border-radius:4px}</style>
+</head><body><h1>lore portal</h1><p>本机已登记的 lore 仓库：</p><ul>${items}</ul></body></html>`;
+}
+
+// 单机共享门户：一个端口聚合本机所有 lore repo。repoMap: { name -> loreDir }。
+// MVP 只读：/<name>/api/… 一律 404（无 write 面 → 无 DNS-rebind 写风险）。配合 .listen 仅绑 127.0.0.1。
+export function createPortalServer(repoMap) {
+  return http.createServer((req, res) => {
+    let pathname;
+    try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+    catch { res.writeHead(400); return res.end('bad request'); }
+
+    if (pathname === '/' || pathname === '') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(renderRepoList(Object.keys(repoMap)));
+    }
+
+    const m = pathname.match(/^\/([^/]+)(\/.*)?$/);
+    const name = m && m[1];
+    // hasOwnProperty（非 `in`）：避免 'constructor'/'__proto__' 这类继承键误判为已登记 repo。
+    if (!name || !Object.prototype.hasOwnProperty.call(repoMap, name)) {
+      res.writeHead(404); return res.end('not found');
+    }
+    if (m[2] === undefined) {                        // "/<name>" 无尾斜杠 → 跳到壳
+      res.writeHead(302, { location: `/${name}/site/` });
+      return res.end();
+    }
+    const rel = m[2].replace(/^\/+/, '');
+    if (rel === 'api' || rel.startsWith('api/')) {   // MVP 只读：不路由写接口
+      res.writeHead(404); return res.end('not found');
+    }
+    return serveStatic(repoMap[name], rel, res);
+  });
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [, , rootDir, portStr] = process.argv;
   if (!rootDir || !portStr) { console.error('usage: node server.js <rootDir> <port>'); process.exit(1); }

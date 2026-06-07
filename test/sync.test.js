@@ -638,6 +638,20 @@ test('foldJournal: multiple tokens → warn once', () => {
   assert.match(warnings[0], /component\/c\.md/);
 });
 
+test('foldJournal: sentinel region whose content literally contains the token → swap, no false warn', () => {
+  // a real commit message that talks ABOUT {{LORE_JOURNAL}} renders into the
+  // decision history; once the page is on sentinels, those literal tokens are
+  // CONTENT, not placeholders — re-sync must swap silently, never "accumulated" warn.
+  const warnings = [];
+  const text = `# C\n\n${DH}\n\n${DH_START}\n` +
+    `- **explain {{LORE_JOURNAL}} replaced only the FIRST {{LORE_JOURNAL}}** (abc1234, 2026-06-01)\n` +
+    `${DH_END}\n\n## Cross-links\n`;
+  const out = foldJournal(text, '- **fresh** (2026-06-02)', { page: 'component/c.md', warn: m => warnings.push(m) });
+  assert.match(out, /- \*\*fresh\*\*/);
+  assert.equal((out.match(/LORE_JOURNAL:START/g) || []).length, 1);   // 仍单区间
+  assert.equal(warnings.length, 0);                                    // 哨兵稳态：内容里的字面 token 不算损坏
+});
+
 test('finalizeSync: decision-history rebuild is idempotent across re-syncs (no accumulation)', () => {
   const root = gitRepo();
   try {

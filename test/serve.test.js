@@ -1,11 +1,12 @@
 // test/serve.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { probeRuntime, readPid, writePid, isAlive, killPid, findPort, start, stop } from '../lib/serve.js';
+import { probeRuntime, readPid, writePid, isAlive, killPid, findPort, start, stop, stablePort, listRunning, stopAllRunning } from '../lib/serve.js';
 import { spawn, execFileSync as exec } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync as mkd, writeFileSync as wf } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
+import { registerServer } from '../lib/registry.js';
 
 test('probeRuntime prefers python3 when available', () => {
   const r = probeRuntime(cmd => cmd === 'python3');
@@ -168,14 +169,15 @@ test('CLI: serve start prints URL, serve stop tears down', async () => {
     mkd(pjoin(root, '.lore', 'site'), { recursive: true });
     wf(pjoin(root, '.lore', 'site', 'index.html'), 'ok');
 
+    const env = { ...process.env, HOME: root, USERPROFILE: root };   // 隔离 registry 到临时 HOME
     const out = exec('node',
       ['lib/serve.js', 'start', '--lore', pjoin(root, '.lore'), '--port', '0'],
-      { cwd: process.cwd() }).toString();
+      { cwd: process.cwd(), env }).toString();
     assert.match(out, /http:\/\/127\.0\.0\.1:\d+\/site\//);
 
     const stopOut = exec('node',
       ['lib/serve.js', 'stop', '--lore', pjoin(root, '.lore')],
-      { cwd: process.cwd() }).toString();
+      { cwd: process.cwd(), env }).toString();
     assert.match(stopOut, /stopped|no running/i);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -192,4 +194,34 @@ test('CLI: serve start without manifest exits non-zero with hint', () => {
     assert.notEqual(err, null);                       // non-zero exit threw
     assert.match(String(err.stderr), /lore:sync/);    // hint present in stderr
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('stablePort: deterministic + in 7000-7999', () => {
+  const a = stablePort('/repo/x');
+  assert.equal(a, stablePort('/repo/x'));
+  assert.ok(a >= 7000 && a <= 7999);
+});
+
+test('listRunning: keeps alive, prunes dead from registry', () => {
+  const p = pjoin(mkdtempSync(pjoin(tmpdir(), 'lore-lr-')), 'servers.json');
+  try {
+    registerServer({ loreDir: '/alive', pid: 111, port: 7001, started: 't' }, p);
+    registerServer({ loreDir: '/dead', pid: 222, port: 7002, started: 't' }, p);
+    const running = listRunning(p, (pid) => pid === 111);
+    assert.deepEqual(running.map(s => s.loreDir), ['/alive']);
+    assert.deepEqual(listRunning(p, () => true).map(s => s.loreDir), ['/alive']);   // dead 已清
+  } finally { rmSync(pjoin(p, '..'), { recursive: true, force: true }); }
+});
+
+test('stopAllRunning: kills alive + clears registry', () => {
+  const p = pjoin(mkdtempSync(pjoin(tmpdir(), 'lore-sa-')), 'servers.json');
+  try {
+    registerServer({ loreDir: '/a', pid: 1, port: 7001, started: 't' }, p);
+    registerServer({ loreDir: '/b', pid: 2, port: 7002, started: 't' }, p);
+    const killed = [];
+    const n = stopAllRunning(p, () => true, (pid) => killed.push(pid), 'linux');
+    assert.equal(n, 2);
+    assert.deepEqual(killed.sort(), [1, 2]);
+    assert.deepEqual(listRunning(p, () => true), []);
+  } finally { rmSync(pjoin(p, '..'), { recursive: true, force: true }); }
 });

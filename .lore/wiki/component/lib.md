@@ -2,9 +2,9 @@
 title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程
 last_updated: 2026-06-07
-code_sha: bb4c05f
-atoms: 100
-commits: 99
+code_sha: 43d4277
+atoms: 104
+commits: 103
 ---
 # component: lib
 
@@ -39,6 +39,10 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(sync): emit wiki/.graph.json (agent graph) in finalizeSync** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (43d4277, 2026-06-06)
+- **refactor(manifest): runManifestCli returns { manifestPath, manifest }** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (b219e9e, 2026-06-06)
+- **feat(graph): buildGraph — atom/page nodes + facet/refs_related edges** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (00251a1, 2026-06-06)
+- **fix(sync): foldJournal warns only on first migration, not literal in-content tokens** — dogfood 暴露：决策史里若有 commit message 字面引用 {{LORE_JOURNAL}}（讲该 token 的 (94c1269, 2026-06-06)
 - **fix(sync): rebuild decision-history section idempotently (sentinel region)** — foldJournal 从一次性 token 替换改为 ## Decision history section 整段重建 + (bb4c05f, 2026-06-06)
 - **feat(sync): fold journal atoms in finalizeSync (orphan-free decision history)** — finalizeSync 先 foldAtoms(rawAtoms, {reachableShas: rev-list --all}) 再喂下游：决策史去重 + HOME/INDEX 计数一致。6 个旧单元测试改用真实可达 sha 的 fixture（realSha helper），反映 journal commit sha 是真实 commit 的前提；断言意图不变。 (cb06d75, 2026-06-06)
 - **feat(fold): drop unreachable (amend/rebase orphan) commit atoms** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (632d5b8, 2026-06-06)

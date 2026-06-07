@@ -1,0 +1,2242 @@
+{
+  "generated": "2026-06-07T06:45:03.413Z",
+  "nodes": [
+    {
+      "id": "page:HOME/HOME",
+      "type": "page",
+      "axis": "HOME",
+      "title": "首页",
+      "path": "HOME.md"
+    },
+    {
+      "id": "page:component/lib",
+      "type": "page",
+      "axis": "component",
+      "title": "lib —— lore 引擎核心",
+      "path": "component/lib.md"
+    },
+    {
+      "id": "page:docs/changelog",
+      "type": "page",
+      "axis": "docs",
+      "title": "CHANGELOG",
+      "path": "docs/changelog.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-06-lore-agent-graph",
+      "type": "page",
+      "axis": "docs",
+      "title": "Agent Graph 数据层 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-06-lore-agent-graph.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-06-lore-decision-history-rebuild",
+      "type": "page",
+      "axis": "docs",
+      "title": "决策史 section 重建（foldJournal 哨兵化）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-06-lore-decision-history-rebuild.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-06-lore-human-home-translation",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore Human HOME + Persistent Translation Layer Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-06-lore-human-home-translation.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-06-lore-journal-fold",
+      "type": "page",
+      "axis": "docs",
+      "title": "Journal 折叠层 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-06-lore-journal-fold.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-06-lore-agent-graph-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore agent graph 数据层（buildGraph + .graph.json）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-06-lore-agent-graph-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-06-lore-decision-history-rebuild-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 决策史 section 重建（foldJournal 哨兵化）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-06-lore-decision-history-rebuild-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-06-lore-human-home-translation-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore Human HOME + Persistent Translation Layer 设计",
+      "path": "docs/superpowers-specs-2026-06-06-lore-human-home-translation-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-06-lore-journal-fold-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore journal 折叠层（fold layer）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-06-lore-journal-fold-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-05-lore-docs-axis-v2",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore docs 轴 v2 + mermaid 懒加载 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-05-lore-docs-axis-v2.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-05-lore-docs-ingestion",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore docs 摄取 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-05-lore-docs-ingestion.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-05-lore-docs-axis-v2-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore docs 轴 v2 + mermaid 懒加载 —— 设计",
+      "path": "docs/superpowers-specs-2026-06-05-lore-docs-axis-v2-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-05-lore-docs-ingestion-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore docs 摄取 → docs 轴 —— 设计",
+      "path": "docs/superpowers-specs-2026-06-05-lore-docs-ingestion-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-04-lore-mermaid-diagrams",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore mermaid 图 Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-04-lore-mermaid-diagrams.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-04-lore-mermaid-diagrams-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore mermaid 图 —— 设计",
+      "path": "docs/superpowers-specs-2026-06-04-lore-mermaid-diagrams-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-03-lore-ask",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:ask Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-03-lore-ask.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-03-lore-flow",
+      "type": "page",
+      "axis": "docs",
+      "title": "flow axis Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-03-lore-flow.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-03-lore-lint",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:lint Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-03-lore-lint.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-03-lore-note",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:note Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-03-lore-note.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-03-lore-theme",
+      "type": "page",
+      "axis": "docs",
+      "title": "theme axis Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-03-lore-theme.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-03-lore-ask-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:ask — wiki 消费（§5，resident-mode payoff）",
+      "path": "docs/superpowers-specs-2026-06-03-lore-ask-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-03-lore-flow-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "flow 轴端到端（§4，对称 theme）",
+      "path": "docs/superpowers-specs-2026-06-03-lore-flow-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-03-lore-lint-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:lint — 只读漂移报告（§5）",
+      "path": "docs/superpowers-specs-2026-06-03-lore-lint-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-03-lore-note-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:note — agent 决策捕获（§4②，MVP）",
+      "path": "docs/superpowers-specs-2026-06-03-lore-note-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-03-lore-theme-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "theme 轴端到端（§4 层2 + sync 多轴）",
+      "path": "docs/superpowers-specs-2026-06-03-lore-theme-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap",
+      "type": "page",
+      "axis": "docs",
+      "title": "Roadmap note: codegraph integration + adjacent ideas",
+      "path": "docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-02-lore-hook",
+      "type": "page",
+      "axis": "docs",
+      "title": "post-commit hook Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-02-lore-hook.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-02-lore-sync-journal-fold",
+      "type": "page",
+      "axis": "docs",
+      "title": "sync folds journal Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-02-lore-sync-journal-fold.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-02-lore-hook-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "post-commit hook — 耐久捕获地板（§4①）",
+      "path": "docs/superpowers-specs-2026-06-02-lore-hook-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-02-lore-sync-journal-fold-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "sync 折叠 journal — 决策历史机械渲染 + token 注入",
+      "path": "docs/superpowers-specs-2026-06-02-lore-sync-journal-fold-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-01-lore-init",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:init Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-01-lore-init.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-01-lore-journal-mine",
+      "type": "page",
+      "axis": "docs",
+      "title": "journal + /lore:mine Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-01-lore-journal-mine.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-01-lore-sync",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:sync Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-01-lore-sync.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-01-lore-init-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:init — 仓库引导（脚手架 + 拷壳 + 组件自动发现）",
+      "path": "docs/superpowers-specs-2026-06-01-lore-init-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-01-lore-journal-mine-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "journal 基座 + `/lore:mine` — 捕获生产者（commits）",
+      "path": "docs/superpowers-specs-2026-06-01-lore-journal-mine-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-01-lore-sync-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:sync — 合成 component 页（v1 MVP：code → wiki，LLM 架构 prose）",
+      "path": "docs/superpowers-specs-2026-06-01-lore-sync-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-05-31-lore-serve",
+      "type": "page",
+      "axis": "docs",
+      "title": "/lore:serve Implementation Plan",
+      "path": "docs/superpowers-plans-2026-05-31-lore-serve.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-05-31-lore-repo-wiki-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "Lore — 面向 AI Agent + 开发者的代码仓库活文档 / 决策历史框架",
+      "path": "docs/superpowers-specs-2026-05-31-lore-repo-wiki-design.md"
+    },
+    {
+      "id": "page:docs/ROADMAP",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 路线图",
+      "path": "docs/ROADMAP.md"
+    },
+    {
+      "id": "commit:2a5cdcbf7d7790c64f1bcb924d4e618f5102679d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): port selection + idempotent start/stop orchestration",
+      "ts": "2026-05-31T23:57:49-07:00"
+    },
+    {
+      "id": "commit:617bdbccec27bd12210fc1aa2a9aa6e017e4a863",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): cross-platform process kill (taskkill/SIGTERM)",
+      "ts": "2026-05-31T23:43:30-07:00"
+    },
+    {
+      "id": "commit:a2b69fd0174c0dae0807bc575a17b30bf386d63c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(serve): regression for readPid corrupt-JSON → null",
+      "ts": "2026-05-31T23:35:06-07:00"
+    },
+    {
+      "id": "commit:72c0219f946188aae189a499146af20bedbfea62",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): pid file read/write + liveness check",
+      "ts": "2026-05-31T23:26:58-07:00"
+    },
+    {
+      "id": "commit:4d66da3afbfb6681f37182ca7a881d8290ffd1b7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): runtime probe chain python3->python->node fallback",
+      "ts": "2026-05-31T23:16:25-07:00"
+    },
+    {
+      "id": "commit:7d8bdee8a3382821efc9a0c4354cdd172f9ede2a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(server): handle ReadStream errors, strip trailing-slash root, harden traversal tests",
+      "ts": "2026-05-31T23:11:14-07:00"
+    },
+    {
+      "id": "commit:7946a27ba8a2066fbc0f445a70eb0f62fec6f4b2",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(server): zero-dep static file server with traversal guard",
+      "ts": "2026-05-31T22:48:31-07:00"
+    },
+    {
+      "id": "commit:857d90f7305c24641186f884fb74a6b5bd71e06a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(manifest): clear git-error message, silence rev-list stderr, normalize loreDir",
+      "ts": "2026-05-31T22:42:34-07:00"
+    },
+    {
+      "id": "commit:51e5bede61b356079ee31586a181d99f39ae770e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): CLI entry wiring real git (rev-parse/rev-list)",
+      "ts": "2026-05-31T22:28:50-07:00"
+    },
+    {
+      "id": "commit:f93be9bcbd27d90fec1f083d211c0816090b7f23",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor(manifest): symmetric file-type filter + deterministic unknown-axis sort",
+      "ts": "2026-05-31T22:23:37-07:00"
+    },
+    {
+      "id": "commit:741d8f19c78adac95f6ae77a2ca0aa9e6500541d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): emitManifest with injected git/clock (deterministic)",
+      "ts": "2026-05-31T22:02:34-07:00"
+    },
+    {
+      "id": "commit:2b2beba8f62f4dc90b330c3e54390c3b97ce4831",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): derive ordered axes from wiki subdirs",
+      "ts": "2026-05-31T21:55:09-07:00"
+    },
+    {
+      "id": "commit:94ca472a7db3b3269ef7024530091bf74a89939a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(manifest): CRLF + NaN-guard regression tests for front-matter parser",
+      "ts": "2026-05-31T21:51:57-07:00"
+    },
+    {
+      "id": "commit:eace1c1e8ff7db603985c5c443b789e9d43b6487",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): flat front-matter parser",
+      "ts": "2026-05-31T21:37:14-07:00"
+    },
+    {
+      "id": "commit:e8cb3459505b4c194b45840c90f2e9bcd4c32db3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore: scaffold lore plugin repo (ESM, node:test, zero deps)",
+      "ts": "2026-05-31T21:31:58-07:00"
+    },
+    {
+      "id": "commit:0748141b829ba561680b18130bae48c36cbaf4e0",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): /lore:serve implementation plan (17 TDD tasks)",
+      "ts": "2026-05-31T21:11:47-07:00"
+    },
+    {
+      "id": "commit:0a3cd89aadc4cab879529638f5441e1c6e81c493",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): make target-repo source read-only an explicit invariant",
+      "ts": "2026-05-31T21:00:07-07:00"
+    },
+    {
+      "id": "commit:099a38c9e8b4dc87978f9aa27d5c5593dc540b0c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): add /lore:serve local visualization to lore v1",
+      "ts": "2026-05-31T20:43:18-07:00"
+    },
+    {
+      "id": "commit:8a5d24c8188261cdd250d251e963c81ea9c7bf0c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): lore — repo wiki + decision-history framework design",
+      "ts": "2026-05-31T09:37:37-07:00"
+    },
+    {
+      "id": "commit:75068b30cce2c4f9ed44646f279a74ff26c8c98f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(journal): appendAtom (append-only ndjson per day)",
+      "ts": "2026-06-01T23:48:42-07:00"
+    },
+    {
+      "id": "commit:f411914a65d51bc3bcf8991a32a99d9280c030ec",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(journal): atomPath shards atoms by ISO date",
+      "ts": "2026-06-01T23:40:47-07:00"
+    },
+    {
+      "id": "commit:f6bd6a26b2eb61278dcc47645204001ce35f00ac",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor: extract parseConfigCodeRoots into lib/config.js (shared by sync + mine)",
+      "ts": "2026-06-01T23:19:29-07:00"
+    },
+    {
+      "id": "commit:b936ce7a5338c3fbfebd0839d98c00f5b77df684",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: implementation plan for journal + /lore:mine",
+      "ts": "2026-06-01T23:05:35-07:00"
+    },
+    {
+      "id": "commit:24779c685dd9dde428fcb0f403f18c73eabaf7a4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec for journal substrate + /lore:mine (commits)",
+      "ts": "2026-06-01T22:56:24-07:00"
+    },
+    {
+      "id": "commit:32fc89f90b867ce0078fe86e2fd211d7f546217b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: README with /lore:sync usage",
+      "ts": "2026-06-01T21:54:15-07:00"
+    },
+    {
+      "id": "commit:cb41acebf8a79bc0261b0dbd1d2bfbbcb7f00d86",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(sync): integration init -> agent page -> finalize -> serve",
+      "ts": "2026-06-01T21:44:50-07:00"
+    },
+    {
+      "id": "commit:10f627c0f6f0b14175942b369719f821888528d3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(command): /lore:sync slash command definition",
+      "ts": "2026-06-01T21:38:01-07:00"
+    },
+    {
+      "id": "commit:0b8eb4f567c3062bf4394fe7c2eda52c1ba3137d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): CLI plan/finalize subcommands",
+      "ts": "2026-06-01T21:27:57-07:00"
+    },
+    {
+      "id": "commit:f25df5aa7d856f6de87a5485c2bfa2c900f6a958",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(sync): resolve loreDir for repoRoot parity with manifest.js",
+      "ts": "2026-06-01T21:23:00-07:00"
+    },
+    {
+      "id": "commit:0bb9f1fabc4c3d72c11b05d3e1b03c854a9f57b4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): finalizeSync stamps pages + builds INDEX + emits manifest",
+      "ts": "2026-06-01T21:06:31-07:00"
+    },
+    {
+      "id": "commit:f89bf6c1eac1332aea16d5ea121c926758223c80",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): buildIndex renders mechanical component TOC",
+      "ts": "2026-06-01T20:51:35-07:00"
+    },
+    {
+      "id": "commit:38bf660e1b1ecdf14e1d64d6681987b65a2f3dd9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): stampFrontmatter merges mechanical fields (reuses manifest.parseFrontmatter)",
+      "ts": "2026-06-01T20:38:26-07:00"
+    },
+    {
+      "id": "commit:1b3846a68cb469bc11332b8a7d4e7996466b92f0",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): planSync builds component worklist from config",
+      "ts": "2026-06-01T20:27:52-07:00"
+    },
+    {
+      "id": "commit:b877739efb6dc180c928fb7a306ec4384e82cf7c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): parseConfigCodeRoots (zero-dep YAML subset)",
+      "ts": "2026-06-01T20:16:49-07:00"
+    },
+    {
+      "id": "commit:af5457931f1b7f5e402f2d028c8b9363cd2aae21",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: implementation plan for /lore:sync",
+      "ts": "2026-06-01T20:06:50-07:00"
+    },
+    {
+      "id": "commit:083597d8c9e845f22498eb6b1a68022ae99851fe",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec for /lore:sync (code -> component pages, LLM architecture)",
+      "ts": "2026-06-01T19:47:09-07:00"
+    },
+    {
+      "id": "commit:7721ea8c8b54d7b6cf8470ff623b43e7b22dd62f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: README with /lore:init usage",
+      "ts": "2026-06-01T05:10:24-07:00"
+    },
+    {
+      "id": "commit:c184f02c483360a9be0a846f87b29e135d85d239",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(integration): route shell copy through /lore:init (close seam)",
+      "ts": "2026-06-01T05:01:48-07:00"
+    },
+    {
+      "id": "commit:483e0476edabbb05ff2ebdb7d19bf75c72151cf9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(command): /lore:init slash command definition",
+      "ts": "2026-06-01T04:55:36-07:00"
+    },
+    {
+      "id": "commit:d362fd12c2cd6a26b18f6161f36f0014fe6c9f68",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): CLI entry (self-locates plugin site/, prints summary)",
+      "ts": "2026-06-01T04:45:54-07:00"
+    },
+    {
+      "id": "commit:ff39a3d5b9f9f8dc0b26e99c79dfad8998be635d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): init orchestrator (config write-if-absent, shell refresh)",
+      "ts": "2026-06-01T04:33:52-07:00"
+    },
+    {
+      "id": "commit:c7b6015382b07d02ae3904a6e22ed029e81bed60",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(init): quote code_roots containing YAML-special chars",
+      "ts": "2026-06-01T04:28:05-07:00"
+    },
+    {
+      "id": "commit:08f01ffa9e964caf6a74e92ad6e3d0599c7c3674",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): renderConfigYaml (component auto + flow/theme seeds + hook:false)",
+      "ts": "2026-06-01T04:17:40-07:00"
+    },
+    {
+      "id": "commit:81b798fc6b0a1e7fa1fa1016e769c041a3eba6d4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): discover JS workspaces (dir/* + object form)",
+      "ts": "2026-06-01T04:07:10-07:00"
+    },
+    {
+      "id": "commit:86ffd7d2b1b465632d7d7559ede1a846af7c0dc7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): discover Python packages + src layout, ancestor dedup",
+      "ts": "2026-06-01T03:52:37-07:00"
+    },
+    {
+      "id": "commit:30a44016bc3b8cfa12bcdd456bdaf9db88192e7c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): discoverComponents fallback layer (top-level code dirs)",
+      "ts": "2026-06-01T03:32:24-07:00"
+    },
+    {
+      "id": "commit:e93d72352edfbe763c0e534a4cf55c1f0619da07",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): ensureGitignore keeps .lore/.state ignored (3-state)",
+      "ts": "2026-06-01T03:18:29-07:00"
+    },
+    {
+      "id": "commit:cfc24879c71cd0730f60224167e9a4214ba4a9ca",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): copyShell copies browser shell into .lore/site (overwrite)",
+      "ts": "2026-06-01T03:10:04-07:00"
+    },
+    {
+      "id": "commit:58d761013db7ab5ed8ae899273e0b963df0998d0",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): scaffold .lore subdirs (idempotent)",
+      "ts": "2026-06-01T02:58:55-07:00"
+    },
+    {
+      "id": "commit:cea51fc4fdb9fe9a28ec7537217f1df8300d4060",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: implementation plan for /lore:init",
+      "ts": "2026-06-01T02:46:28-07:00"
+    },
+    {
+      "id": "commit:9f960823509e02e104ce515c050a66f15e745fd7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec for /lore:init (scaffold + shell copy + component discovery)",
+      "ts": "2026-06-01T02:37:04-07:00"
+    },
+    {
+      "id": "commit:4b984de2670b3b132b7fecb0f2d38e54dfb5517b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: README with /lore:serve usage",
+      "ts": "2026-06-01T01:45:53-07:00"
+    },
+    {
+      "id": "commit:e3c60c8512df11a2c5479365679d4ce36d811f79",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(command): /lore:serve slash command definition",
+      "ts": "2026-06-01T01:42:05-07:00"
+    },
+    {
+      "id": "commit:62fbcb31bde0ba9399c874f8a886a7dfa57d6c9e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test: end-to-end fixtures->manifest->serve->fetch->stop",
+      "ts": "2026-06-01T01:36:21-07:00"
+    },
+    {
+      "id": "commit:9452e5605b731f70cd1a7f19d85ce745e974cac3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor(shell): drop unused matchesSearch import from index.html",
+      "ts": "2026-06-01T01:30:47-07:00"
+    },
+    {
+      "id": "commit:1ea590e9ab8e8555062fd1948d69e025aa27e52e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): browser DOM + 3 themes (dark/light/sepia) wired to shell.mjs",
+      "ts": "2026-06-01T01:20:04-07:00"
+    },
+    {
+      "id": "commit:517901d292e2d1f636ca5495bb2528ab35d56a5f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test: committed fixture wiki for serve integration",
+      "ts": "2026-06-01T01:06:00-07:00"
+    },
+    {
+      "id": "commit:21e9d5457e0bf0a204a0a5d4467d6512ac5cad37",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(shell): remove stray scaffolding comment",
+      "ts": "2026-06-01T01:02:25-07:00"
+    },
+    {
+      "id": "commit:fe81ccad0388f7cebbc5e3372552c29ba93738ea",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): nav model, wikilink rewrite, search, meta chips",
+      "ts": "2026-06-01T00:54:44-07:00"
+    },
+    {
+      "id": "commit:f362c2e2474e5d72d3071e644e89cd6bef9e4984",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(shell): support GFM tables without trailing pipe; document no-escape design",
+      "ts": "2026-06-01T00:49:02-07:00"
+    },
+    {
+      "id": "commit:6c806ef8454b79789b610da4881fb55273ad8813",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): front-matter strip + mini markdown renderer",
+      "ts": "2026-06-01T00:38:21-07:00"
+    },
+    {
+      "id": "commit:1410f81f73957f2427a88323b09fd43740fe08fe",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(serve): clean CLI error handling + URL spacing + assert sync hint",
+      "ts": "2026-06-01T00:32:25-07:00"
+    },
+    {
+      "id": "commit:4cf91529e8905b4425031542b95828efd60f733e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): start/stop CLI entry with manifest precheck",
+      "ts": "2026-06-01T00:23:18-07:00"
+    },
+    {
+      "id": "commit:473f4b7e479e33637d1582045893a07950e458e3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(serve): throw on server-never-binds, default now, document edge cases",
+      "ts": "2026-06-01T00:15:26-07:00"
+    },
+    {
+      "id": "commit:80b7df1c7e33671620ac9d478a0516fe852c0129",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): installHook writes post-commit stub (install-if-absent, strategy A)",
+      "ts": "2026-06-02T23:58:32-07:00"
+    },
+    {
+      "id": "commit:60a2727f2f1d1586e3ffd3beacd74e787f8ba3e3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(hook): captureHead writes HEAD commit atom (best-effort, source=hook)",
+      "ts": "2026-06-02T23:40:32-07:00"
+    },
+    {
+      "id": "commit:1f9a6b29de5fab476a1b37f65e8f02c53abb5060",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor(mine): export GIT_FORMAT + commitAtom source param (for hook reuse)",
+      "ts": "2026-06-02T22:35:14-07:00"
+    },
+    {
+      "id": "commit:e6edf72a39b240dcfcc484c421995712cbc87e89",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec + plan for post-commit hook (§4①)",
+      "ts": "2026-06-02T22:31:06-07:00"
+    },
+    {
+      "id": "commit:79676dea8ffa0733d54565150e5dd52b3e440f13",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(sync): guard against \\$-pattern corruption in journal injection",
+      "ts": "2026-06-02T21:43:07-07:00"
+    },
+    {
+      "id": "commit:325f91333b3f4cc8b3f1048fd664ca3b05e73fd9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: README notes sync folds journal into decision-history",
+      "ts": "2026-06-02T21:29:00-07:00"
+    },
+    {
+      "id": "commit:60a94f9e6c668eb210ed5c3c590449f22abccb73",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(sync): integration mine → sync folds commit atom into component page",
+      "ts": "2026-06-02T21:10:58-07:00"
+    },
+    {
+      "id": "commit:17aa004c89833d357ef2043b5991a780c085f970",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(command): /lore:sync writes {{LORE_JOURNAL}} token (finalize folds journal)",
+      "ts": "2026-06-02T21:02:55-07:00"
+    },
+    {
+      "id": "commit:5b872a2e3a0efb5be1e83cebbca174ad4c35ab29",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): finalizeSync folds journal atoms into decision-history (token + per-page counts)",
+      "ts": "2026-06-02T20:45:35-07:00"
+    },
+    {
+      "id": "commit:494097b912e8c84420ccfa4810b33305d1b88838",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): renderDecisionHistory (mechanical ts-desc atom bullets)",
+      "ts": "2026-06-02T20:32:04-07:00"
+    },
+    {
+      "id": "commit:5f83f892648f2d013eb83a809e8fd9a15a88ccea",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: roadmap note on codegraph integration ideas",
+      "ts": "2026-06-02T20:25:04-07:00"
+    },
+    {
+      "id": "commit:47e2713447b094e3cb65a7c8fcadce4d8e70b43b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: implementation plan for sync folds journal",
+      "ts": "2026-06-02T19:57:43-07:00"
+    },
+    {
+      "id": "commit:92e88f0a4129b78f8aa406b559df8155df729d46",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec for sync folds journal (decision-history mechanical render)",
+      "ts": "2026-06-02T19:37:09-07:00"
+    },
+    {
+      "id": "commit:240a3ba66a94c5193acdc644431c379680f35516",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: README with /lore:mine usage",
+      "ts": "2026-06-02T02:04:42-07:00"
+    },
+    {
+      "id": "commit:bd1a2009dcc38be02640188f423e90683871cd54",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(command): /lore:mine slash command definition",
+      "ts": "2026-06-02T01:50:56-07:00"
+    },
+    {
+      "id": "commit:2c80419a5cda660ecf95bb2d78d97eef47851e04",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): CLI entry + init→mine integration (component facets, idempotent)",
+      "ts": "2026-06-02T01:32:23-07:00"
+    },
+    {
+      "id": "commit:e21d14db2b41aecdf12dbf552aa4931c7095e494",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): mine orchestration with id-based dedup (idempotent)",
+      "ts": "2026-06-02T01:17:52-07:00"
+    },
+    {
+      "id": "commit:055bc17abfda19ecb6ec7e5befb9c50f7b7ab91d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): mineCommits runs git log → commit atoms",
+      "ts": "2026-06-02T00:56:28-07:00"
+    },
+    {
+      "id": "commit:1167930963afd96ed590f398ed5f16c822de6e62",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): commitAtom builds full journal atom + component facets",
+      "ts": "2026-06-02T00:35:24-07:00"
+    },
+    {
+      "id": "commit:868581bfd05f44b115584e11cf25e0a686fed3b1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): parseGitLog (RS/US-delimited git log → raw commits)",
+      "ts": "2026-06-02T00:19:02-07:00"
+    },
+    {
+      "id": "commit:4bab62959b1bdaed80d4fe5765be0d9cbb3ac0c9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): pathComponent maps file path to component (longest code_root)",
+      "ts": "2026-06-02T00:09:56-07:00"
+    },
+    {
+      "id": "commit:4498a29a97c769e55429a18190dadfd7346a46d1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(journal): readAllAtoms + existingIds (recursive ndjson walk)",
+      "ts": "2026-06-02T00:00:36-07:00"
+    },
+    {
+      "id": "commit:9f0ab79754b682a5932891605c773531b5ef0b0b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(plugin): package lore as installable Claude Code plugin",
+      "ts": "2026-06-03T22:53:32-07:00"
+    },
+    {
+      "id": "commit:1def5f7d248abafe9afc3ca52641d57578f24b5b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: v0.1.0 wrap-up — README rewrite, CHANGELOG, ROADMAP",
+      "ts": "2026-06-03T22:12:33-07:00"
+    },
+    {
+      "id": "commit:c169d1c4c1e4fc2367e740c0fea9a3dd607a605c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(ask): integration init → sync → ask finds the page",
+      "ts": "2026-06-03T21:08:02-07:00"
+    },
+    {
+      "id": "commit:fb1b50e2ffbaeb4cba23e7516f2f0da85196840a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: /lore:ask command + README",
+      "ts": "2026-06-03T20:57:11-07:00"
+    },
+    {
+      "id": "commit:a2d92d0f3514728f74a804c7926d48ec269f3347",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(ask): searchPages (manifest keyword retrieval) + CLI",
+      "ts": "2026-06-03T20:39:41-07:00"
+    },
+    {
+      "id": "commit:57c2db5a42a11a10f69eeae7ede60eeaa7404183",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec + plan for /lore:ask (§5 consume)",
+      "ts": "2026-06-03T20:34:53-07:00"
+    },
+    {
+      "id": "commit:88f35e12f5655a57b4481a00bebcdf805ee45d30",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs+test(flow): integration config→mine→sync flow page + README",
+      "ts": "2026-06-03T19:46:53-07:00"
+    },
+    {
+      "id": "commit:afcca99aa1b87052e193e4c206f80dbdba4c5a33",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(command): /lore:sync writes flow pages (3 axes)",
+      "ts": "2026-06-03T19:41:43-07:00"
+    },
+    {
+      "id": "commit:1da0a61132ab3481470c0b821ebdad5e27c75fcc",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): planSync flow worklist + SYNC_AXES includes flow",
+      "ts": "2026-06-03T19:33:06-07:00"
+    },
+    {
+      "id": "commit:c673a96d7086aba7067c52112e8989073289ffdd",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(hook): captureHead tags flow from config flows",
+      "ts": "2026-06-03T19:17:23-07:00"
+    },
+    {
+      "id": "commit:e43c1acb00e5b2aae29494a922afeeff41dc1094",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): thread config flows through mineCommits/mine/CLI",
+      "ts": "2026-06-03T19:12:31-07:00"
+    },
+    {
+      "id": "commit:f1c875af7e2ea7069b3a0ef441062adde1e72d54",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): commitAtom flows param → facets.flow",
+      "ts": "2026-06-03T19:07:14-07:00"
+    },
+    {
+      "id": "commit:10655b5b05c94e0709015ed56eb879f5f2933aac",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): tagFlows (component-membership in flow spans)",
+      "ts": "2026-06-03T19:02:54-07:00"
+    },
+    {
+      "id": "commit:65bacd56486795739f368773a6d84aee23d7182c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parseConfigFlows (flow id + spans)",
+      "ts": "2026-06-03T18:59:34-07:00"
+    },
+    {
+      "id": "commit:573207bbbd532f2c654d7c0ba91173aa661334d6",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec + plan for flow axis (§4, third axis)",
+      "ts": "2026-06-03T18:50:56-07:00"
+    },
+    {
+      "id": "commit:1db9bdaf34f78fee9c5b8484fafd406a53c5a90a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs+test(theme): integration config→mine→sync theme page + README",
+      "ts": "2026-06-03T05:28:24-07:00"
+    },
+    {
+      "id": "commit:b1ba93031c97d6799fc8a1bf1b5c811f06eb4807",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(command): /lore:sync writes theme pages",
+      "ts": "2026-06-03T05:22:47-07:00"
+    },
+    {
+      "id": "commit:dc6ab17e2c28af84228296f6d7f6000a2f5a0c14",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): finalizeSync + buildIndex generalize to multi-axis (component + theme)",
+      "ts": "2026-06-03T05:12:49-07:00"
+    },
+    {
+      "id": "commit:f707b63dd593da2fcdd2d33129b39983ae58c1aa",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): planSync adds theme worklist items (axis field)",
+      "ts": "2026-06-03T05:02:13-07:00"
+    },
+    {
+      "id": "commit:81edefb4ad19422bb8ac8962f3c9fb4e7d45294f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(hook): captureHead tags theme from config themes",
+      "ts": "2026-06-03T04:44:00-07:00"
+    },
+    {
+      "id": "commit:cbebc0fe395d01c31f104d3861da2f8ff7a26018",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): thread config themes through mineCommits/mine/CLI",
+      "ts": "2026-06-03T04:38:42-07:00"
+    },
+    {
+      "id": "commit:9e14cc415ee462ba85036112aa4ce5cf9625651f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): commitAtom themes param → facets.theme",
+      "ts": "2026-06-03T04:23:25-07:00"
+    },
+    {
+      "id": "commit:3caff5a6ae4a649a66f77923f6322e6fb92c7e5f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mine): tagThemes (case-insensitive keyword substring)",
+      "ts": "2026-06-03T04:19:36-07:00"
+    },
+    {
+      "id": "commit:9f9ad5ab03f7492fe5993bf3781560b5ea54ea22",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parseConfigThemes (theme id + match keywords)",
+      "ts": "2026-06-03T04:08:13-07:00"
+    },
+    {
+      "id": "commit:26c21ce6270eea838c673ed662a9e36cf95db9c7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec + plan for theme axis (§4 layer-2 + sync multi-axis)",
+      "ts": "2026-06-03T03:57:26-07:00"
+    },
+    {
+      "id": "commit:56fc13a94a18c5427a62063ec79a91a5dcb87cac",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs+test(lint): command, README, sync→stale→lint integration",
+      "ts": "2026-06-03T03:26:47-07:00"
+    },
+    {
+      "id": "commit:5c9b40b2519407353c6082738b3fab9c198c5818",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(lint): CLI prints drift report (exit 0, advisory)",
+      "ts": "2026-06-03T03:17:56-07:00"
+    },
+    {
+      "id": "commit:6e45c4cc9c65fe52211ede6cf81bb29035813a37",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(lint): use real sha in test; revert unrequested manifest stale change",
+      "ts": "2026-06-03T03:05:29-07:00"
+    },
+    {
+      "id": "commit:94b8074eb08d5d9f8391d79e8f08239de48c5a84",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(lint): lintStale + lint orchestrator (config/wiki/git, read-only)",
+      "ts": "2026-06-03T02:59:06-07:00"
+    },
+    {
+      "id": "commit:8ee9658efb41a3f9780cfac32a54d6b72e88cfb9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(lint): lintOrphans + lintMissing (page↔code_root diff)",
+      "ts": "2026-06-03T02:47:52-07:00"
+    },
+    {
+      "id": "commit:fec5607f6195b407f5e948314812b84eb8956657",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor(manifest): export gitCurrentSha + makeCountCommitsSince (for lint reuse)",
+      "ts": "2026-06-03T02:40:49-07:00"
+    },
+    {
+      "id": "commit:2b93b5e83ee0de7288f3c2492e39b64cc0da6d63",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec + plan for /lore:lint (§5 read-only drift)",
+      "ts": "2026-06-03T02:36:00-07:00"
+    },
+    {
+      "id": "commit:9708ecb26b9ad67683b46a8497ba7864f07d3997",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(note): integration note → sync folds decision atom into page",
+      "ts": "2026-06-03T02:13:48-07:00"
+    },
+    {
+      "id": "commit:591bbcb537e55cd2b9c5068337dbf415722d40bb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: /lore:note command + README",
+      "ts": "2026-06-03T02:04:58-07:00"
+    },
+    {
+      "id": "commit:389bb21f089aad935d021a36f3a6d032de9d1fda",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): renderDecisionHistory omits sha for commit-less (decision) atoms",
+      "ts": "2026-06-03T01:56:08-07:00"
+    },
+    {
+      "id": "commit:51de636f22aeb9307719b16331999242d552a3eb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(note): noteAtom + CLI (agent decision atom, source=agent)",
+      "ts": "2026-06-03T01:45:54-07:00"
+    },
+    {
+      "id": "commit:ea5b6f922133ed4772ec29c36899a2d4e95d7caa",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: spec + plan for /lore:note (§4②, MVP)",
+      "ts": "2026-06-03T01:35:50-07:00"
+    },
+    {
+      "id": "commit:4d2765c1860fb99b2adc57e9096b607876163977",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(hook): integration init → real commit fires hook → journal atom",
+      "ts": "2026-06-03T00:56:05-07:00"
+    },
+    {
+      "id": "commit:5bb2e28347fdfbb0ede65742a76862d348e621e7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: /lore:init now installs the post-commit hook",
+      "ts": "2026-06-03T00:41:54-07:00"
+    },
+    {
+      "id": "commit:36849b2e0cb02a00ab7e0ebe06037bd08d63b5d8",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): init installs post-commit hook + config hook: true",
+      "ts": "2026-06-03T00:20:34-07:00"
+    },
+    {
+      "id": "commit:01676f93fdb5c5f77050b2fd6ae44ea8ae9a5545",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(init): installHook resolves common git dir (worktree-safe)",
+      "ts": "2026-06-03T00:13:58-07:00"
+    },
+    {
+      "id": "commit:3ba02a2ef05ada139faa113015df4090b7166aeb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): dogfood — track lore's own .lore/ (config + journal + wiki)",
+      "ts": "2026-06-03T23:35:10-07:00"
+    },
+    {
+      "id": "commit:5dd1a7086c733e7fc8bf5143698c9394e217b6f2",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): shared single-server multi-repo portal (needs brainstorm)",
+      "ts": "2026-06-03T23:44:01-07:00"
+    },
+    {
+      "id": "commit:f3578a0560819acd36ba2efb755eec1e5df4fda5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(sync): fold journal into exactly-once {{LORE_JOURNAL}} token; lint flags survivors",
+      "ts": "2026-06-04T00:24:55-07:00"
+    },
+    {
+      "id": "note:mpzar1nlhusdol",
+      "type": "atom",
+      "kind": "decision",
+      "title": "暂缓单机共享 wiki server，记入 ROADMAP 待头脑风暴",
+      "ts": "2026-06-04T09:32:22.689Z"
+    },
+    {
+      "id": "commit:29b007c26bc9c7c727744812254a89c59b15cfcb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): dogfood — lib wiki page now renders a mermaid architecture diagram",
+      "ts": "2026-06-04T23:25:42-07:00"
+    },
+    {
+      "id": "commit:648ccd026f4c67cf9ac4378c85ece318fadbc1d5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(server): serve index.html for bare directory requests",
+      "ts": "2026-06-04T22:52:14-07:00"
+    },
+    {
+      "id": "commit:d15d04c167160a17aff968a14691be6303dcd1ec",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(release): 0.2.0 — mermaid diagrams",
+      "ts": "2026-06-04T22:39:07-07:00"
+    },
+    {
+      "id": "commit:164a7e4d2c0079753b038bda32987a04fc9dbb4e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(sync): guide agent to emit mermaid arch/dataflow diagrams",
+      "ts": "2026-06-04T22:07:51-07:00"
+    },
+    {
+      "id": "commit:b14a3577365b8bfdbc0c53f6b6d8b26ebacecd2c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): load vendored mermaid + render diagrams per route (strict)",
+      "ts": "2026-06-04T21:46:28-07:00"
+    },
+    {
+      "id": "commit:283c1cfeae121a934ad1424be08bc729e6163f84",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): copy vendored mermaid.min.js into .lore/site/",
+      "ts": "2026-06-04T21:27:43-07:00"
+    },
+    {
+      "id": "commit:0b17a5551f3ad8af16a23cbfb9c36ccf530a2fd5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(site): vendor mermaid@11.15.0 UMD for offline diagram render",
+      "ts": "2026-06-04T21:22:45-07:00"
+    },
+    {
+      "id": "commit:80c08a95535fba28e78655338eb3f1cf47647b3e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): render \\`\\`\\`mermaid fences as <div class=mermaid>",
+      "ts": "2026-06-04T21:13:16-07:00"
+    },
+    {
+      "id": "commit:308c62db92a04404a29ce634f8cd627ef0ae3f8b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): mermaid diagrams implementation plan (6 tasks, TDD)",
+      "ts": "2026-06-04T20:51:03-07:00"
+    },
+    {
+      "id": "commit:6cce3eea006989d4333a1a40f8ca3ee369eb7694",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): mermaid architecture + dataflow diagrams design",
+      "ts": "2026-06-04T20:19:38-07:00"
+    },
+    {
+      "id": "commit:6ae43a04282e1886ee423798229722d7e1a32296",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(init): install post-commit hook when core.hooksPath is the repo default",
+      "ts": "2026-06-04T03:12:55-07:00"
+    },
+    {
+      "id": "commit:6b0727818b3e4c51a20891f082bb86155aa6a0bf",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): doc-ingestion gap + wiki rendering (mermaid, bilingual)",
+      "ts": "2026-06-04T02:57:42-07:00"
+    },
+    {
+      "id": "commit:0475038235f30db48a88bf0166f5991fa0284867",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): note shared-server decision + re-sync wiki",
+      "ts": "2026-06-04T02:36:35-07:00"
+    },
+    {
+      "id": "commit:75bf1600615a6781146b35e484f15c168ff3fdf2",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parseConfigDocsAxis (docs axis sources + glob)",
+      "ts": "2026-06-05T01:07:00-07:00"
+    },
+    {
+      "id": "commit:65d6ab6cafd20cfd124d708ca11420ed16793b89",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): docsExtractor (docs/**/*.md → page specs)",
+      "ts": "2026-06-05T01:38:56-07:00"
+    },
+    {
+      "id": "commit:b1c1ea64be8bd03f9596df200c61cadac9d9a677",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): changelogExtractor (versions → one folded spec)",
+      "ts": "2026-06-05T01:58:03-07:00"
+    },
+    {
+      "id": "commit:32f3f878fe70c5db5cc7e47b3f524e3d5efe61a9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): pitfallsExtractor (CLAUDE.md Problem/Fix/Prevention)",
+      "ts": "2026-06-05T02:25:21-07:00"
+    },
+    {
+      "id": "commit:11d0225c8484d218607ad9568463cfcd7d11d4cf",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): renderDocsPage (front-matter + source link + entries)",
+      "ts": "2026-06-05T02:59:20-07:00"
+    },
+    {
+      "id": "commit:171f2b5e9d15e9f00f6c909fb4ecc46f972e12fc",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): buildDocsAxis (nuke-rebuild wiki/docs from current files)",
+      "ts": "2026-06-05T03:39:22-07:00"
+    },
+    {
+      "id": "commit:2fe6669cc70c789c3d29bdcb3f91b0105530cc0e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): finalize builds docs axis; AXIS_ORDER + buildIndex include docs",
+      "ts": "2026-06-05T07:43:44-07:00"
+    },
+    {
+      "id": "commit:1eb0ad80886e1c8378b2ba270df092d1c2cf22a1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): shell dot + init config example + sync.md note; align INDEX/sidebar axis order",
+      "ts": "2026-06-05T07:59:30-07:00"
+    },
+    {
+      "id": "commit:8ad615cf8ded31456e3fcbf8047440b10f13cf8d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(sync): describe home page generation",
+      "ts": "2026-06-05T22:36:59-07:00"
+    },
+    {
+      "id": "commit:4974cb25f846c1b5cb1d076cbced2a3badd23eac",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): prefer node server for bilingual repos",
+      "ts": "2026-06-05T22:34:19-07:00"
+    },
+    {
+      "id": "commit:e2b85b94c2c776785e9d03b58326350cc23243a9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(translate): add sidecar translation command",
+      "ts": "2026-06-05T22:30:09-07:00"
+    },
+    {
+      "id": "commit:9d72397262ee47733d979698ebfabb77294ecd75",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(server): add local wiki state APIs",
+      "ts": "2026-06-05T22:27:07-07:00"
+    },
+    {
+      "id": "commit:96a9c49ff852bb34972d7d0e45eddd986d53fecd",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): fold review fixes into implementation plan",
+      "ts": "2026-06-05T22:16:56-07:00"
+    },
+    {
+      "id": "commit:55d54242dc8d8c3116046ffdf85c3bcfb47bd6a5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): add language switcher",
+      "ts": "2026-06-05T22:16:11-07:00"
+    },
+    {
+      "id": "commit:f01a3dadde5f7a99e8917581f776e62d2e90d0cf",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): resolve localized pages",
+      "ts": "2026-06-05T22:11:08-07:00"
+    },
+    {
+      "id": "commit:4477a26bb9a0733cc8577f0588417c33dc4e3544",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): read language and preferences",
+      "ts": "2026-06-05T22:08:47-07:00"
+    },
+    {
+      "id": "commit:36b71017fc61f1994b2079a22483318f07ce52c1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init): include language defaults",
+      "ts": "2026-06-05T22:03:58-07:00"
+    },
+    {
+      "id": "commit:19aa253467713c8cfcc5d1faee31e870f1c9f54d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): generate human home page",
+      "ts": "2026-06-05T22:00:32-07:00"
+    },
+    {
+      "id": "commit:ee22de059010007e36f3c757233e67f1efaaaafe",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): expose home and translations",
+      "ts": "2026-06-05T21:51:38-07:00"
+    },
+    {
+      "id": "commit:b04feb8b4cdbced76c5754d058a73cbca4e9719c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(i18n): add translation sidecar helpers",
+      "ts": "2026-06-05T21:41:56-07:00"
+    },
+    {
+      "id": "commit:5d99c32f8c0e5da841c787a81d5f89ce2c32d1ed",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parse wiki language preferences",
+      "ts": "2026-06-05T21:34:17-07:00"
+    },
+    {
+      "id": "commit:fb44b80524a03df70867d39e45a8838852d480a6",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(shell): show last_updated date on docs sidebar links",
+      "ts": "2026-06-05T19:23:38-07:00"
+    },
+    {
+      "id": "commit:3d6231c6162b3b7c6cf4ea11918531d6ac884457",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(release): 0.4.0 — docs pages embed full body, time-sort, mermaid lazy-load",
+      "ts": "2026-06-05T18:59:51-07:00"
+    },
+    {
+      "id": "commit:c89427487cb2b389b57966d87a3ec59aff32155a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): dogfood docs-axis-v2 — embed full body, time-sort, lazy-load shell",
+      "ts": "2026-06-05T11:03:03-07:00"
+    },
+    {
+      "id": "commit:943b46a5c04bb6eff003cdf65fc1e281473dcab4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): lazy-load mermaid only on pages that have a diagram",
+      "ts": "2026-06-05T10:29:43-07:00"
+    },
+    {
+      "id": "commit:9f8cc7a3d6834f4f95fc03b163a0b6b0d48d7a4a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): sort docs axis pages by last_updated desc",
+      "ts": "2026-06-05T10:07:38-07:00"
+    },
+    {
+      "id": "commit:c7187a7efbe41909b2cb3988f1006024021224fb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): buildDocsAxis returns specs sorted by date desc",
+      "ts": "2026-06-05T09:56:59-07:00"
+    },
+    {
+      "id": "commit:2c3158e909e8fb3e933af3d24a9a686adbbef70e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): renderDocsPage embeds full body + plain-text source ref (no 404)",
+      "ts": "2026-06-05T09:49:39-07:00"
+    },
+    {
+      "id": "commit:cd627347eff2097fcc6ca89c2c49825c4c3ebe15",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): extractors carry source body for embedding",
+      "ts": "2026-06-05T09:43:05-07:00"
+    },
+    {
+      "id": "commit:950c3ecc10bc1b10e4aa674d8946cf324c8477cb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): docs axis v2 + mermaid lazy-load (6 tasks, TDD)",
+      "ts": "2026-06-05T09:30:19-07:00"
+    },
+    {
+      "id": "commit:139fd3f53651649184b5d19597c840fd344245a5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): docs axis v2 (embed full body, time-sort) + mermaid lazy-load",
+      "ts": "2026-06-05T09:16:03-07:00"
+    },
+    {
+      "id": "commit:160f8967a81465cf3919168684afdc8c62058a7d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: record north-star — human + agent (wiki+graph) dual mandate",
+      "ts": "2026-06-05T09:06:32-07:00"
+    },
+    {
+      "id": "commit:17b251962489d9b4ee3f6a591fcd1868de56b980",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(release): 0.3.0 — docs axis (document ingestion)",
+      "ts": "2026-06-05T08:40:15-07:00"
+    },
+    {
+      "id": "commit:93aa86f6c45056c994db713bbb83127262ba5967",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(docs): no empty docs axis when zero specs; tolerate trailing-slash glob",
+      "ts": "2026-06-05T08:24:56-07:00"
+    },
+    {
+      "id": "commit:373863e1ef36fe8803004cd8eddae3141e8f8687",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): dogfood — enable docs axis (28 docs/ + CHANGELOG → 29 pages)",
+      "ts": "2026-06-05T08:15:29-07:00"
+    },
+    {
+      "id": "commit:d37405c317249875d355d092755c0ec1f07c31b7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): docs-ingestion in progress (Y); record deferred items",
+      "ts": "2026-06-05T01:00:02-07:00"
+    },
+    {
+      "id": "commit:b019a9b6e4d4df508bfe9340264afe663b4caa10",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): docs ingestion implementation plan (9 tasks, TDD)",
+      "ts": "2026-06-05T00:54:16-07:00"
+    },
+    {
+      "id": "commit:57c23345ef158a2e65bbf8653c67151db4763704",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): docs ingestion → docs axis (materialized view)",
+      "ts": "2026-06-05T00:42:06-07:00"
+    },
+    {
+      "id": "commit:e1056521f9798e1f36ee948c46a2b383acf0f7c6",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(server): reject non-loopback Host on write APIs (DNS-rebind guard)",
+      "ts": "2026-06-06T01:31:17-07:00"
+    },
+    {
+      "id": "commit:53f09bf20308605995e54c60e88569231148261a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): decision-history section rebuild (foldJournal sentinel)",
+      "ts": "2026-06-06T18:57:18-07:00"
+    },
+    {
+      "id": "commit:5cd1e65c42553c8f10c452dab48db37fea45e756",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): decision-history section rebuild TDD plan",
+      "ts": "2026-06-06T19:10:53-07:00"
+    },
+    {
+      "id": "commit:bb4c05fd795697f4da9bc76d9a6ed2c0c451f328",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(sync): rebuild decision-history section idempotently (sentinel region)",
+      "ts": "2026-06-06T19:50:47-07:00"
+    },
+    {
+      "id": "commit:cb06d75c4324551835a21e913a19440bbef30cea",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): fold journal atoms in finalizeSync (orphan-free decision history)",
+      "ts": "2026-06-06T18:05:02-07:00"
+    },
+    {
+      "id": "commit:632d5b896e8c7ae8cee70e05bfddae3c3a987b96",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(fold): drop unreachable (amend/rebase orphan) commit atoms",
+      "ts": "2026-06-06T17:39:36-07:00"
+    },
+    {
+      "id": "commit:9f73a55ca6fe6fc7fcb9deb02b626924f9996eab",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(fold): foldAtoms merge-by-id (why append, refs union, ts earliest)",
+      "ts": "2026-06-06T17:37:31-07:00"
+    },
+    {
+      "id": "commit:ba7cae5bbb19953d0bf4559e09751d06a476bbca",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): journal fold layer TDD plan",
+      "ts": "2026-06-06T17:28:13-07:00"
+    },
+    {
+      "id": "commit:9e6eb0cee71681f8766f0405e89679bcf020a034",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): journal fold layer — drop amend orphans + fold-by-id merge",
+      "ts": "2026-06-06T11:05:37-07:00"
+    },
+    {
+      "id": "commit:d032c02e7e5aee9d42190ca2eab0f5b9612a76b3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: README test count 152→229; record current-iteration plan in roadmap",
+      "ts": "2026-06-06T11:05:35-07:00"
+    },
+    {
+      "id": "commit:988d48e3fd4167a4f196e7e6a7981ef8bdaef792",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(config): parseConfigLanguage tolerates comment + CRLF on language: line",
+      "ts": "2026-06-06T02:11:04-07:00"
+    },
+    {
+      "id": "commit:bbe3dca9bfeaac66329c5b2099717e08bff775fe",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): record v0.2-0.5 shipped, known issues, agent-graph todo",
+      "ts": "2026-06-06T01:55:37-07:00"
+    },
+    {
+      "id": "commit:53a6f454a5234482be4734a14e3fb997678767c9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(release): 0.5.0 — human HOME page + bilingual translation layer",
+      "ts": "2026-06-06T01:37:59-07:00"
+    },
+    {
+      "id": "commit:8481e05e44e24c84daa5259f6fa8e70be73cf72d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): dogfood — Chinese HOME + default=zh (content is Chinese)",
+      "ts": "2026-06-06T01:36:22-07:00"
+    },
+    {
+      "id": "commit:15ffff996fc871f5ce52ed708dd6e4a9b49cf7f3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: plan human home and translation layer",
+      "ts": "2026-06-06T11:49:19+08:00"
+    },
+    {
+      "id": "commit:94c1269e61b83928de1c46ce0a2ee8a3b38e2a97",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(sync): foldJournal warns only on first migration, not literal in-content tokens",
+      "ts": "2026-06-06T20:00:05-07:00"
+    },
+    {
+      "id": "commit:347cb287ff51bdea85ac20f72184c16b370c4a7d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): agent graph data layer — buildGraph + .graph.json",
+      "ts": "2026-06-06T23:22:00-07:00"
+    },
+    {
+      "id": "commit:d541700867aa8ec016281ed330e69c82ffc61956",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): agent graph data layer TDD plan",
+      "ts": "2026-06-06T23:29:16-07:00"
+    },
+    {
+      "id": "commit:00251a1afee2f73447bf57b60c95e50d17daffd0",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(graph): buildGraph — atom/page nodes + facet/refs_related edges",
+      "ts": "2026-06-06T23:31:55-07:00"
+    },
+    {
+      "id": "commit:b219e9ee0dd18896b19be9f6eb9890d34a397b7d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor(manifest): runManifestCli returns { manifestPath, manifest }",
+      "ts": "2026-06-06T23:37:32-07:00"
+    },
+    {
+      "id": "commit:43d4277795ebfb7a7b4a89c033078534030d6bed",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): emit wiki/.graph.json (agent graph) in finalizeSync",
+      "ts": "2026-06-06T23:44:16-07:00"
+    },
+    {
+      "id": "commit:ff4ee000da6d564c04ae7438d66a1d840b07d6b7",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore(lore): dogfood resync — decision history deduped (lib.md 639->146)",
+      "ts": "2026-06-06T20:01:12-07:00"
+    }
+  ],
+  "edges": [
+    {
+      "from": "commit:2a5cdcbf7d7790c64f1bcb924d4e618f5102679d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:617bdbccec27bd12210fc1aa2a9aa6e017e4a863",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:72c0219f946188aae189a499146af20bedbfea62",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:4d66da3afbfb6681f37182ca7a881d8290ffd1b7",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:857d90f7305c24641186f884fb74a6b5bd71e06a",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:51e5bede61b356079ee31586a181d99f39ae770e",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f93be9bcbd27d90fec1f083d211c0816090b7f23",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:741d8f19c78adac95f6ae77a2ca0aa9e6500541d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:2b2beba8f62f4dc90b330c3e54390c3b97ce4831",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:94ca472a7db3b3269ef7024530091bf74a89939a",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:eace1c1e8ff7db603985c5c443b789e9d43b6487",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:75068b30cce2c4f9ed44646f279a74ff26c8c98f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f411914a65d51bc3bcf8991a32a99d9280c030ec",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f6bd6a26b2eb61278dcc47645204001ce35f00ac",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:0b8eb4f567c3062bf4394fe7c2eda52c1ba3137d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f25df5aa7d856f6de87a5485c2bfa2c900f6a958",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:0bb9f1fabc4c3d72c11b05d3e1b03c854a9f57b4",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f89bf6c1eac1332aea16d5ea121c926758223c80",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:38bf660e1b1ecdf14e1d64d6681987b65a2f3dd9",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1b3846a68cb469bc11332b8a7d4e7996466b92f0",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:b877739efb6dc180c928fb7a306ec4384e82cf7c",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:d362fd12c2cd6a26b18f6161f36f0014fe6c9f68",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:ff39a3d5b9f9f8dc0b26e99c79dfad8998be635d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:c7b6015382b07d02ae3904a6e22ed029e81bed60",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:08f01ffa9e964caf6a74e92ad6e3d0599c7c3674",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:81b798fc6b0a1e7fa1fa1016e769c041a3eba6d4",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:86ffd7d2b1b465632d7d7559ede1a846af7c0dc7",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:30a44016bc3b8cfa12bcdd456bdaf9db88192e7c",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:e93d72352edfbe763c0e534a4cf55c1f0619da07",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:cfc24879c71cd0730f60224167e9a4214ba4a9ca",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:58d761013db7ab5ed8ae899273e0b963df0998d0",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:fe81ccad0388f7cebbc5e3372552c29ba93738ea",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1410f81f73957f2427a88323b09fd43740fe08fe",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:4cf91529e8905b4425031542b95828efd60f733e",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:473f4b7e479e33637d1582045893a07950e458e3",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:80b7df1c7e33671620ac9d478a0516fe852c0129",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:60a2727f2f1d1586e3ffd3beacd74e787f8ba3e3",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1f9a6b29de5fab476a1b37f65e8f02c53abb5060",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:5b872a2e3a0efb5be1e83cebbca174ad4c35ab29",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:494097b912e8c84420ccfa4810b33305d1b88838",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:2c80419a5cda660ecf95bb2d78d97eef47851e04",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:e21d14db2b41aecdf12dbf552aa4931c7095e494",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:055bc17abfda19ecb6ec7e5befb9c50f7b7ab91d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1167930963afd96ed590f398ed5f16c822de6e62",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:868581bfd05f44b115584e11cf25e0a686fed3b1",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:4bab62959b1bdaed80d4fe5765be0d9cbb3ac0c9",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:4498a29a97c769e55429a18190dadfd7346a46d1",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:a2d92d0f3514728f74a804c7926d48ec269f3347",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1da0a61132ab3481470c0b821ebdad5e27c75fcc",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:c673a96d7086aba7067c52112e8989073289ffdd",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:e43c1acb00e5b2aae29494a922afeeff41dc1094",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f1c875af7e2ea7069b3a0ef441062adde1e72d54",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:10655b5b05c94e0709015ed56eb879f5f2933aac",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:65bacd56486795739f368773a6d84aee23d7182c",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:dc6ab17e2c28af84228296f6d7f6000a2f5a0c14",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f707b63dd593da2fcdd2d33129b39983ae58c1aa",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:81edefb4ad19422bb8ac8962f3c9fb4e7d45294f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:cbebc0fe395d01c31f104d3861da2f8ff7a26018",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:9e14cc415ee462ba85036112aa4ce5cf9625651f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:3caff5a6ae4a649a66f77923f6322e6fb92c7e5f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:9f9ad5ab03f7492fe5993bf3781560b5ea54ea22",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:5c9b40b2519407353c6082738b3fab9c198c5818",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:6e45c4cc9c65fe52211ede6cf81bb29035813a37",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:94b8074eb08d5d9f8391d79e8f08239de48c5a84",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:8ee9658efb41a3f9780cfac32a54d6b72e88cfb9",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:fec5607f6195b407f5e948314812b84eb8956657",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:389bb21f089aad935d021a36f3a6d032de9d1fda",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:51de636f22aeb9307719b16331999242d552a3eb",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:36849b2e0cb02a00ab7e0ebe06037bd08d63b5d8",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:01676f93fdb5c5f77050b2fd6ae44ea8ae9a5545",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f3578a0560819acd36ba2efb755eec1e5df4fda5",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "note:mpzar1nlhusdol",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:283c1cfeae121a934ad1424be08bc729e6163f84",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:6ae43a04282e1886ee423798229722d7e1a32296",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:75bf1600615a6781146b35e484f15c168ff3fdf2",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:65d6ab6cafd20cfd124d708ca11420ed16793b89",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:b1c1ea64be8bd03f9596df200c61cadac9d9a677",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:32f3f878fe70c5db5cc7e47b3f524e3d5efe61a9",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:11d0225c8484d218607ad9568463cfcd7d11d4cf",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:171f2b5e9d15e9f00f6c909fb4ecc46f972e12fc",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:2fe6669cc70c789c3d29bdcb3f91b0105530cc0e",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1eb0ad80886e1c8378b2ba270df092d1c2cf22a1",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:4974cb25f846c1b5cb1d076cbced2a3badd23eac",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:e2b85b94c2c776785e9d03b58326350cc23243a9",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:4477a26bb9a0733cc8577f0588417c33dc4e3544",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:36b71017fc61f1994b2079a22483318f07ce52c1",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:19aa253467713c8cfcc5d1faee31e870f1c9f54d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:ee22de059010007e36f3c757233e67f1efaaaafe",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:b04feb8b4cdbced76c5754d058a73cbca4e9719c",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:5d99c32f8c0e5da841c787a81d5f89ce2c32d1ed",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:9f8cc7a3d6834f4f95fc03b163a0b6b0d48d7a4a",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:c7187a7efbe41909b2cb3988f1006024021224fb",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:2c3158e909e8fb3e933af3d24a9a686adbbef70e",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:cd627347eff2097fcc6ca89c2c49825c4c3ebe15",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:93aa86f6c45056c994db713bbb83127262ba5967",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:bb4c05fd795697f4da9bc76d9a6ed2c0c451f328",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:cb06d75c4324551835a21e913a19440bbef30cea",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:632d5b896e8c7ae8cee70e05bfddae3c3a987b96",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:9f73a55ca6fe6fc7fcb9deb02b626924f9996eab",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:988d48e3fd4167a4f196e7e6a7981ef8bdaef792",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:94c1269e61b83928de1c46ce0a2ee8a3b38e2a97",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:00251a1afee2f73447bf57b60c95e50d17daffd0",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:b219e9ee0dd18896b19be9f6eb9890d34a397b7d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:43d4277795ebfb7a7b4a89c033078534030d6bed",
+      "to": "page:component/lib",
+      "type": "facet"
+    }
+  ]
+}

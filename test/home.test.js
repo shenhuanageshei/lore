@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildHomeStatus, defaultHomePage, finalizeHomeText } from '../lib/home.js';
 
 test('defaultHomePage contains the home status token and required sections', () => {
-  const md = defaultHomePage({ title: 'lore' });
+  const md = defaultHomePage({ title: 'lore', axisPages: { component: [{ id: 'lib' }], docs: [{ id: 'pitfalls' }, { id: 'changelog' }] } });
   assert.match(md, /title: Home/);
   assert.match(md, /\{\{LORE_HOME_STATUS\}\}/);
   assert.match(md, /## Knowledge flow/);
@@ -48,4 +48,21 @@ test('finalizeHomeText is idempotent: re-finalize swaps the region, no duplicate
   assert.match(twice, /- b/);                                   // refreshed
   assert.doesNotMatch(twice, /- a/);                            // stale values gone
   assert.doesNotMatch(twice, /\{\{LORE_HOME_STATUS\}\}/);
+});
+
+test('defaultHomePage: omits empty sections (no INDEX fallback)', () => {
+  const md = defaultHomePage({ axisPages: { component: [{ id: 'lib' }] } });
+  assert.match(md, /## Understand the project/);
+  assert.match(md, /- \[\[lib\]\]/);
+  assert.doesNotMatch(md, /## Debug a problem/);
+  assert.doesNotMatch(md, /## Decisions and timeline/);
+  assert.doesNotMatch(md, /\[\[INDEX\]\]/);
+});
+
+test('defaultHomePage: renders sections when docs present', () => {
+  const md = defaultHomePage({ axisPages: { component: [{ id: 'lib' }], docs: [{ id: 'pitfalls' }, { id: 'changelog' }] } });
+  assert.match(md, /## Debug a problem/);
+  assert.match(md, /- \[\[pitfalls\]\]/);
+  assert.match(md, /## Decisions and timeline/);
+  assert.match(md, /- \[\[changelog\]\]/);
 });

@@ -50,6 +50,9 @@ node lib/sync.js finalize /path/to/your-repo/.lore
 node lib/serve.js start --lore /path/to/your-repo/.lore   # 打印 127.0.0.1 URL
 node lib/serve.js stop  --lore /path/to/your-repo/.lore
 
+# 4b.（可选）单机共享门户：一个端口（7842）聚合本机所有已登记 lore 仓库
+node lib/portal.js start   # 打印 http://127.0.0.1:7842/ ；另有 stop / list
+
 # 5. agent 答问（从 wiki 检索）
 node lib/ask.js /path/to/your-repo/.lore "M3 的准确率为什么这么调"
 
@@ -69,6 +72,7 @@ node lib/lint.js /path/to/your-repo/.lore
 | `/lore:note` | 捕获②（人工 why） | agent 决策当下记 `kind:decision` 原子（why + facets） | agent |
 | `/lore:sync` | 合成 | component/theme/flow 三轴页（agent 写架构 prose；Node 折 journal + INDEX + manifest） | 混合 |
 | `/lore:serve` | 浏览 | 起本地哑服务器 + 浏览器壳（侧栏/渲染/搜索/多主题），只读 | 否 |
+| `/lore:portal` | 浏览（聚合） | 单机一个常驻门户（7842）聚合本机所有 lore 仓库，顶层选 repo，只读 | 否 |
 | `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
 | `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing），不自动改 | 否 |
 

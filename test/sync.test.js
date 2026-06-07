@@ -76,6 +76,13 @@ function gitRepo() {
   return root;
 }
 
+// 建一个空 commit 返回完整 sha —— 让 fixture 的 commit 原子在 repo 里真实可达，
+// 不被 finalizeSync 的孤儿折叠（git rev-list --all 可达性）丢弃。
+function realSha(root, msg = 'fixture') {
+  execFileSync('git', ['commit', '-q', '--allow-empty', '-m', msg], { cwd: root });
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
+}
+
 function agentPage(title, summary) {
   return `---\ntitle: ${title}\nsummary: ${summary}\n---\n# component: ${title}\n\n` +
     `## Current architecture\n\narch prose\n\n## Decision history\n\n暂无 journal 原子。\n\n` +
@@ -218,15 +225,17 @@ test('finalizeSync folds journal atoms into the {{LORE_JOURNAL}} token + stamps 
     writeFileSync(join(compDir, 'other.md'), tokenPage('Other', 'x'));   // no matching atoms
 
     const journalDir = join(lore, 'journal');
-    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'newer fix', why: 'because', facets: { component: ['lib'] } });
-    appendAtom(journalDir, { id: 'commit:b', ts: '2026-05-01T08:00:00Z', kind: 'commit', commit: 'bbbbbbb0', title: 'older fix', why: '', facets: { component: ['lib'] } });
+    const shaNewer = realSha(root, 'newer fix');
+    const shaOlder = realSha(root, 'older fix');
+    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: shaNewer, title: 'newer fix', why: 'because', facets: { component: ['lib'] } });
+    appendAtom(journalDir, { id: 'commit:b', ts: '2026-05-01T08:00:00Z', kind: 'commit', commit: shaOlder, title: 'older fix', why: '', facets: { component: ['lib'] } });
 
     finalizeSync(lore, '2026-06-02T00:00:00Z');
 
     const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
     assert.doesNotMatch(libPage, /\{\{LORE_JOURNAL\}\}/);                       // token replaced
-    assert.match(libPage, /- \*\*newer fix\*\* — because \(aaaaaaa, 2026-06-01\)/);
-    assert.match(libPage, /- \*\*older fix\*\* \(bbbbbbb, 2026-05-01\)/);
+    assert.match(libPage, new RegExp(`- \\*\\*newer fix\\*\\* — because \\(${shaNewer.slice(0, 7)}, 2026-06-01\\)`));
+    assert.match(libPage, new RegExp(`- \\*\\*older fix\\*\\* \\(${shaOlder.slice(0, 7)}, 2026-05-01\\)`));
     assert.match(libPage, /newer fix[\s\S]*older fix/);                          // ts desc
     assert.match(libPage, /atoms: 2/);
     assert.match(libPage, /commits: 2/);
@@ -249,7 +258,8 @@ test('finalizeSync backward-compat: page without token does not crash, still sta
     mkdirSync(compDir, { recursive: true });
     writeFileSync(join(compDir, 'lib.md'), agentPage('Lib', 'core'));   // old format, no token
     const journalDir = join(lore, 'journal');
-    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 't', why: '', facets: { component: ['lib'] } });
+    const sha = realSha(root, 't');
+    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: sha, title: 't', why: '', facets: { component: ['lib'] } });
 
     finalizeSync(lore, '2026-06-02T00:00:00Z');
     const libPage = readFileSync(join(compDir, 'lib.md'), 'utf8');
@@ -296,8 +306,9 @@ test('finalizeSync injects journal markdown literally — no $-pattern corruptio
     writeFileSync(join(compDir, 'lib.md'), tokenPage('Lib', 'core'));
     const journalDir = join(lore, 'journal');
     // commit title containing replacement-pattern special sequences
+    const sha = realSha(root, 'patterns');
     appendAtom(journalDir, {
-      id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0',
+      id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: sha,
       title: 'fix $& and $$ and $1 patterns', why: '', facets: { component: ['lib'] },
     });
 
@@ -366,7 +377,8 @@ test('finalizeSync: duplicate {{LORE_JOURNAL}} tokens fold into the last, ship n
     const compDir = join(lore, 'wiki', 'component');
     mkdirSync(compDir, { recursive: true });
     writeFileSync(join(compDir, 'lib.md'), twoTokenPage('Lib', 'core'));
-    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'real fix', why: 'reason', facets: { component: ['lib'] } });
+    const sha = realSha(root, 'real fix');
+    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: sha, title: 'real fix', why: 'reason', facets: { component: ['lib'] } });
 
     const warnings = [];
     finalizeSync(lore, '2026-06-02T00:00:00Z', { warn: m => warnings.push(m) });
@@ -427,7 +439,8 @@ test('finalizeSync folds both component and theme axes', () => {
     writeFileSync(join(lore, 'wiki', 'component', 'lib.md'), tokenPage('Lib', 'c'));
     writeFileSync(join(lore, 'wiki', 'theme', 'quality.md'), tokenPage('Quality', 't'));
     const journalDir = join(lore, 'journal');
-    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-03T00:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'lib fix', why: '', facets: { component: ['lib'], flow: [], theme: ['quality'] } });
+    const sha = realSha(root, 'lib fix');
+    appendAtom(journalDir, { id: 'commit:a', ts: '2026-06-03T00:00:00Z', kind: 'commit', commit: sha, title: 'lib fix', why: '', facets: { component: ['lib'], flow: [], theme: ['quality'] } });
 
     finalizeSync(lore, '2026-06-03T00:00:00Z');
 
@@ -533,7 +546,8 @@ test('finalizeSync folds the flow axis', () => {
     const lore = join(root, '.lore');
     mkdirSync(join(lore, 'wiki', 'flow'), { recursive: true });
     writeFileSync(join(lore, 'wiki', 'flow', 'pipe.md'), tokenPage('Pipe', 'p'));
-    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-03T00:00:00Z', kind: 'commit', commit: 'aaaaaaa0', title: 'flow fix', why: '', facets: { component: ['lib'], flow: ['pipe'], theme: [] } });
+    const sha = realSha(root, 'flow fix');
+    appendAtom(join(lore, 'journal'), { id: 'commit:a', ts: '2026-06-03T00:00:00Z', kind: 'commit', commit: sha, title: 'flow fix', why: '', facets: { component: ['lib'], flow: ['pipe'], theme: [] } });
     finalizeSync(lore, '2026-06-03T00:00:00Z');
     assert.match(readFileSync(join(lore, 'wiki', 'flow', 'pipe.md'), 'utf8'), /- \*\*flow fix\*\*/);
     assert.match(readFileSync(join(lore, 'wiki', 'INDEX.md'), 'utf8'), /## Flow/);
@@ -589,5 +603,46 @@ test('finalizeSync builds docs axis from config + files (INDEX + manifest)', () 
     assert.match(index, /\[\[design\]\]/);
     const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
     assert.ok(manifest.axes.some(a => a.id === 'docs' && a.pages.some(p => p.id === 'design')));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync folds amend orphans out of a component decision history', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+
+    // 提交一个 lib 改动，再 amend 改 message → 旧 sha 变不可达孤儿
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'feature.js'), 'export const x = 1;\n');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'feat: widget alpha'], { cwd: root });
+    const oldSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
+    execFileSync('git', ['commit', '--amend', '-qm', 'feat: widget bravo'], { cwd: root });
+    const newSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
+
+    // journal append-only 同时带着孤儿与重生两条原子
+    const journalDir = join(lore, 'journal');
+    const mkAtom = (sha, title) => ({
+      id: `commit:${sha}`, ts: '2026-06-06T01:00:00-07:00', kind: 'commit', commit: sha,
+      title, why: 'body', what_changed: '',
+      facets: { component: ['lib'], flow: [], theme: [] },
+      refs: { files: ['lib/feature.js'], pitfall: null, related: [] },
+      source: 'hook', enriched: false, confidence: 'EXTRACTED',
+    });
+    appendAtom(journalDir, mkAtom(oldSha, 'feat: widget alpha'));
+    appendAtom(journalDir, mkAtom(newSha, 'feat: widget bravo'));
+
+    // 带 {{LORE_JOURNAL}} token 的 component 页，决策史才会被注入
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'),
+      '---\ntitle: Lib\nsummary: s\n---\n# component: lib\n\n## Decision history\n\n{{LORE_JOURNAL}}\n');
+
+    finalizeSync(lore, '2026-06-06T08:00:00Z', { warn() {} });
+
+    const page = readFileSync(join(compDir, 'lib.md'), 'utf8');
+    assert.match(page, /feat: widget bravo/);         // 重生在
+    assert.doesNotMatch(page, /feat: widget alpha/);   // 孤儿被折掉
+    assert.match(page, /\ncommits: 1\n/);             // 计数反映折叠后(1)，不是 2
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

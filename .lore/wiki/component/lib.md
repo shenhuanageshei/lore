@@ -1,10 +1,10 @@
 ---
 title: lib —— lore 引擎核心
-summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程
+summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费（per-repo serve + 单机门户）+ lint 的全流程
 last_updated: 2026-06-07
-code_sha: e6a87e3
-atoms: 111
-commits: 110
+code_sha: c8f0721
+atoms: 114
+commits: 113
 ---
 # component: lib
 
@@ -15,30 +15,41 @@ flowchart TD
   hook[hook.js post-commit] --> J[(journal ndjson)]
   mine[mine.js git-log 回填] --> J
   note[note.js agent 决策] --> J
+  J --> fold[fold.js 按 id 折叠/去 orphan]
   config[config.js code_roots/themes/flows] --> sync[sync.js plan / finalize]
-  J --> sync
+  fold --> sync
   sync --> manifest[manifest.js .manifest.json]
-  sync --> wiki[wiki 三轴页]
+  sync --> graph[graph.js .graph.json]
+  sync --> wiki[wiki 多轴页]
   manifest --> serve[serve.js + server.js]
-  manifest --> ask[ask.js 检索]
   wiki --> serve
+  serve -. per-repo .-> reg[registry.js ~/.lore/servers.json + stablePort]
+  repos[repos.js ~/.lore/repos.json] --> portal[portal.js 单机门户 :7842]
+  wiki --> portal
+  graph --> mcp[mcp.js agent 工具]
+  manifest --> ask[ask.js 检索]
   manifest --> lint[lint.js 漂移]
-  wiki --> lint
-  init[init.js 脚手架] -. 装 .-> hook
+  init[init.js 脚手架] -. 装 hook + 登记 repo .-> repos
 ```
 
 `lib/` 是 lore 的全部引擎，纯 Node 内置、零依赖。按数据流分四层：
 
-- **捕获（写 journal 原子）**：`hook.js`（post-commit 自动、机械、<50ms、永不阻断 commit）、`mine.js`（`git log` 全历史回填，按 sha 幂等）、`note.js`（agent 决策当下记 `kind:decision`）。三源都经 `journal.js`（append-only ndjson，按日分片、去重）落地。
-- **合成（journal + 代码 → wiki）**：`sync.js` 两阶段——`plan` 出 worklist、agent 写页正文、`finalize` 机械盖 front-matter + 折决策历史（journal 占位符）+ 建 INDEX + emit `.manifest.json`（`manifest.js`）。`config.js` 解析 `code_roots` / theme `match` / flow `spans`，驱动三轴打标。
-- **消费**：`serve.js`（探测 python→内置 `server.js` 兜底，哑静态服务器 + 浏览器壳）、`ask.js`（按 manifest title+summary 检索，agent 从 wiki 答）。
+- **捕获（写 journal 原子）**：`hook.js`（post-commit 自动、机械、<50ms、永不阻断 commit）、`mine.js`（`git log` 全历史回填，按 sha 幂等）、`note.js`（agent 决策当下记 `kind:decision`）。三源经 `journal.js`（append-only ndjson，按日分片、去重）落地；`fold.js` 在读取层按 id 折叠（why append / refs union / ts 最早）并丢弃 amend/rebase 的 orphan sha，给下游去重后的决策史。
+- **合成（journal + 代码 → wiki）**：`sync.js` 两阶段——`plan` 出 worklist、agent 写页正文、`finalize` 机械盖 front-matter + 折决策历史 + 建 INDEX + emit `.manifest.json`（`manifest.js`）与 `.graph.json`（`graph.js`，节点页/原子/组件 + 边 facet/refs/translation）。`config.js` 解析 `code_roots` / theme `match` / flow `spans` 驱动多轴打标；`home.js` 产人读 HOME 页 + 机械状态块（版本/sha/轴/语言/翻译进度）；`docs.js` 把 `docs/`+CHANGELOG+CLAUDE.md 物化成 docs 轴（零 LLM）；`i18n.js` + `translate.js` 管双语 sidecar（按需翻译、防陈旧 hash）。
+- **消费**：两条并存路径——
+  - **per-repo**：`serve.js`（探测 python→内置 `server.js` 兜底的哑静态服务器 + 浏览器壳）+ `registry.js`（`~/.lore/servers.json` 中央登记 + `serve list/stop-all`）+ `stablePort`（hash(loreDir)→7000-7999，同 repo URL 恒定）。
+  - **单机门户（v0.6 新）**：`portal.js` 一个常驻 server 固定端口 `7842` 聚合本机所有 lore repo；`repos.js`（`~/.lore/repos.json`，`/lore:init` 自动登记、过滤失效条目）发现各 repo；`server.js` 的 `createPortalServer` 按 `/<name>/` 白名单路由，复用从 `createServer` 提取的共享 `serveStatic`（穿越防护 + dir→index.html + MIME，与 per-repo 同款语义）。MVP 只读：`/<name>/api/…` 一律 404，仅绑 127.0.0.1。
+  - **agent 检索**：`ask.js`（按 manifest title+summary 命中）、`mcp.js`（零依赖 stdio MCP，`lore_ask`/`page`/`neighbors` 顺 graph 推理）。
 - **检查**：`lint.js` 只读报漂移（stale / orphan / missing），不自动改。
 
-`init.js` 是一次性脚手架：搭 `.lore/`、自动发现组件写 `config.yml`、拷浏览器壳（含 `mermaid.min.js`）、装 post-commit hook。
+`init.js` 是一次性脚手架：搭 `.lore/`、自动发现组件写 `config.yml`、拷浏览器壳（含 `mermaid.min.js`）、装 post-commit hook，并把本 repo 登记进 portal 的 `~/.lore/repos.json`。
 
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(init): auto-register repo in ~/.lore/repos.json on init CLI (best-effort)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (57a30e7, 2026-06-07)
+- **feat(portal): portal lifecycle CLI (start/stop/list) on fixed port 7842** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (e7de56d, 2026-06-07)
+- **feat(repos): ~/.lore/repos.json repo registry for portal discovery** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (6a45fe5, 2026-06-07)
 - **fix(meta): docs pages show last-updated only (no atoms/code_sha chips)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (e6a87e3, 2026-06-07)
 - **fix(home): omit empty HOME sections instead of INDEX fallback** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (88c0515, 2026-06-07)
 - **fix(i18n): exclude sentinel regions from translation source hash** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (179ae87, 2026-06-07)

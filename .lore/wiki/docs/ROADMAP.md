@@ -25,6 +25,7 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - **v0.3.0** docs 轴 —— 文档摄取（`docs/` + CHANGELOG + CLAUDE.md 踩坑 → 物化视图，零 LLM）。
 - **v0.4.0 / 0.4.1** docs 页嵌入文档全文（消 404）· docs 时间降序（侧栏显日期）· mermaid 懒加载 · server 目录索引修复。
 - **v0.5.0** 人读 **HOME 首页**（HOME 轴）· 持久化**双语层 i18n**（语言配置 + 翻译 sidecar + `/lore:translate` 命令 + 语言切换器 + 本地 state API + Host-guard 安全）。注：翻译**按需生成**（非 sync 自动），未译时回退源页显「missing」。
+- **v0.6.0（portal MVP）** 单机共享门户 —— 固定端口 `7842` 一个常驻 server 聚合本机所有 lore repo（`~/.lore/repos.json` 发现 + init 自动登记 + `/<name>/` 路由 + `/` repo 选择器 + 只读 + 白名单/穿越防护）。`/lore:portal start|stop|list`，与 per-repo `/lore:serve` 共存。设计见 `docs/superpowers/specs/2026-06-07-lore-portal-design.md`。
 
 ## 当前迭代（决策 2026-06-06）
 
@@ -86,7 +87,8 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 
 ## 中期（消费纪律 + 质量）
 
-### 单机共享 wiki server（多 repo 聚合门户）⚑ 待头脑风暴
+### 单机共享 wiki server（多 repo 聚合门户）✅ MVP 已实现（v0.6）· 余项待迭代
+> MVP 已实现（见上「已完成 v0.6.0」）：单进程聚合 + 中央 registry + `/<name>/` 路由 + repo 选择器 + 只读白名单。**余项（后续迭代）**：跨 repo 全局搜索、write API 多路由、壳内「切 repo」下拉、per-repo serve 自动迁移/端口回收、namespace 高级冲突策略。
 - **现状痛点**：每 repo 独立 server，各占一个端口（7842 先到先得、其余随机），`detached` 常驻 → 易堆积、无 stop-all、2+ repo 端口不固定、无中央登记。
 - **目标**：**单机一个常驻 server** 聚合本机所有 lore repo；顶层先选 repo → 再进该 repo 的多轴 wiki（按 repo 切分页/导航）。
 - **待定（brainstorm 项）**：

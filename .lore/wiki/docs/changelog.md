@@ -1,8 +1,8 @@
 ---
 title: CHANGELOG
-summary: 7 个版本，最新 0.5.1
+summary: 8 个版本，最新 0.6.0
 source_path: CHANGELOG.md
-last_updated: 2026-06-06
+last_updated: 2026-06-07
 ---
 > 源文档：`CHANGELOG.md`
 
@@ -10,6 +10,16 @@ last_updated: 2026-06-06
 
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
+
+## [0.6.0] — 2026-06-07
+
+### 新增
+- **单机共享门户（portal MVP）** — 一个常驻 server（固定端口 `7842`，仅绑 `127.0.0.1`）聚合本机所有 lore 仓库：顶层 `/` repo 选择器 → `/<name>/site/` 进该仓库多轴 wiki。仓库发现走中央 `~/.lore/repos.json`（`/lore:init` 自动登记、`listRepos` 过滤已失效条目）；路由用 repo 根目录名（同名加 `-2` 后缀兜底）。新 `/lore:portal start|stop|list` 命令；与 per-repo `/lore:serve`（各自 `stablePort`）共存。（`lib/repos.js`、`lib/portal.js`、`server.js`、`commands/portal.md`）
+- **共享静态 serve 逻辑** — 从 `server.js` 的 `createServer` 提取 `serveStatic(root, rel, res)`（穿越防护 + dir→index.html + MIME 流式），per-repo server 与 portal 共用同一套静态语义；新 `createPortalServer(repoMap)` 复用之。
+- **壳 base 前缀感知** — `site/shell.mjs` 新增 `baseFromPathname`，壳从 `location.pathname` 推断 `/<repo>/site/` 前缀，wiki/api fetch 自动带正确前缀（per-repo 下为 `/`、行为不变；portal 下带 `/<name>/`）。
+
+### 安全
+- portal **MVP 只读**：`/<name>/api/…` 一律 404（无 write 面 → 无 DNS-rebind 写风险）；只 serve `~/.lore/repos.json` 白名单内的 loreDir，每 root 独立 normalize 穿越防护；仅绑 `127.0.0.1`。
 
 ## [0.5.1] — 2026-06-06
 

@@ -66,3 +66,15 @@ test('readPreferences and writePreferences round-trip .state/preferences.json', 
     assert.deepEqual(readPreferences(state), { language: 'zh' });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('translationSourceHash: ignores sentinel region changes', () => {
+  const mk = (status) =>
+    '---\ntitle: Home\n---\n# Home\n\n<!-- LORE_HOME_STATUS:START -->\n' + status + '\n<!-- LORE_HOME_STATUS:END -->\n\n## Body\n\nprose\n';
+  assert.equal(translationSourceHash(mk('v1 stuff')), translationSourceHash(mk('v2 different')));
+});
+
+test('translationSourceHash: still reflects real body changes', () => {
+  const base = '---\ntitle: X\n---\n# X\n\n## Body\n\nprose one\n';
+  const changed = '---\ntitle: X\n---\n# X\n\n## Body\n\nprose two\n';
+  assert.notEqual(translationSourceHash(base), translationSourceHash(changed));
+});

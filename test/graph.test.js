@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildGraph } from '../lib/graph.js';
+import { buildGraph, neighbors, resolvePagePath } from '../lib/graph.js';
 
 const atom = (over = {}) => ({
   id: 'commit:a', ts: '2026-06-06T01:00:00-07:00', kind: 'commit', commit: 'a',
@@ -57,4 +57,35 @@ test('buildGraph: facet edges across flow/theme axes', () => {
   const a = atom({ id: 'commit:x', facets: { component: [], flow: ['pipe'], theme: ['quality'] } });
   const facet = buildGraph([a], manifest, 'NOW').edges.filter(e => e.type === 'facet').map(e => e.to).sort();
   assert.deepEqual(facet, ['page:flow/pipe', 'page:theme/quality']);
+});
+
+test('neighbors: out+in edges, dir + edge type, type/title from node', () => {
+  const graph = {
+    nodes: [
+      { id: 'commit:x', type: 'atom', kind: 'commit', title: 'feat: x', ts: '' },
+      { id: 'commit:y', type: 'atom', kind: 'commit', title: 'feat: y', ts: '' },
+      { id: 'page:component/lib', type: 'page', axis: 'component', title: 'Lib', path: 'component/lib.md' },
+    ],
+    edges: [
+      { from: 'commit:x', to: 'page:component/lib', type: 'facet' },
+      { from: 'commit:x', to: 'commit:y', type: 'refs_related' },
+      { from: 'commit:y', to: 'commit:x', type: 'refs_related' },
+    ],
+  };
+  const nb = neighbors(graph, 'commit:x');
+  assert.equal(nb.length, 3);
+  assert.ok(nb.some(n => n.id === 'page:component/lib' && n.edge === 'facet' && n.dir === 'out' && n.type === 'page' && n.title === 'Lib'));
+  assert.ok(nb.some(n => n.id === 'commit:y' && n.edge === 'refs_related' && n.dir === 'out'));
+  assert.ok(nb.some(n => n.id === 'commit:y' && n.edge === 'refs_related' && n.dir === 'in'));
+});
+
+test('neighbors: unknown node → []', () => {
+  assert.deepEqual(neighbors({ nodes: [], edges: [] }, 'nope'), []);
+});
+
+test('resolvePagePath: page id → path; plain path passthrough; unknown page id → null', () => {
+  const graph = { nodes: [{ id: 'page:component/lib', type: 'page', path: 'component/lib.md' }], edges: [] };
+  assert.equal(resolvePagePath(graph, 'page:component/lib'), 'component/lib.md');
+  assert.equal(resolvePagePath(graph, 'component/lib.md'), 'component/lib.md');
+  assert.equal(resolvePagePath(graph, 'page:component/ghost'), null);
 });

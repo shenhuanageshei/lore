@@ -1,10 +1,10 @@
 ---
 title: 首页
 summary: 仓库人读导航首页 —— 一句话定位 + 状态 + 知识流 + 入口
-last_updated: 2026-06-06
-code_sha: e105652
-atoms: 148
-commits: 147
+last_updated: 2026-06-07
+code_sha: bb4c05f
+atoms: 197
+commits: 196
 ---
 # lore
 
@@ -13,12 +13,12 @@ commits: 147
 <!-- LORE_HOME_STATUS:START -->
 ## Status
 
-- Version: `0.4.1`
-- Code: `e105652`
-- Updated: `2026-06-06`
-- Axes: `component 1 · docs 33`
+- Version: `0.5.1`
+- Code: `bb4c05f`
+- Updated: `2026-06-07`
+- Axes: `component 1 · docs 37`
 - Language: `zh` default · `zh, en` available
-- Translations: `0 ready` · `0 stale` · `34 missing`
+- Translations: `0 ready` · `0 stale` · `38 missing`
 <!-- LORE_HOME_STATUS:END -->
 
 ## 知识流

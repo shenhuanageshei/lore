@@ -296,3 +296,20 @@ test('runManifestCli reads language config and user preferences', () => {
     assert.deepEqual(m.user_preferences, { language: 'en' });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('runManifestCli returns { manifestPath, manifest }', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mani-ret-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'init'], { cwd: root });
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'component'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', 'component', 'lib.md'),
+      '---\ntitle: Lib\nsummary: s\ncode_sha: abc\n---\n# component: lib\n');
+    const r = runManifestCli(lore, '2026-06-06T00:00:00Z');
+    assert.equal(typeof r.manifestPath, 'string');
+    assert.ok(r.manifest && Array.isArray(r.manifest.axes), 'returns manifest object with axes');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

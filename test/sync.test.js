@@ -685,3 +685,33 @@ test('finalizeSync: decision-history rebuild is idempotent across re-syncs (no a
     assert.equal((page.match(/LORE_JOURNAL:START/g) || []).length, 1);            // 仍单区间
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('finalizeSync writes .graph.json with page/atom nodes and a facet edge', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n');
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'feature.js'), 'export const x = 1;\n');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'feat: graph thing'], { cwd: root });
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });   // commit atom, facets.component=['lib']
+
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    writeFileSync(join(compDir, 'lib.md'),
+      '---\ntitle: Lib\nsummary: s\n---\n# component: lib\n\n## Decision history\n\n{{LORE_JOURNAL}}\n');
+
+    finalizeSync(lore, '2026-06-06T08:00:00Z');
+
+    const graph = JSON.parse(readFileSync(join(lore, 'wiki', '.graph.json'), 'utf8'));
+    const pageNode = graph.nodes.find(n => n.id === 'page:component/lib');
+    const atomNode = graph.nodes.find(n => n.type === 'atom' && n.kind === 'commit');
+    const facetEdge = graph.edges.find(e => e.type === 'facet' && e.to === 'page:component/lib');
+    assert.ok(pageNode, 'page node present');
+    assert.ok(atomNode, 'commit atom node present');
+    assert.ok(facetEdge, 'facet edge present');
+    assert.equal(facetEdge.from, atomNode.id);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

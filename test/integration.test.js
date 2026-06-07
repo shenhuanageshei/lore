@@ -26,7 +26,7 @@ test('e2e: fixtures -> manifest -> serve -> fetch page -> stop', async () => {
     execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
 
     // 1. manifest
-    const manifestPath = runManifestCli(lore, '2026-05-31T00:00:00Z');
+    const { manifestPath } = runManifestCli(lore, '2026-05-31T00:00:00Z');
     const m = JSON.parse(readFileSync(manifestPath, 'utf8'));
     assert.equal(m.axes.find(a => a.id === 'component').pages[0].id, 'm3_nlp');
 

@@ -2,9 +2,9 @@
 title: Index
 summary: table of contents
 last_updated: 2026-06-07
-code_sha: bb4c05f
-atoms: 197
-commits: 196
+code_sha: 43d4277
+atoms: 204
+commits: 203
 ---
 # lore wiki — index
 
@@ -13,9 +13,11 @@ commits: 196
 
 ## Docs
 - [[changelog]]
+- [[superpowers-plans-2026-06-06-lore-agent-graph]]
 - [[superpowers-plans-2026-06-06-lore-decision-history-rebuild]]
 - [[superpowers-plans-2026-06-06-lore-human-home-translation]]
 - [[superpowers-plans-2026-06-06-lore-journal-fold]]
+- [[superpowers-specs-2026-06-06-lore-agent-graph-design]]
 - [[superpowers-specs-2026-06-06-lore-decision-history-rebuild-design]]
 - [[superpowers-specs-2026-06-06-lore-human-home-translation-design]]
 - [[superpowers-specs-2026-06-06-lore-journal-fold-design]]

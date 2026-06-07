@@ -18,6 +18,16 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - **v0.4.0 / 0.4.1** docs 页嵌入文档全文（消 404）· docs 时间降序（侧栏显日期）· mermaid 懒加载 · server 目录索引修复。
 - **v0.5.0** 人读 **HOME 首页**（HOME 轴）· 持久化**双语层 i18n**（语言配置 + 翻译 sidecar + `/lore:translate` 命令 + 语言切换器 + 本地 state API + Host-guard 安全）。注：翻译**按需生成**（非 sync 自动），未译时回退源页显「missing」。
 
+## 当前迭代（决策 2026-06-06）
+
+人读端已四连更（v0.2→v0.5），边际收益递减；而北极星的 **agent 端（graph + MCP）仍是 0**。本轮按「先清债 → 再补 agent 半边天」推进，已知问题一条不丢、分别归位到下方各节：
+
+1. **journal fold-by-id**（清 ⭐ biting 债，且是 note-enrich / 跨轴折叠的前置）→ 见「待修复」⭐ 与「note enrich 骨架 + journal fold-by-id」。
+2. **agent 友好 graph + MCP 暴露**（兑现北极星缺失的另一半）→ 见「待办（北极星 agent 端）」。
+3. **server 运维踏脚石**（`serve --list/--stop-all` + `hash(loreDir)→稳定端口`，低风险穿插）→ 见「单机共享 server」的「踏脚石」。
+
+排期收尾（不丢）：HOME 翻译过度 stale、defaultHomePage 空段、docs 页 chips → 见下「待修复」。
+
 ## 待修复（known issues）
 
 - **journal fold-by-id（决策史重复）⭐ 已实测 biting** —— amend 的 commit 在 journal 留 pre/post 两条 sha 原子 → 决策史出现重复条目（dogfood `component/lib` 页可见）。按 id 折叠取最新即修（见下「note enrich + fold-by-id」）。

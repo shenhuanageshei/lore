@@ -106,7 +106,7 @@ node lib/lint.js /path/to/your-repo/.lore
 ## 开发
 
 ```bash
-node --test        # 全部测试（152，零外部依赖）
+node --test        # 全部测试（229，零外部依赖）
 ```
 
 - 流程：每功能走 brainstorming → spec（`docs/superpowers/specs/`）→ plan（`docs/superpowers/plans/`）→ TDD → 双审 → 合并。

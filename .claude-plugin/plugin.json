@@ -2,5 +2,8 @@
   "name": "lore",
   "version": "0.1.0",
   "description": "Repo living-docs / decision-history framework — capture (hook/mine/note) → synthesize (3-axis wiki) → consume (ask/serve)",
-  "author": { "name": "lore" }
+  "author": { "name": "lore" },
+  "mcpServers": {
+    "lore": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/lib/mcp.js"] }
+  }
 }

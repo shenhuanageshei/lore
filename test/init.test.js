@@ -207,16 +207,24 @@ test('init re-run keeps user-edited config.yml, still refreshes shell', () => {
   }
 });
 
-test('CLI: node lib/init.js <repo> initializes and prints summary', () => {
+test('CLI: node lib/init.js <repo> initializes, prints summary, registers for portal', () => {
   const root = tmpRepo();
+  const home = mkdtempSync(join(tmpdir(), 'lore-init-home-'));   // 隔离 ~/.lore/repos.json，防污染
   try {
-    const out = execFileSync('node', ['lib/init.js', root], { cwd: process.cwd() }).toString();
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    const out = execFileSync('node', ['lib/init.js', root], { cwd: process.cwd(), env }).toString();
     assert.match(out, /lore initialized/);
     assert.match(out, /shell copied: index\.html, shell\.mjs, mermaid\.min\.js/);
     // uses the REAL plugin site/ (self-located) — both shell files land in the temp repo
     assert.equal(existsSync(join(root, '.lore', 'site', 'index.html')), true);
     assert.equal(existsSync(join(root, '.lore', 'site', 'shell.mjs')), true);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    // init 把本 repo 登记进（隔离的）portal registry
+    const repos = JSON.parse(readFileSync(join(home, '.lore', 'repos.json'), 'utf8'));
+    assert.equal(repos.some(e => e.loreDir === join(root, '.lore')), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 function bareGitRepo() {

@@ -87,3 +87,64 @@ test('portal: 写接口不路由（MVP 只读）→ 404', async () => {
     rmSync(loreA, { recursive: true, force: true });
   }
 });
+
+// ── lib/portal.js 生命周期（确定性：注入 home/spawnFn + 本进程 pid/不可能 pid，不碰 7842）──
+import { toMap, start, stop, portalPidPath, PORTAL_PORT } from '../lib/portal.js';
+import { registerRepo } from '../lib/repos.js';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
+
+test('toMap: [{name,loreDir}] → { name: loreDir }', () => {
+  assert.deepEqual(
+    toMap([{ name: 'a', loreDir: '/x' }, { name: 'b', loreDir: '/y' }]),
+    { a: '/x', b: '/y' });
+});
+
+test('portal start: pid 活着则复用、不 spawn', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'lore-portal-home-'));
+  let spawned = false;
+  try {
+    // 预写一个指向本进程（必活）的 pid 文件
+    mkdirSync(join(home, '.lore'), { recursive: true });
+    writeFileSync(portalPidPath(home), JSON.stringify({ pid: process.pid, port: PORTAL_PORT }));
+    const info = await start({ home, spawnFn: () => { spawned = true; return { pid: 0, unref() {} }; } });
+    assert.equal(info.reused, true);
+    assert.equal(info.pid, process.pid);
+    assert.equal(spawned, false);               // 复用路径绝不 spawn 子进程
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('portal stop: 无 pid 文件 → no-op', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'lore-portal-home-'));
+  try {
+    assert.deepEqual(await stop({ home }), { stopped: false });
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('portal stop: 死 pid → 不 kill、清掉 pid 文件', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'lore-portal-home-'));
+  try {
+    mkdirSync(join(home, '.lore'), { recursive: true });
+    writeFileSync(portalPidPath(home), JSON.stringify({ pid: 2 ** 31 - 1, port: PORTAL_PORT })); // 不可能的 pid
+    const res = await stop({ home });
+    assert.equal(res.stopped, true);
+    assert.equal(existsSync(portalPidPath(home)), false);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('CLI: portal list 打印已登记仓库', () => {
+  const home = mkdtempSync(join(tmpdir(), 'lore-portal-home-'));
+  const repoBase = mkdtempSync(join(tmpdir(), 'lore-portal-repo-'));
+  try {
+    const loreDir = join(repoBase, 'demo', '.lore');
+    mkdirSync(loreDir, { recursive: true });
+    registerRepo(join(home, '.lore', 'repos.json'), { loreDir });
+    const env = { ...process.env, HOME: home, USERPROFILE: home };   // 隔离 registry 到临时 HOME
+    const out = execFileSync('node', ['lib/portal.js', 'list'], { cwd: process.cwd(), env }).toString();
+    assert.match(out, /demo/);
+    assert.match(out, /\.lore/);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(repoBase, { recursive: true, force: true });
+  }
+});

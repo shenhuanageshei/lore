@@ -329,3 +329,24 @@ test('pageEntry: manifest pages carry their axis', () => {
     assert.equal(comp.pages[0].axis, 'component');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// makeCountCommitsSince already imported above (line ~216) — reuse fs/os/path/child_process imports too.
+test('countCommitsSince scopes to a pathspec', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-ccs-'));
+  try {
+    const git = (...a) => execFileSync('git', a, { cwd: root, stdio: 'pipe' });
+    git('init', '-q');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'base'], { cwd: root, stdio: 'pipe' });
+    const base = git('rev-parse', '--short', 'HEAD').toString().trim();
+    // 一个 commit 动 a/，一个动 b/
+    execFileSync('bash', ['-c', 'mkdir -p a b && echo x > a/f && git add a/f && git commit -q -m a'], { cwd: root, stdio: 'pipe' });
+    execFileSync('bash', ['-c', 'echo y > b/f && git add b/f && git commit -q -m b'], { cwd: root, stdio: 'pipe' });
+    const count = makeCountCommitsSince(root);
+    assert.equal(count(base), 2);              // 全仓：2 个 commit
+    assert.equal(count(base, ['a']), 1);       // 只数动过 a/ 的：1
+    assert.equal(count(base, ['b']), 1);       // 只数动过 b/ 的：1
+    assert.equal(count(base, ['a', 'b']), 2);  // 并集：2
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

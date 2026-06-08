@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GOLDEN PAGE 样例 · component: sync</title>
+<style>
+  :root { --fg:#1a1d21; --muted:#5b6573; --bg:#f6f7f9; --card:#fff; --line:#e3e7ec;
+          --accent:#2563eb; --accent-soft:#eaf1ff; --tip:#fff8e1; --tip-line:#f5d76e;
+          --scene:#eef6ef; --scene-line:#bcd9bf; --code-bg:#f2f4f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:40px 24px 120px; }
+  .ribbon { background:var(--accent-soft); border:1px solid #cfe0ff; border-radius:10px;
+            padding:14px 18px; font-size:13.5px; color:#33415c; margin-bottom:28px; }
+  .ribbon b { color:var(--accent); }
+  article { background:var(--card); border:1px solid var(--line); border-radius:14px;
+            padding:36px 40px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  h1 { font-size:28px; margin:0 0 4px; letter-spacing:-.5px; }
+  h1 .sub { color:var(--muted); font-weight:500; font-size:18px; }
+  h2 { font-size:20px; margin:34px 0 14px; padding-bottom:7px; border-bottom:2px solid var(--line); }
+  h3 { font-size:16px; margin:22px 0 8px; }
+  p, li { color:#222; }
+  .lead { font-size:17px; }
+  ol.steps { padding-left:0; counter-reset:s; list-style:none; margin:16px 0; }
+  ol.steps > li { counter-increment:s; position:relative; padding:10px 0 10px 44px; border-bottom:1px dashed var(--line); }
+  ol.steps > li:last-child { border-bottom:none; }
+  ol.steps > li::before { content:counter(s); position:absolute; left:0; top:10px;
+        width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff;
+        font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .tip { background:var(--tip); border:1px solid var(--tip-line); border-radius:9px;
+         padding:12px 16px; margin:16px 0; font-size:14.5px; }
+  .scene { background:var(--scene); border:1px solid var(--scene-line); border-left:4px solid #6aa873;
+           border-radius:8px; padding:14px 18px; margin:14px 0; }
+  .scene b { color:#2f5d35; }
+  code { background:var(--code-bg); padding:2px 6px; border-radius:5px; font-size:13.5px;
+         font-family:"SF Mono",Consolas,"Cascadia Code",monospace; }
+  pre.mermaid { background:#fbfcfe; border:1px solid var(--line); border-radius:10px;
+                padding:18px; text-align:center; margin:18px 0; overflow-x:auto; }
+  details { border:1px solid var(--line); border-radius:10px; margin:10px 0; overflow:hidden; background:#fcfdff; }
+  details[open] { box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  summary { cursor:pointer; padding:13px 18px; font-weight:600; font-size:15px;
+            list-style:none; display:flex; align-items:center; gap:8px; user-select:none; }
+  summary::-webkit-details-marker { display:none; }
+  summary::before { content:"▸"; color:var(--accent); font-size:13px; transition:transform .15s; }
+  details[open] summary::before { transform:rotate(90deg); }
+  summary:hover { background:var(--accent-soft); }
+  .body { padding:4px 20px 18px; border-top:1px solid var(--line); }
+  table { border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px; }
+  th, td { border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); font-weight:600; }
+  .anchor { color:var(--accent); font-family:"SF Mono",Consolas,monospace; font-size:12.5px; white-space:nowrap; }
+  .axis-tag { display:inline-block; background:var(--accent-soft); color:var(--accent);
+              border-radius:5px; padding:1px 7px; font-size:12px; font-weight:600; margin-right:4px; }
+  a.wlink { color:var(--accent); text-decoration:none; border-bottom:1px dotted var(--accent); }
+  hr { border:none; border-top:1px solid var(--line); margin:30px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="ribbon">
+    📐 <b>GOLDEN PAGE 标杆样例</b>（lore「内容质量 C」设计探索，非正式 wiki 页）。
+    示范 <b>概览档（去黑话）+ 折叠机制档 + 符号锚点</b> 两档结构。
+    对照物：现状 <code>lib.md</code> 里 <code>sync</code> 只有「一句话」。
+  </div>
+
+  <article>
+    <h1>component: sync <span class="sub">—— 合成总装线</span></h1>
+
+    <h2>概览</h2>
+
+    <p class="lead"><b>这个模块在干嘛</b>：你写代码、提交（commit），<code>sync</code> 负责把这些变更
+    <b>整理成一页页给人看的 wiki 文档</b>。它像总装线的<b>调度员</b>——自己不写文档内容，
+    而是安排好三道工序：先列要更新哪些页 → 让 AI 读源码写正文 → 最后机械收尾盖章。</p>
+
+    <ol class="steps">
+      <li><b>plan（列工单）</b>：机械扫一遍，列出「哪些页对应的代码动过了、该重写」。</li>
+      <li><b>写正文</b>：AI 读真实源码，写每页的「当前架构」段。<i>（这步要 AI，贵且慢）</i></li>
+      <li><b>finalize（盖章收尾）</b>：纯机械——把决策历史、更新日期、统计数字填进每页页头，再生成索引。<i>（这步零 AI、快）</i></li>
+    </ol>
+
+    <pre class="mermaid">
+flowchart LR
+  plan["plan 列工单 · 机械增量"] --> write["写正文 · AI 读源码"] --> fin["finalize 盖章 · 机械零AI"]
+  fin --> mf[".manifest.json · 诚实 stale"]
+  fin --> gr[".graph.json · agent 图谱"]
+  fin --> fp[".state/fingerprints.json · 正文指纹"]
+  classDef ai fill:#fff3e0,stroke:#e8a33d;
+  classDef mech fill:#e8f0fe,stroke:#2563eb;
+  class write ai; class plan,fin mech;
+    </pre>
+
+    <div class="tip">
+      💡 <b>finalize</b> = 「定稿盖章」那道收尾工序；<b>页头</b>（代码里叫 frontmatter）=
+      每页最上面那几行元信息（标题、日期、对应的代码版本…）。下面场景会用到这两个词。
+    </div>
+
+    <p><b>为什么要分三道</b>：写正文要 AI（贵），盖章是死规矩（不该用 AI）。分开后，
+    盖章那道能在你每次 commit 后<b>自动后台跑</b>，正文只在真改了架构时才劳动 AI 重写——省钱省时。</p>
+
+    <h3>一个场景：「这页文档过时了吗？」lore 怎么诚实回答</h3>
+    <div class="scene">
+      lore 给每页悄悄记一个数：「<b>这页正文上次重写时，代码是哪个版本</b>」（一个 commit 号）。
+      <ul style="margin:8px 0 0">
+        <li>你改几行代码就 commit，但<b>没重写</b>这页正文 → 那个记录的版本号<b>原地不动</b> →
+        lore 一对比「记录的版本 vs 现在」，差了 3 个 commit → 诚实显示
+        <b>「这页正文落后 3 个提交，建议重写」</b>。</li>
+        <li>等你真重写了正文 → 记录的版本号更新到最新 → 「落后」归零。</li>
+      </ul>
+      <p style="margin:10px 0 0">关键巧思：它<b>只认「正文有没有变」</b>，不认「页头日期、决策历史这些机械刷新」——
+      所以盖章那道天天自动跑，也不会假装「正文还新鲜」。</p>
+    </div>
+
+    <p style="color:var(--muted);font-size:14.5px">想知道「只认正文变没变」具体怎么实现、想查 BUG 或改 sync？展开下面 👇</p>
+
+    <h2>机制详解</h2>
+
+    <details open>
+      <summary>⓪ 调用入口 &amp; I/O 契约 —— 从哪进、读什么、写什么</summary>
+      <div class="body">
+        <p><b>谁触发 sync</b>：</p>
+        <ul>
+          <li><code>/lore:sync</code> 命令 → 逐 worklist 项让 AI 写正文 → <code>finalizeSync</code> 盖章</li>
+          <li><code>hook.js</code> 的 <code>maybeRefresh</code> → 提交后 detached 跑 <code>node sync.js finalize</code>（只机械刷新）</li>
+          <li>CLI：<code>node lib/sync.js plan|finalize &lt;loreDir&gt;</code></li>
+        </ul>
+        <table>
+          <tr><th>函数</th><th>读（输入）</th><th>写（副作用）</th></tr>
+          <tr><td><code>planSync</code></td><td>config.yml · fingerprints.json · git rev-list</td><td><b>无</b> —— 纯读，返回 worklist</td></tr>
+          <tr><td><code>finalizeSync</code></td><td>journal · 各 wiki 页 · config.yml · fingerprints.json · git</td><td>每页 <code>.md</code> · <code>INDEX.md</code> · <code>HOME.md</code> · <code>.manifest.json</code> · <code>.graph.json</code> · <code>.state/fingerprints.json</code></td></tr>
+        </table>
+        <p style="font-size:13px;color:var(--muted)">debug「某文件没更新 / 被改坏」时，先对照这张写清单锁定「是谁写的」。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>① 接口 / 能力面 —— 导出与签名</summary>
+      <div class="body">
+        <table>
+          <tr><th>导出</th><th>签名</th><th>干什么</th><th>锚点</th></tr>
+          <tr><td><code>planSync</code></td><td><code>(loreDir, {all}) → {…, worklist}</code></td><td>列「要重写哪些页」（增量）</td><td class="anchor">planSync @ lib/sync.js</td></tr>
+          <tr><td><code>finalizeSync</code></td><td><code>(loreDir, now, {warn}) → {stamped, manifestPath}</code></td><td>机械盖章总入口</td><td class="anchor">finalizeSync @ lib/sync.js</td></tr>
+          <tr><td><code>foldJournal</code></td><td><code>(text, md, …) → text</code></td><td>幂等重建决策史哨兵区</td><td class="anchor">foldJournal @ lib/sync.js</td></tr>
+          <tr><td><code>stampFrontmatter</code></td><td><code>(text, {codeSha,…}) → text</code></td><td>盖机械页头</td><td class="anchor">stampFrontmatter @ lib/sync.js</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>② finalize 数据流 —— 模块内 step-by-step</summary>
+      <div class="body">
+        <ol>
+          <li>读 journal 原子 → <code>foldAtoms</code> 去重 / 丢 amend·rebase orphan</li>
+          <li>读旧指纹，逐页：<code>foldJournal</code> 折决策史 → 对<b>折叠后文本</b>算 <code>proseHash</code>
+              → <code>resolveProseSha</code> 定版本号 → <code>stampFrontmatter</code> 盖 <code>code_sha</code></li>
+          <li>HOME 同走指纹逻辑；INDEX 纯机械、不进指纹</li>
+          <li>写回指纹 + <b>GC 孤儿</b>（只留本轮处理过的页 → 已删页天然丢弃）</li>
+          <li>构造 <code>staleScopes</code>：component→<code>[code_root]</code>、flow→<code>spans</code> 各 root</li>
+          <li><code>runManifestCli</code> 出 manifest + 写 <code>.graph.json</code></li>
+        </ol>
+        <p class="anchor">主体：finalizeSync @ lib/sync.js（读指纹→逐页→HOME→INDEX→写回→staleScopes→manifest）</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>③ 关键数据契约 —— 状态长什么样</summary>
+      <div class="body">
+        <p><code>.state/fingerprints.json</code>：</p>
+        <pre style="background:var(--code-bg);padding:12px;border-radius:8px;font-size:13px;overflow-x:auto">{ "component/sync.md": { "prose_hash": "sha256:…", "prose_sha": "3fbb170" } }</pre>
+        <ul>
+          <li><code>prose_hash</code> = 正文哈希，<b>剥掉页头 + 决策史哨兵区</b> → 只反映 AI 写的架构正文。
+              改日期 / 决策史 / 状态块都不动它。<span class="anchor">proseHash @ lib/fingerprint.js</span></li>
+          <li><code>prose_sha</code> = 正文<b>上次重写</b>时的 HEAD；页头 <code>code_sha</code> 盖的就是它 →
+              <code>stale = code_sha..HEAD 的 commit 数</code>（按 code_root 限定）。<span class="anchor">pageEntry @ lib/manifest.js</span></li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>④ 指纹状态机 —— seed / 保持 / 推进</summary>
+      <div class="body">
+        <pre class="mermaid">
+stateDiagram-v2
+  [*] --> seed: 无指纹（新页/首跑）
+  seed --> keep: hash 不变
+  keep --> keep: 只机械刷新
+  keep --> bump: AI 重写正文（hash 变）
+  bump --> keep: hash 不变
+  note right of seed: prose_sha = 当前 HEAD
+  note right of bump: prose_sha = 当前 HEAD
+  note right of keep: prose_sha = 旧值（不动）
+        </pre>
+        <p class="anchor">resolveProseSha @ lib/sync.js（三态：seed / 保持 / 推进）</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>⑤ 边界 / 坑 —— 改代码前必看</summary>
+      <div class="body">
+        <ul>
+          <li><b>对「折叠后」文本算 hash，不是读入文本</b>：<code>{{LORE_JOURNAL}}</code> token ↔ 哨兵区形态在首次
+              finalize 跳变；若对读入文本算，seed 后第一次机械刷新会被误判成「正文变了」而错误推进版本号。
+              <span class="anchor">注释 @ lib/sync.js（resolveProseSha 上方）</span> ←（A 期实测踩到的坑）</li>
+          <li><b>极速连续 commit</b>：两个后台 finalize 可能叠跑 → 幂等全量重建、最后写赢、无锁（YAGNI，spec 决策）。</li>
+          <li><b>坏指纹 JSON / 非 git</b>：<code>readFingerprints→{}</code>、<code>reachableShaSet→null</code> → 退化不崩。</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>⑥ 故障地图 —— 症状 → 定位（debug 从这进）</summary>
+      <div class="body">
+        <table>
+          <tr><th>症状</th><th>可能原因</th><th>查哪</th></tr>
+          <tr><td>某页 stale 一直不归零</td><td>正文 hash 没变（你以为重写了，其实只动了决策史/页头区）</td><td class="anchor">确认改的是「## Current architecture」段；proseHash 剥离范围 @ fingerprint.js</td></tr>
+          <tr><td>重写正文后 stale 反而变大</td><td>code_sha 盖成了更旧的 prose_sha</td><td class="anchor">resolveProseSha @ sync.js；查指纹 prose_hash 是否真变</td></tr>
+          <tr><td>决策史重复 / 累积</td><td>foldJournal 没正确折叠哨兵区</td><td class="anchor">foldJournal @ sync.js；查 START/END 哨兵</td></tr>
+          <tr><td>删了页 stale 还在报</td><td>指纹孤儿没 GC</td><td class="anchor">写回指纹逻辑 @ sync.js（nextFingerprints）</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>⑦ 测试锚点 —— 改了跑什么</summary>
+      <div class="body">
+        <ul>
+          <li><code>test/sync.test.js</code>：「正文不变→prose_sha 保持」「正文改了→前移」「删页 GC」「planSync 增量 / --all」</li>
+          <li><code>test/fingerprint.test.js</code>：round-trip / 坏 JSON / proseHash 剥离</li>
+          <li>改 finalize 或指纹逻辑后跑：<code>node --test test/sync.test.js test/fingerprint.test.js</code></li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>⑧ 不变量 —— debug 的标尺（违反即 bug）</summary>
+      <div class="body">
+        <ul>
+          <li>页头 <code>code_sha</code> <b>恒等于</b> <code>prose_sha</code>（不再是当前 HEAD）—— 违反 → stale 会撒谎</li>
+          <li><code>INDEX</code> / <code>docs</code> 轴 <b>永不进指纹</b>（纯机械、永远当前）</li>
+          <li><code>fingerprints.json</code> <b>只含本轮处理过的页</b>（已删页天然 GC，无孤儿）</li>
+          <li><code>finalize</code> <b>幂等</b>：同输入多次跑，wiki 收敛到同一结果（最后写赢）</li>
+          <li>正文 hash <b>只反映「## Current architecture」段</b>，不含页头 / 决策史 / 状态块</li>
+        </ul>
+      </div>
+    </details>
+
+    <h2>依赖 / 邻居</h2>
+    <p>
+      <span class="axis-tag">依赖</span>
+      <code>fold</code> · <code>fingerprint</code> · <code>manifest</code> · <code>graph</code> ·
+      <code>journal</code> · <code>config</code> · <code>docs</code> · <code>home</code> · <code>i18n</code>
+    </p>
+    <p>
+      <span class="axis-tag">被调</span>
+      <code>/lore:sync</code> 命令 · <code>hook.js</code> 的 <code>maybeRefresh</code>（提交即 finalize）
+    </p>
+    <p>
+      <span class="axis-tag">相关页</span>
+      <a class="wlink" href="#">manifest</a>（stale 计算）·
+      <a class="wlink" href="#">fingerprint</a>（指纹层）·
+      <a class="wlink" href="#">hook</a>（提交刷新）·
+      <a class="wlink" href="#">lib</a>（鸟瞰页 ↑）
+    </p>
+
+    <hr>
+    <p style="color:var(--muted);font-size:13px">Decision history（真实页此处由 finalize 机械折入 <code>{{LORE_JOURNAL}}</code>）</p>
+  </article>
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  // startOnLoad:false —— 不让 mermaid 预渲染折叠里的隐藏图（display:none 下尺寸为 0 会渲坏）
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
+  const run = (nodes) => { const todo = [...nodes].filter(n => !n.dataset.processed);
+                           if (todo.length) mermaid.run({ nodes: todo }); };
+  // 初始只渲染当前可见的图（概览档；offsetParent 为 null = 隐藏）
+  run([...document.querySelectorAll('pre.mermaid')].filter(n => n.offsetParent !== null));
+  // 折叠展开时再渲染其中尚未处理的图
+  document.querySelectorAll('details').forEach(d => {
+    d.addEventListener('toggle', () => { if (d.open) run(d.querySelectorAll('pre.mermaid')); });
+  });
+</script>
+</body>
+</html>

@@ -108,3 +108,44 @@ test('captureHead tags flow from config flows', () => {
     assert.deepEqual(readAllAtoms(journalDir)[0].facets.flow, ['pipe']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// --- maybeRefresh (Task 6): commit-time detached mechanical finalize ---
+import { maybeRefresh } from '../lib/hook.js';
+
+test('maybeRefresh: 有 manifest → spawn finalize（detached）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', '.manifest.json'), '{"axes":[]}');
+    const calls = [];
+    const r = maybeRefresh({ loreDir: lore, spawnFn: (cmd, args) => { calls.push({ cmd, args }); return { unref() {} }; } });
+    assert.equal(r.spawned, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args[1], 'finalize');            // node sync.js finalize <lore>
+    assert.equal(calls[0].args[2], lore);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('maybeRefresh: 无 manifest → 不 spawn', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    let spawned = false;
+    const r = maybeRefresh({ loreDir: lore, spawnFn: () => { spawned = true; return { unref() {} }; } });
+    assert.equal(r.spawned, false);
+    assert.equal(spawned, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('maybeRefresh: spawn 抛错也不抛出（best-effort）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', '.manifest.json'), '{"axes":[]}');
+    const r = maybeRefresh({ loreDir: lore, spawnFn: () => { throw new Error('boom'); } });
+    assert.equal(r.spawned, false);                        // 吞掉异常、返回未 spawn
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -12,37 +12,61 @@ commits: 113
 
 ```mermaid
 flowchart TD
-  hook[hook.js post-commit] --> J[(journal ndjson)]
-  mine[mine.js git-log 回填] --> J
-  note[note.js agent 决策] --> J
-  J --> fold[fold.js 按 id 折叠/去 orphan]
-  config[config.js code_roots/themes/flows] --> sync[sync.js plan / finalize]
+  hook["hook.js · post-commit"] --> J[("journal ndjson")]
+  mine["mine.js · git log 回填"] --> J
+  note["note.js · agent 决策"] --> J
+  J --> fold["fold.js · 按 id 折叠 / 去 orphan"]
+  cfg["config.js · 组件/主题/流"] --> sync["sync.js · plan / finalize"]
   fold --> sync
-  sync --> manifest[manifest.js .manifest.json]
-  sync --> graph[graph.js .graph.json]
-  sync --> wiki[wiki 多轴页]
-  manifest --> serve[serve.js + server.js]
+  sync --> manifest["manifest.js · .manifest.json"]
+  sync --> gj["graph.js · .graph.json"]
+  sync --> wiki["wiki 多轴页"]
+  manifest --> serve["serve.js + server.js"]
   wiki --> serve
-  serve -. per-repo .-> reg[registry.js ~/.lore/servers.json + stablePort]
-  repos[repos.js ~/.lore/repos.json] --> portal[portal.js 单机门户 :7842]
+  serve -.->|per-repo| reg["registry.js · servers.json"]
+  repos["repos.js · repos.json"] --> portal["portal.js · 门户 7842"]
   wiki --> portal
-  graph --> mcp[mcp.js agent 工具]
-  manifest --> ask[ask.js 检索]
-  manifest --> lint[lint.js 漂移]
-  init[init.js 脚手架] -. 装 hook + 登记 repo .-> repos
+  gj --> mcp["mcp.js · agent 工具"]
+  manifest --> ask["ask.js · 检索"]
+  manifest --> lint["lint.js · 漂移"]
+  init["init.js · 脚手架"] -.->|装 hook + 登记| repos
 ```
 
-`lib/` 是 lore 的全部引擎，纯 Node 内置、零依赖。按数据流分四层：
+一句话：`lib/` 是 lore 的全部引擎——纯 Node 内置、零依赖，把仓库变更沿「捕获 → 合成 → 消费」单向流水线变成 wiki。
 
-- **捕获（写 journal 原子）**：`hook.js`（post-commit 自动、机械、<50ms、永不阻断 commit）、`mine.js`（`git log` 全历史回填，按 sha 幂等）、`note.js`（agent 决策当下记 `kind:decision`）。三源经 `journal.js`（append-only ndjson，按日分片、去重）落地；`fold.js` 在读取层按 id 折叠（why append / refs union / ts 最早）并丢弃 amend/rebase 的 orphan sha，给下游去重后的决策史。
-- **合成（journal + 代码 → wiki）**：`sync.js` 两阶段——`plan` 出 worklist、agent 写页正文、`finalize` 机械盖 front-matter + 折决策历史 + 建 INDEX + emit `.manifest.json`（`manifest.js`）与 `.graph.json`（`graph.js`，节点页/原子/组件 + 边 facet/refs/translation）。`config.js` 解析 `code_roots` / theme `match` / flow `spans` 驱动多轴打标；`home.js` 产人读 HOME 页 + 机械状态块（版本/sha/轴/语言/翻译进度）；`docs.js` 把 `docs/`+CHANGELOG+CLAUDE.md 物化成 docs 轴（零 LLM）；`i18n.js` + `translate.js` 管双语 sidecar（按需翻译、防陈旧 hash）。
-- **消费**：两条并存路径——
-  - **per-repo**：`serve.js`（探测 python→内置 `server.js` 兜底的哑静态服务器 + 浏览器壳）+ `registry.js`（`~/.lore/servers.json` 中央登记 + `serve list/stop-all`）+ `stablePort`（hash(loreDir)→7000-7999，同 repo URL 恒定）。
-  - **单机门户（v0.6 新）**：`portal.js` 一个常驻 server 固定端口 `7842` 聚合本机所有 lore repo；`repos.js`（`~/.lore/repos.json`，`/lore:init` 自动登记、过滤失效条目）发现各 repo；`server.js` 的 `createPortalServer` 按 `/<name>/` 白名单路由，复用从 `createServer` 提取的共享 `serveStatic`（穿越防护 + dir→index.html + MIME，与 per-repo 同款语义）。MVP 只读：`/<name>/api/…` 一律 404，仅绑 127.0.0.1。
-  - **agent 检索**：`ask.js`（按 manifest title+summary 命中）、`mcp.js`（零依赖 stdio MCP，`lore_ask`/`page`/`neighbors` 顺 graph 推理）。
-- **检查**：`lint.js` 只读报漂移（stale / orphan / missing），不自动改。
+### 捕获：每次变更记成 journal 原子
 
-`init.js` 是一次性脚手架：搭 `.lore/`、自动发现组件写 `config.yml`、拷浏览器壳（含 `mermaid.min.js`）、装 post-commit hook，并把本 repo 登记进 portal 的 `~/.lore/repos.json`。
+- `hook.js` — post-commit 钩子，每次 commit 自动记一条原子（<50ms，不阻断 commit）。
+- `mine.js` — 从 `git log` 全量回填历史，按 sha 幂等。
+- `note.js` — agent 当场记决策原子（带 why）。
+- `journal.js` — 三源都落成 append-only ndjson（按日分片、去重）。
+- `fold.js` — 读取层按 id 折叠（why 追加 / refs 并集 / ts 最早），丢弃 amend、rebase 留下的 orphan。
+
+### 合成：journal + 源码 → wiki
+
+`sync.js` 三步走：**plan**（机械列出要写的页）→ **写正文**（agent 读源码写「当前架构」）→ **finalize**（机械盖 frontmatter、折决策史、建 INDEX、产出 `.manifest.json` + `.graph.json`）。
+
+配套模块：
+
+- `config.js` — 解析组件 / 主题 / 数据流配置，驱动多轴打标。
+- `manifest.js`、`graph.js` — 产出给壳和 agent 用的索引与图谱。
+- `home.js` — HOME 首页 + 机械状态块（版本 / sha / 轴 / 语言）。
+- `docs.js` — 把 `docs/` 等物化成 docs 轴（零 LLM）。
+- `i18n.js` + `translate.js` — 双语翻译页（按需生成、防陈旧）。
+
+### 消费：人读 + agent 读
+
+- **人读 · 单仓**：`serve.js`（本地静态服务器 + 浏览器壳）+ `registry.js`（中央登记）+ `stablePort`（每仓固定端口）。
+- **人读 · 门户**（v0.6 新）：`portal.js` 一个常驻端口 `7842` 聚合本机所有仓库；`repos.js` 发现各仓；`createPortalServer` 按 `/<仓库>/` 路由。只读、仅绑本机。
+- **agent 读**：`ask.js`（关键词检索）+ `mcp.js`（MCP 工具，顺 `.graph.json` 图谱推理）。
+
+### 检查
+
+- `lint.js` — 只读报告漂移（stale / orphan / missing），不自动改。
+
+---
+
+`init.js` 是一次性脚手架：建 `.lore/`、自动发现组件、拷壳、装 hook，并登记到门户。
 
 ## Decision history
 

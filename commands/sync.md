@@ -14,12 +14,15 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 
 本命令编排 `lib/sync.js`：
 
-1. **plan**（机械）：
+1. **plan**（机械，增量）：
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" plan "$(pwd)/.lore"
    ```
-   输出 worklist JSON：`{ codeRoots, worklist:[{component, codeRoot, path, priorExists}] }`。
+   输出 worklist JSON：`{ codeRoots, worklist:[{component, codeRoot, path, priorExists, stale, reason}] }`。
    worklist 空 → 提示先 `/lore:init`（或编辑 `.lore/config.yml` 填 `code_roots`），停止。
+
+   > 增量：`plan` 默认只列「代码动过」的 component 页（据 `.state/fingerprints.json` 指纹，`reason: new|code-changed`）；HOME/theme/flow 仍全列。要强制全量（首跑 / 大改后 / 兜底）：`node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" plan "$(pwd)/.lore" --all`。
+   > 提交即刷新：装了 post-commit hook 的 repo，每次 commit 会后台自动跑机械 `finalize`（决策史 / docs / 状态 / `stale` 准实时、零 LLM、不挡 commit）；架构 prose 仍按 `plan` 增量、由 agent 重写。
 
 2. **合成**（你来，逐 worklist 项）：读该 `codeRoot` 的实际源码，写 `.lore/wiki/<path>`，格式：
    ```markdown

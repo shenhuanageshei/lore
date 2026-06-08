@@ -350,3 +350,23 @@ test('countCommitsSince scopes to a pathspec', () => {
     assert.equal(count(base, ['a', 'b']), 2);  // 并集：2
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// emitManifest already imported above — reuse it + fs/os/path imports.
+test('emitManifest uses staleScopes to scope per-page stale', () => {
+  const wiki = mkdtempSync(join(tmpdir(), 'lore-ss-'));
+  try {
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    const page = (id, sha) => `---\ntitle: ${id}\ncode_sha: ${sha}\natoms: 0\ncommits: 0\n---\n# ${id}\n`;
+    writeFileSync(join(wiki, 'component', 'a.md'), page('a', 'OLD'));
+    writeFileSync(join(wiki, 'component', 'b.md'), page('b', 'OLD'));
+    // 假 countCommitsSince：动过 'a' 算 5，动过 'b' 算 0
+    const count = (sha, pathspec) => (pathspec && pathspec.includes('a')) ? 5 : 0;
+    const m = emitManifest({
+      wikiDir: wiki, currentSha: 'NEW', countCommitsSince: count, now: 't',
+      staleScopes: { 'component/a.md': ['a'], 'component/b.md': ['b'] },
+    });
+    const comp = m.axes.find(x => x.id === 'component');
+    assert.equal(comp.pages.find(p => p.id === 'a').stale, 5);
+    assert.equal(comp.pages.find(p => p.id === 'b').stale, 0);
+  } finally { rmSync(wiki, { recursive: true, force: true }); }
+});

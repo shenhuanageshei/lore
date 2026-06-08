@@ -119,6 +119,10 @@ test('integration: sync then a new commit makes the page stale → lint reports 
     mkdirSync(join(root, 'lib'), { recursive: true });
     writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
     init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    // 本测试只验证 finalize→commit→lint 的 stale 检测，不涉及 hook。移除 init 装的 post-commit
+    // hook —— 否则下面的 commit 会触发 hook 的 detached finalize（manifest 已存在），其后台进程
+    // 在 Windows 上持有临时目录句柄，与 finally 的 rmSync 竞态报 EPERM。
+    rmSync(join(root, '.git', 'hooks', 'post-commit'), { force: true });
     const lore = join(root, '.lore');
     const compDir = join(lore, 'wiki', 'component');
     mkdirSync(compDir, { recursive: true });

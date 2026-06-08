@@ -715,3 +715,77 @@ test('finalizeSync writes .graph.json with page/atom nodes and a facet edge', ()
     assert.equal(facetEdge.from, atomNode.id);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// --- fingerprint semantics (Task 4): prose_sha decoupled from mechanical finalize ---
+import { finalizeSync as fz } from '../lib/sync.js';
+import { readFingerprints as rfp } from '../lib/fingerprint.js';
+import { parseFrontmatter as pfm } from '../lib/manifest.js';
+import { mkdtempSync as mkN, rmSync as rmN, mkdirSync as mdN, writeFileSync as wfN, readFileSync as rdN } from 'node:fs';
+import { tmpdir as tmpN } from 'node:os';
+import { join as jN } from 'node:path';
+import { execFileSync as exN2 } from 'node:child_process';
+
+// 建一个真 git repo + 最小 .lore（1 component 页 lib），返回 {root, loreDir, git, sha}
+function fzRepo() {
+  const root = mkN(jN(tmpN(), 'lore-fz-'));
+  const git = (...a) => exN2('git', a, { cwd: root, stdio: 'pipe' }).toString().trim();
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  mdN(jN(root, 'lib'), { recursive: true });
+  wfN(jN(root, 'lib', 'a.js'), 'export const x = 1;\n');
+  wfN(jN(root, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n');
+  const lore = jN(root, '.lore');
+  mdN(jN(lore, 'wiki', 'component'), { recursive: true });
+  mdN(jN(lore, 'journal'), { recursive: true });
+  mdN(jN(lore, '.state'), { recursive: true });
+  // config 进 .lore（finalize 读 .lore/config.yml）
+  wfN(jN(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n');
+  wfN(jN(lore, 'wiki', 'component', 'lib.md'),
+    '---\ntitle: lib\nsummary: s\n---\n# component: lib\n\n## Current architecture\n\n架构 v1\n\n## Decision history\n\n{{LORE_JOURNAL}}\n');
+  exN2('git', ['add', '-A'], { cwd: root, stdio: 'pipe' });
+  exN2('git', ['commit', '-q', '-m', 'init'], { cwd: root, stdio: 'pipe' });
+  return { root, loreDir: lore, git, sha: () => git('rev-parse', '--short', 'HEAD') };
+}
+
+test('finalize: 正文不变 + 新 commit → prose_sha 保持、code_sha 不前移', () => {
+  const r = fzRepo();
+  try {
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    const fp1 = rfp(jN(r.loreDir, '.state'))['component/lib.md'];
+    const sha1 = r.sha();
+    assert.equal(fp1.prose_sha, sha1);                       // seed = 当前
+    // 动代码、提交（正文不动）
+    wfN(jN(r.root, 'lib', 'a.js'), 'export const x = 2;\n');
+    exN2('git', ['commit', '-aqm', 'change code'], { cwd: r.root, stdio: 'pipe' });
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    const fp2 = rfp(jN(r.loreDir, '.state'))['component/lib.md'];
+    assert.equal(fp2.prose_sha, sha1);                       // 保持旧 sha（正文 hash 未变）
+    const { data } = pfm(rdN(jN(r.loreDir, 'wiki', 'component', 'lib.md'), 'utf8'));
+    assert.equal(data.code_sha, sha1);                       // frontmatter 盖 prose_sha，不是当前
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('finalize: 正文改了 → prose_sha 前移到当前', () => {
+  const r = fzRepo();
+  try {
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    wfN(jN(r.root, 'lib', 'a.js'), 'export const x = 3;\n');
+    exN2('git', ['commit', '-aqm', 'change'], { cwd: r.root, stdio: 'pipe' });
+    // 重写架构正文（模拟 agent）
+    const pPath = jN(r.loreDir, 'wiki', 'component', 'lib.md');
+    wfN(pPath, rdN(pPath, 'utf8').replace('架构 v1', '架构 v2 重写'));
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    const fp = rfp(jN(r.loreDir, '.state'))['component/lib.md'];
+    assert.equal(fp.prose_sha, r.sha());                     // 前移到当前
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('finalize: 删页后 GC 掉孤儿指纹', () => {
+  const r = fzRepo();
+  try {
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    assert.ok(rfp(jN(r.loreDir, '.state'))['component/lib.md']);
+    rmN(jN(r.loreDir, 'wiki', 'component', 'lib.md'), { force: true });
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    assert.equal(rfp(jN(r.loreDir, '.state'))['component/lib.md'], undefined);  // 已 GC
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});

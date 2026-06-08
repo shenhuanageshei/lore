@@ -75,6 +75,7 @@ axes:
 
 - `deep.<code_root>: [子模块…]`，子模块名 = 源文件名去 `.js`。每个生成 `component/<子模块>.md` 深度页，锚定源文件 `<code_root>/<子模块>.js`。
 - 未在 `deep` 声明的文件 → 仍归鸟瞰页（不强制全文件深度页）。
+- **跨 code_root 同名**（如两个 code_root 都有 `util.js`）→ 理论冲突；dogfood 单 code_root 不触发，实施计划定前缀策略（`component/<code_root>-<子模块>.md`）。
 
 **引擎改动**：
 
@@ -106,7 +107,7 @@ axes:
 - 改 `commands/sync.md`（A：5 条标准 + golden page 范例 + 鸟瞰/深度页区分 + 去黑话/符号锚点硬规则）
 - 改 `lib/config.js`（解析 `deep`）
 - 改 `lib/sync.js`（`planSync` 深度页工单 + 增量按源文件；`finalizeSync` 深度页 `staleScopes`）
-- 改 `lib/manifest.js`（确认深度页 `staleScopes` 透传 —— A 期已支持 `staleScopes`，大概率仅需 sync 侧构造）
+- `lib/manifest.js`：**预期无需改** —— A 期 `emitManifest` / `pageEntry` / `runManifestCli` 已接受任意 `page rel → pathspec` 的 `staleScopes`；深度页只需 sync 侧构造 `component/<子模块>.md → [源文件]` 映射。实施时测试确认。
 - `lib/graph.js`（深度页节点自动派生，预期**无需改**，测试确认）
 - 新增（已建）`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.{html,md}`（标准标杆）
 - 扩展 `test/{config,sync,manifest}.test.js`

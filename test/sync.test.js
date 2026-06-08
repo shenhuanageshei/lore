@@ -22,8 +22,8 @@ test('planSync builds worklist from config code_roots', () => {
     assert.deepEqual(codeRoots, ['lib', 'src/pkg']);
     assert.deepEqual(worklist, [
       { axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false },
-      { axis: 'component', id: 'lib', component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true },
-      { axis: 'component', id: 'pkg', component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false },
+      { axis: 'component', id: 'lib', component: 'lib', codeRoot: 'lib', path: 'component/lib.md', priorExists: true, stale: null, reason: 'new' },
+      { axis: 'component', id: 'pkg', component: 'pkg', codeRoot: 'src/pkg', path: 'component/pkg.md', priorExists: false, stale: null, reason: 'new' },
     ]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -787,5 +787,34 @@ test('finalize: 删页后 GC 掉孤儿指纹', () => {
     rmN(jN(r.loreDir, 'wiki', 'component', 'lib.md'), { force: true });
     fz(r.loreDir, '2026-06-08T00:00:00Z');
     assert.equal(rfp(jN(r.loreDir, '.state'))['component/lib.md'], undefined);  // 已 GC
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+// --- incremental planSync (Task 5) ---
+import { planSync as pl } from '../lib/sync.js';
+
+test('planSync 增量：未动 code_root 的 component 页跳过，动了的入 worklist', () => {
+  const r = fzRepo();
+  try {
+    fz(r.loreDir, '2026-06-08T00:00:00Z');                  // seed 指纹（lib 此刻 fresh）
+    let wl = pl(r.loreDir).worklist.filter(w => w.axis === 'component');
+    assert.equal(wl.length, 0);                             // lib fresh → 不入
+    // 动 lib 代码 + 提交
+    wfN(jN(r.root, 'lib', 'a.js'), 'export const x = 9;\n');
+    exN2('git', ['commit', '-aqm', 'touch lib'], { cwd: r.root, stdio: 'pipe' });
+    wl = pl(r.loreDir).worklist.filter(w => w.axis === 'component');
+    assert.equal(wl.length, 1);                             // lib 代码动了 → 入
+    assert.equal(wl[0].id, 'lib');
+    assert.equal(wl[0].reason, 'code-changed');
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync --all 强制全量', () => {
+  const r = fzRepo();
+  try {
+    fz(r.loreDir, '2026-06-08T00:00:00Z');                  // lib fresh
+    const wl = pl(r.loreDir, { all: true }).worklist.filter(w => w.axis === 'component');
+    assert.equal(wl.length, 1);                             // --all 忽略指纹
+    assert.equal(wl[0].reason, 'all');
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });

@@ -872,3 +872,19 @@ test('planSync 增量：深度页无指纹 → new 入；动其源文件 → cod
     assert.equal(deep[0].reason, 'code-changed');
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
+
+test('finalize: 深度页 staleScopes → [源文件]，stale 按源文件精确', () => {
+  const r = fzRepoDeep();
+  try {
+    const syncPage = jN(r.loreDir, 'wiki', 'component', 'sync.md');
+    wfN(syncPage, '---\ntitle: sync\nsummary: s\n---\n# component: sync\n\n## Current architecture\n\nv1\n');
+    fz(r.loreDir, '2026-06-08T00:00:00Z');                  // seed：prose_sha = 当前
+    // 动 lib/manifest.js（不是 sync.js）+ commit
+    wfN(jN(r.root, 'lib', 'manifest.js'), 'export const b = 2;\n');
+    exN2('git', ['commit', '-aqm', 'touch manifest'], { cwd: r.root, stdio: 'pipe' });
+    fz(r.loreDir, '2026-06-08T00:00:00Z');                  // 机械刷新（正文未变 → prose_sha 保持）
+    const manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+    const page = manifest.axes.find(a => a.id === 'component').pages.find(p => p.id === 'sync');
+    assert.equal(page.stale, 0);                            // 动的是 manifest.js，不是 sync.js → sync 深度页 stale 0
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});

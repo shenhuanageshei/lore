@@ -125,3 +125,24 @@ test('parseConfigLanguage: tolerates a trailing comment and CRLF on the language
   const cfg = 'language:                # wiki language (human home + sidecars)\r\n  default: zh\r\n  available: [zh, en]\r\n';
   assert.deepEqual(parseConfigLanguage(cfg), { default: 'zh', available: ['zh', 'en'] });
 });
+
+import { parseConfigDeep } from '../lib/config.js';
+
+test('parseConfigDeep: reads <root>: [submodules] under deep block', () => {
+  const cfg = 'axes:\n  component:\n    code_roots: [lib]\n    deep:\n      lib: [sync, manifest, fingerprint]\n  flow:\n    values: []\n';
+  assert.deepEqual(parseConfigDeep(cfg), { lib: ['sync', 'manifest', 'fingerprint'] });
+});
+
+test('parseConfigDeep: absent deep → {}', () => {
+  assert.deepEqual(parseConfigDeep('axes:\n  component:\n    code_roots: [lib]\n'), {});
+});
+
+test('parseConfigDeep: stops at shallower key (no leak from sibling axes)', () => {
+  const cfg = 'axes:\n  component:\n    deep:\n      lib: [sync]\n  theme:\n    values:\n    - { id: q, match: [a] }\n';
+  assert.deepEqual(parseConfigDeep(cfg), { lib: ['sync'] });
+});
+
+test('parseConfigDeep: dequotes entries, ignores empty list', () => {
+  const cfg = '    deep:\n      lib: ["sync", \'manifest\']\n      site: []\n';
+  assert.deepEqual(parseConfigDeep(cfg), { lib: ['sync', 'manifest'] });
+});

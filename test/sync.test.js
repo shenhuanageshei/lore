@@ -888,3 +888,17 @@ test('finalize: 深度页 staleScopes → [源文件]，stale 按源文件精确
     assert.equal(page.stale, 0);                            // 动的是 manifest.js，不是 sync.js → sync 深度页 stale 0
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
+
+test('深度页自动进 manifest + graph 模块级节点（manifest/graph 无需改）', () => {
+  const r = fzRepoDeep();
+  try {
+    wfN(jN(r.loreDir, 'wiki', 'component', 'sync.md'),
+      '---\ntitle: sync\nsummary: s\n---\n# component: sync\n\n## Current architecture\n\nv1\n');
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    const manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+    const ids = manifest.axes.find(a => a.id === 'component').pages.map(p => p.id);
+    assert.ok(ids.includes('sync'));                        // 深度页进 manifest
+    const graph = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.graph.json'), 'utf8'));
+    assert.ok(graph.nodes.some(n => n.id === 'page:component/sync'));   // graph 模块级节点
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});

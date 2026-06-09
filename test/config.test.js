@@ -128,21 +128,34 @@ test('parseConfigLanguage: tolerates a trailing comment and CRLF on the language
 
 import { parseConfigDeep } from '../lib/config.js';
 
-test('parseConfigDeep: reads <root>: [submodules] under deep block', () => {
+test('parseConfigDeep: flat list → {order, groups:[]} (向后兼容)', () => {
   const cfg = 'axes:\n  component:\n    code_roots: [lib]\n    deep:\n      lib: [sync, manifest, fingerprint]\n  flow:\n    values: []\n';
-  assert.deepEqual(parseConfigDeep(cfg), { lib: ['sync', 'manifest', 'fingerprint'] });
+  assert.deepEqual(parseConfigDeep(cfg), { lib: { order: ['sync', 'manifest', 'fingerprint'], groups: [] } });
+});
+
+test('parseConfigDeep: 分组 map → order 展平 + groups 保序', () => {
+  const cfg = 'axes:\n  component:\n    deep:\n      lib:\n        捕获: [hook, mine, fold]\n        合成: [sync, manifest, fingerprint]\n  theme:\n    values: []\n';
+  assert.deepEqual(parseConfigDeep(cfg), {
+    lib: {
+      order: ['hook', 'mine', 'fold', 'sync', 'manifest', 'fingerprint'],
+      groups: [
+        { name: '捕获', mods: ['hook', 'mine', 'fold'] },
+        { name: '合成', mods: ['sync', 'manifest', 'fingerprint'] },
+      ],
+    },
+  });
 });
 
 test('parseConfigDeep: absent deep → {}', () => {
   assert.deepEqual(parseConfigDeep('axes:\n  component:\n    code_roots: [lib]\n'), {});
 });
 
-test('parseConfigDeep: stops at shallower key (no leak from sibling axes)', () => {
-  const cfg = 'axes:\n  component:\n    deep:\n      lib: [sync]\n  theme:\n    values:\n    - { id: q, match: [a] }\n';
-  assert.deepEqual(parseConfigDeep(cfg), { lib: ['sync'] });
+test('parseConfigDeep: 分组停在更浅 key（不漏到同级轴）', () => {
+  const cfg = 'axes:\n  component:\n    deep:\n      lib:\n        捕获: [hook]\n  theme:\n    values:\n    - { id: q, match: [a] }\n';
+  assert.deepEqual(parseConfigDeep(cfg), { lib: { order: ['hook'], groups: [{ name: '捕获', mods: ['hook'] }] } });
 });
 
-test('parseConfigDeep: dequotes entries, ignores empty list', () => {
-  const cfg = '    deep:\n      lib: ["sync", \'manifest\']\n      site: []\n';
-  assert.deepEqual(parseConfigDeep(cfg), { lib: ['sync', 'manifest'] });
+test('parseConfigDeep: dequotes + 空组忽略', () => {
+  const cfg = '    deep:\n      lib:\n        捕获: ["hook", \'mine\']\n        空组: []\n';
+  assert.deepEqual(parseConfigDeep(cfg), { lib: { order: ['hook', 'mine'], groups: [{ name: '捕获', mods: ['hook', 'mine'] }] } });
 });

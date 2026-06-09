@@ -2,7 +2,7 @@
 title: sync —— 合成总装线
 summary: plan 列工单 → agent 写正文 → finalize 机械盖章；prose 指纹让 stale 诚实、增量只重写动过的页
 last_updated: 2026-06-09
-code_sha: 35acc10
+code_sha: 57efae2
 atoms: 0
 commits: 0
 ---
@@ -18,7 +18,7 @@ commits: 0
 flowchart LR
   plan["plan 列工单 · 机械增量"] --> write["agent 写正文 · LLM 读源码"] --> finalize["finalize 盖章 · 机械零LLM"]
   finalize --> manifest[".manifest.json · 诚实 stale"]
-  finalize --> graph[".graph.json · agent 图谱"]
+  finalize --> gj[".graph.json · agent 图谱"]
   finalize --> fp[".state/fingerprints.json · prose 指纹"]
 ```
 

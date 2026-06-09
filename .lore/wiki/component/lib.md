@@ -3,8 +3,8 @@ title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-09
 code_sha: b934c49
-atoms: 117
-commits: 116
+atoms: 120
+commits: 119
 ---
 # component: lib
 
@@ -76,6 +76,9 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(manifest): component pages ordered by componentOrder + group field (pipeline order)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (a29c43f, 2026-06-09)
+- **refactor(sync): consume parseConfigDeep .order (grouped-deep schema)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (3d63da4, 2026-06-09)
+- **feat(config): parseConfigDeep returns {order, groups} (grouped deep map + flat back-compat)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (6d42790, 2026-06-09)
 - **feat(sync): finalize maps deep pages to per-file staleScopes (honest per-module stale)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (7e37b19, 2026-06-08)
 - **feat(sync): planSync lists per-file deep-page worklist items (incremental by source file)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (b94e048, 2026-06-08)
 - **feat(config): parseConfigDeep — per-file deep-page declarations** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (6335e61, 2026-06-08)

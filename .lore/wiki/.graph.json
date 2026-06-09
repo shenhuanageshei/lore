@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-09T04:39:22.848Z",
+  "generated": "2026-06-09T11:09:14.321Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -9,18 +9,11 @@
       "path": "HOME.md"
     },
     {
-      "id": "page:component/fingerprint",
+      "id": "page:component/lib",
       "type": "page",
       "axis": "component",
-      "title": "fingerprint —— 每页 prose 指纹",
-      "path": "component/fingerprint.md"
-    },
-    {
-      "id": "page:component/fold",
-      "type": "page",
-      "axis": "component",
-      "title": "fold —— journal 的去重对账员",
-      "path": "component/fold.md"
+      "title": "lib —— lore 引擎核心",
+      "path": "component/lib.md"
     },
     {
       "id": "page:component/hook",
@@ -30,11 +23,25 @@
       "path": "component/hook.md"
     },
     {
-      "id": "page:component/lib",
+      "id": "page:component/mine",
       "type": "page",
       "axis": "component",
-      "title": "lib —— lore 引擎核心",
-      "path": "component/lib.md"
+      "title": "mine —— git 历史考古队",
+      "path": "component/mine.md"
+    },
+    {
+      "id": "page:component/fold",
+      "type": "page",
+      "axis": "component",
+      "title": "fold —— journal 的去重对账员",
+      "path": "component/fold.md"
+    },
+    {
+      "id": "page:component/sync",
+      "type": "page",
+      "axis": "component",
+      "title": "sync —— 合成总装线",
+      "path": "component/sync.md"
     },
     {
       "id": "page:component/manifest",
@@ -44,18 +51,25 @@
       "path": "component/manifest.md"
     },
     {
-      "id": "page:component/mine",
+      "id": "page:component/fingerprint",
       "type": "page",
       "axis": "component",
-      "title": "mine —— git 历史考古队",
-      "path": "component/mine.md"
+      "title": "fingerprint —— 每页 prose 指纹",
+      "path": "component/fingerprint.md"
     },
     {
-      "id": "page:component/sync",
+      "id": "page:docs/superpowers-plans-2026-06-09-lore-shell-presentation",
       "type": "page",
-      "axis": "component",
-      "title": "sync —— 合成总装线",
-      "path": "component/sync.md"
+      "axis": "docs",
+      "title": "lore 壳呈现（mermaid 放大 + component 排序分组）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-09-lore-shell-presentation.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-09-lore-shell-presentation-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 壳呈现（mermaid 放大 + component 排序分组）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-09-lore-shell-presentation-design.md"
     },
     {
       "id": "page:docs/superpowers-notes-2026-06-08-lore-golden-page-sync",
@@ -2058,6 +2072,62 @@
       "kind": "commit",
       "title": "docs(roadmap): content-quality C done; correct stale 'agent-side is 0' note",
       "ts": "2026-06-08T20:57:32-07:00"
+    },
+    {
+      "id": "commit:72d3e280fc31ceed6ea44ef8a5b7ed3c4042a915",
+      "type": "atom",
+      "kind": "commit",
+      "title": "dogfood(lore): fix hook mermaid syntax + introduce server.js in lib overview",
+      "ts": "2026-06-08T21:39:28-07:00"
+    },
+    {
+      "id": "commit:96f9440d997089288b5b456e1c362b6281aded96",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): shell presentation (mermaid zoom + component order/grouping) — round-2 spec①",
+      "ts": "2026-06-08T23:40:38-07:00"
+    },
+    {
+      "id": "commit:eb26aa8f9d79941ea4c7e098b05525090594ab59",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): shell presentation implementation plan (7 tasks)",
+      "ts": "2026-06-09T00:17:40-07:00"
+    },
+    {
+      "id": "commit:6d42790177059711d2ab074774ce2e8776518dcc",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parseConfigDeep returns {order, groups} (grouped deep map + flat back-compat)",
+      "ts": "2026-06-09T00:48:05-07:00"
+    },
+    {
+      "id": "commit:3d63da4ce59b503e645db2980dc44fd2bdf6a35c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "refactor(sync): consume parseConfigDeep .order (grouped-deep schema)",
+      "ts": "2026-06-09T00:52:32-07:00"
+    },
+    {
+      "id": "commit:a29c43f741ee88b837a98fed4edc01f8b21ac21f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): component pages ordered by componentOrder + group field (pipeline order)",
+      "ts": "2026-06-09T01:10:03-07:00"
+    },
+    {
+      "id": "commit:57efae20ee59bd2f62ef7cd63a46d1096bcc81eb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "chore: gitignore preview self-test tooling (.claude/, .preview-serve.cjs)",
+      "ts": "2026-06-09T04:03:44-07:00"
+    },
+    {
+      "id": "commit:71d9f4aafad91566417932f11bb28fac40798597",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): click-to-zoom mermaid lightbox (theme-aware)",
+      "ts": "2026-06-09T04:03:45-07:00"
     }
   ],
   "edges": [
@@ -2643,6 +2713,21 @@
     },
     {
       "from": "commit:7e37b195d7c163bf79db969a5536e5129a6b4300",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:6d42790177059711d2ab074774ce2e8776518dcc",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:3d63da4ce59b503e645db2980dc44fd2bdf6a35c",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:a29c43f741ee88b837a98fed4edc01f8b21ac21f",
       "to": "page:component/lib",
       "type": "facet"
     }

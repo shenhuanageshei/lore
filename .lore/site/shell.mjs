@@ -122,6 +122,9 @@ export function resolveLocalizedPage(page, selectedLang) {
 }
 
 export function buildMeta(page) {
+  if (page.axis === 'docs') {
+    return { chips: [{ icon: '📄', text: `last-updated ${page.last_updated ?? '—'}`, kind: 'plain' }] };
+  }
   const f = page.synthesized_from ?? { atoms: 0, commits: 0 };
   const chips = [
     { icon: '📅', text: `last-updated ${page.last_updated ?? '—'}`, kind: 'plain' },
@@ -132,4 +135,11 @@ export function buildMeta(page) {
     ? { icon: '⚠', text: `落后 ${page.stale} commits · 跑 /lore:sync`, kind: 'stale' }
     : { icon: '✓', text: '最新', kind: 'fresh' });
   return { chips };
+}
+
+// 壳被 serve 在 <base>site/(index.html)：per-repo 下 <base> 为 "/"，portal 下为 "/<repo>/"。
+// 从文档路径推断该前缀，让 wiki/api fetch 不写死、自动命中正确前缀。
+export function baseFromPathname(pathname) {
+  const i = pathname.lastIndexOf('/site');
+  return i >= 0 ? pathname.slice(0, i + 1) : '/';
 }

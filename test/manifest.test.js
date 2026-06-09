@@ -370,3 +370,22 @@ test('emitManifest uses staleScopes to scope per-page stale', () => {
     assert.equal(comp.pages.find(p => p.id === 'b').stale, 0);
   } finally { rmSync(wiki, { recursive: true, force: true }); }
 });
+
+test('emitManifest: component 按 componentOrder 排 + group 字段', () => {
+  const wiki = mkdtempSync(join(tmpdir(), 'lore-ord-'));
+  try {
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    const page = id => `---\ntitle: ${id}\ncode_sha: X\natoms: 0\ncommits: 0\n---\n# ${id}\n`;
+    for (const id of ['lib', 'hook', 'sync', 'manifest']) writeFileSync(join(wiki, 'component', `${id}.md`), page(id));
+    const m = emitManifest({
+      wikiDir: wiki, currentSha: 'X', countCommitsSince: () => 0, now: 't',
+      componentOrder: ['lib', 'hook', 'sync', 'manifest'],
+      pageGroups: { hook: '捕获', sync: '合成', manifest: '合成' },
+    });
+    const comp = m.axes.find(a => a.id === 'component');
+    assert.deepEqual(comp.pages.map(p => p.id), ['lib', 'hook', 'sync', 'manifest']);   // 按 order，非字母序
+    assert.equal(comp.pages.find(p => p.id === 'lib').group, '');                        // 鸟瞰不归组
+    assert.equal(comp.pages.find(p => p.id === 'hook').group, '捕获');
+    assert.equal(comp.pages.find(p => p.id === 'sync').group, '合成');
+  } finally { rmSync(wiki, { recursive: true, force: true }); }
+});

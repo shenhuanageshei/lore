@@ -70,6 +70,8 @@
   .links a .stale { margin-left: auto; font-size: 10px; color: var(--yellow); }
   .links a .when { flex-basis: 100%; font-size: 10px; color: var(--fg-dim); }
   .links a.hidden { display: none; }
+  .links .grp { padding: 6px 16px 2px 30px; font-size: 10px; letter-spacing: .5px;
+    color: var(--fg-dim); text-transform: uppercase; }
 
   /* main */
   #main { overflow-y: auto; padding: 0; }
@@ -230,14 +232,24 @@ function wireLanguage() {
 
 function buildSidebar() {
   const nav = document.getElementById('sidebar');
+  const linkHtml = (ax, p) => `<a href="#${ax.id}/${p.id}" data-key="${ax.id}/${p.id}"
+     data-search="${(p.title + ' ' + (p.summary||'')).toLowerCase()}">
+    ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}${ax.id === 'docs' && p.last_updated ? `<span class="when">📅 ${p.last_updated}</span>` : ''}</a>`;
+  const pagesHtml = (ax) => {
+    if (ax.id !== 'component') return ax.pages.map(p => linkHtml(ax, p)).join('');
+    let out = '', lastGroup = null;                          // component 轴：按连续 group 插小标题
+    for (const p of ax.pages) {
+      const g = p.group || '';
+      if (g && g !== lastGroup) out += `<div class="grp">▸ ${g}</div>`;
+      lastGroup = g;
+      out += linkHtml(ax, p);
+    }
+    return out;
+  };
   nav.innerHTML = buildNavModel(MANIFEST).map(ax => `
     <div class="axis" data-axis="${ax.id}">
       <div class="axis-h"><span class="dot ${ax.id}"></span>${ax.label}<span class="caret">▼</span></div>
-      <div class="links">
-        ${ax.pages.map(p => `<a href="#${ax.id}/${p.id}" data-key="${ax.id}/${p.id}"
-           data-search="${(p.title + ' ' + (p.summary||'')).toLowerCase()}">
-          ${p.title}${p.stale ? `<span class="stale">⚠${p.stale}</span>` : ''}${ax.id === 'docs' && p.last_updated ? `<span class="when">📅 ${p.last_updated}</span>` : ''}</a>`).join('')}
-      </div>
+      <div class="links">${pagesHtml(ax)}</div>
     </div>`).join('');
   nav.querySelectorAll('.axis-h').forEach(h =>
     h.onclick = () => h.parentElement.classList.toggle('collapsed'));

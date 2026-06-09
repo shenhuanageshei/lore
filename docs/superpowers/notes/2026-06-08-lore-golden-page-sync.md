@@ -118,13 +118,11 @@ stateDiagram-v2
 - **被调**：`/lore:sync` 命令 · `hook.js` 的 `maybeRefresh`（提交即 finalize）
 - **相关页**：[[manifest]]（stale 计算）· [[fingerprint]]（指纹层）· [[hook]]（提交刷新）
 
-## Decision history
-
-{{LORE_JOURNAL}}
-
 ## Cross-links
 
 - [[lib]]（鸟瞰页）· [[manifest]] · [[fingerprint]] · [[hook]]
+
+> 深度页 v1 **不放** `## Decision history`：决策史汇总在鸟瞰页 [[lib]]（按文件分流决策史 = ROADMAP 未来项，需文件级 facet）。
 ```
 
 ---

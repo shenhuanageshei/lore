@@ -133,3 +133,15 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
 flowchart TD
   A[入口] --> B[关键模块] --> C[出口]
 ```
+
+## 内容质量标准（两档好页 + 深度页）
+
+每页正文按**两档**写，范例见 `docs/superpowers/notes/2026-06-08-lore-golden-page-sync.html`：
+
+- **概览档**（默认展示，目标「30 秒读懂」）：一句话定位 + 类比 · 主干 mermaid 图 · 用**场景**串讲核心机制 · 讲「为什么这么设计」。**零黑话**：内部术语（如 `prose_sha`）首次出现就地用大白话锚定，别预设读者懂。
+- **机制档**（`<details>` 折叠，给查 BUG / 改代码的人和 agent）：⓪ 调用入口&I/O（读写哪些文件）· ① 接口签名 · ② 模块内数据流 · ③ 数据契约 schema · ④ 状态机 · ⑤ 边界/坑 · ⑥ 故障地图（症状→定位）· ⑦ 测试锚点 · ⑧ 不变量。
+- **锚点锚符号**：写 `resolveProseSha @ lib/sync.js`，**绝不写行号**（行号一改代码就 stale）。
+
+**两层粒度**：
+- **鸟瞰页**（`component/<code_root>`，如 `lib`）：只要**概览档** —— 系统定位 + 模块间架构图 + 模块清单（每条 `[[深度页]]` cross-link）。不要求 9 节机制档。
+- **深度页**（`component/<子模块>`，如 `sync`）：**完整两档**。由 config `axes.component.deep.<root>: [子模块…]` 声明、`plan` 列出（`kind:'deep'`）。**深度页不放 `## Decision history` token**（决策史汇总在鸟瞰页；文件级分流见 ROADMAP 未来项）。

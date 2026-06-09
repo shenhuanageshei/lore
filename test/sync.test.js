@@ -902,3 +902,12 @@ test('深度页自动进 manifest + graph 模块级节点（manifest/graph 无�
     assert.ok(graph.nodes.some(n => n.id === 'page:component/sync'));   // graph 模块级节点
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
+
+test('commands/sync.md documents two-tier page standard + deep pages', () => {
+  const doc = readFileSync(join(process.cwd(), 'commands', 'sync.md'), 'utf8');
+  assert.match(doc, /概览档/);                  // 两档标准
+  assert.match(doc, /机制档/);
+  assert.match(doc, /深度页/);                  // 粒度
+  assert.match(doc, /鸟瞰页/);
+  assert.match(doc, /符号/);                    // 锚点锚符号
+});

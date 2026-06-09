@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-09T03:42:58.314Z",
+  "generated": "2026-06-09T04:39:22.848Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -2044,6 +2044,20 @@
       "kind": "commit",
       "title": "feat(sync.md): two-tier page standard + deep-page guidance; golden page v1 drops decision-history",
       "ts": "2026-06-08T19:25:38-07:00"
+    },
+    {
+      "id": "commit:f6ff4a9bea9291104483b76dbf1f5ae6359583f6",
+      "type": "atom",
+      "kind": "commit",
+      "title": "dogfood(lore): per-file deep pages (sync/manifest/fingerprint/hook/fold/mine) + lib overview rewrite",
+      "ts": "2026-06-08T20:45:36-07:00"
+    },
+    {
+      "id": "commit:b934c49d18cf35b9764d228f0a4c3a09b2649993",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): content-quality C done; correct stale 'agent-side is 0' note",
+      "ts": "2026-06-08T20:57:32-07:00"
     }
   ],
   "edges": [

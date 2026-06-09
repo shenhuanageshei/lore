@@ -2,7 +2,7 @@
 title: hook —— 提交即记录·提交即刷新
 summary: 每次 commit 后台记一条 journal 原子 + 触发机械 finalize；best-effort、detached、永不挡 commit
 last_updated: 2026-06-09
-code_sha: 35acc10
+code_sha: b934c49
 atoms: 0
 commits: 0
 ---
@@ -24,7 +24,7 @@ flowchart LR
   cap --> journal[("journal<br/>追加 1 条原子")]
   ref -. manifest 存在? .-> spawn["detached spawn<br/>sync.js finalize"]
   spawn -. 后台·零LLM .-> wiki[("wiki 机械部分<br/>准实时刷新")]
-  commit ==立刻返回== > you((你))
+  commit ==立刻返回==> you((你))
 ```
 
 **一个场景串到底**：

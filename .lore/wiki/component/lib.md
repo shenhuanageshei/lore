@@ -2,7 +2,7 @@
 title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-09
-code_sha: 35acc10
+code_sha: b934c49
 atoms: 117
 commits: 116
 ---
@@ -61,7 +61,7 @@ flowchart TD
 
 ### 消费：人读 + agent 读
 
-- **人读 · 单仓**：`serve.js`（本地静态服务器 + 浏览器壳）+ `registry.js`（中央登记）+ 每仓稳定端口。
+- **人读 · 单仓**：`server.js`（**仓库根**的零依赖 HTTP server —— 静态 serve wiki + i18n 写 API + Host / 目录穿越防护）；`serve.js`（start/stop 生命周期 + python/node 运行时探测）+ `registry.js`（中央登记）+ 每仓稳定端口。
 - **人读 · 门户**（v0.6）：`portal.js` 一个常驻端口 `7842` 聚合本机所有仓库；`repos.js` 发现各仓；按 `/<仓库>/` 路由。只读、仅绑本机。
 - **agent 读**：`ask.js`（关键词检索）+ `mcp.js`（MCP 工具，顺 `.graph.json` 图谱推理）。深度页让图谱可遍历到**模块级**。
 

@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-09T03:42:58.314Z",
-  "current_code_sha": "35acc10",
+  "generated": "2026-06-09T04:39:22.848Z",
+  "current_code_sha": "b934c49",
   "language": {
     "default": "zh",
     "available": [
@@ -23,11 +23,11 @@
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 7,
+          "stale": 9,
           "code_sha": "7de5966",
           "synthesized_from": {
-            "atoms": 234,
-            "commits": 233
+            "atoms": 236,
+            "commits": 235
           }
         }
       ]
@@ -46,10 +46,10 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "35acc10",
+          "code_sha": "b934c49",
           "synthesized_from": {
-            "atoms": 234,
-            "commits": 233
+            "atoms": 236,
+            "commits": 235
           }
         }
       ]
@@ -100,7 +100,7 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "35acc10",
+          "code_sha": "b934c49",
           "synthesized_from": {
             "atoms": 0,
             "commits": 0
@@ -116,7 +116,7 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "35acc10",
+          "code_sha": "b934c49",
           "synthesized_from": {
             "atoms": 117,
             "commits": 116

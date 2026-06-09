@@ -45,9 +45,9 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - **docs 页 chips** —— 「0 atoms · code_sha —」对文档页怪（`buildMeta` 区分 docs 页）。
 - **server 堆积** —— 每 repo 独立 server 占端口、易堆（见中期「单机共享 server」+ `serve --list/--stop-all`）。
 
-## 待办（北极星 agent 端 —— 还没动的另一半）
+## 北极星 agent 端 —— ✅ 基本已实现
 
-- **agent 友好 graph + MCP 暴露** —— 把 wiki 变机器可遍历结构（节点：页/原子/组件；边：wikilink/facet/refs/translation_of），`lore_ask`/`lore_page`/`lore_stale` MCP 工具让 agent 顺图谱检索/推理。v0.5 的 manifest `translations[]`/`lang` 已留边接口。**北极星两端目前只打磨了人读端。**
+- **agent 友好 graph + MCP 暴露** ✅ —— `graph.js` 把 wiki 合成机器可遍历结构（节点：页/原子/组件；边：facet/refs_related），`mcp.js` 暴露 `lore_ask`/`lore_page`/`lore_neighbors` 三工具让 agent 顺图谱检索/推理。**内容质量 C 的源文件级深度页让图谱可遍历到模块级**（dogfood：lib 从 1→7 个 component 节点）。**余项**：`lore_stale` 工具 + resident-mode 消费纪律（grep/读大文件前先查 wiki）。
 
 ## 近期（高价值、自洽）
 
@@ -105,7 +105,10 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 形态：插件注入 CLAUDE.md 规则 / PreToolUse 提醒（plugin 打包 / hook 配置活，非可测 lib）。把 `/lore:ask` 的「按需查」升级成「always-on 纪律」。
 
 ### 增量 sync（母 §5「增量合成」）✅ 已实现（低摩擦合成 A）
-- 已实现：`.state/fingerprints.json` 每页 `{prose_hash, prose_sha}`（`prose_hash` 复用 `translationSourceHash`）；finalize 只在正文变了才推进 `prose_sha`、frontmatter `code_sha` 盖 `prose_sha` → `stale` 诚实（按 code_root 精确）；`planSync` 只挑动过 code_root 的 component 页（`--all` 兜底）；post-commit hook detached 跑机械 `finalize`。设计见 `docs/superpowers/specs/2026-06-08-lore-low-friction-sync-design.md`。余项（B 前端控制台/档位、C 质量打磨）另立 spec。
+- 已实现：`.state/fingerprints.json` 每页 `{prose_hash, prose_sha}`（`prose_hash` 复用 `translationSourceHash`）；finalize 只在正文变了才推进 `prose_sha`、frontmatter `code_sha` 盖 `prose_sha` → `stale` 诚实（按 code_root 精确）；`planSync` 只挑动过 code_root 的 component 页（`--all` 兜底）；post-commit hook detached 跑机械 `finalize`。设计见 `docs/superpowers/specs/2026-06-08-lore-low-friction-sync-design.md`。余项（B 前端控制台/档位）另立 spec。
+
+### 内容质量（两档好页 + 源文件级深度页）✅ 已实现（C-内容）
+- 已实现：定义「好 wiki 页」**两档标准**（**概览档**零黑话 + **机制档** 9 节 `<details>` 折叠 + **锚点锚符号**），写进 `commands/sync.md` + golden page 标杆（`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.{html,md}`）；**两层粒度**——config `axes.component.deep.<root>:[子模块…]` 声明源文件级深度页，`planSync` 列深度页工单（增量按源文件）、`finalizeSync` 按源文件精确算 stale；深度页是普通 component 页 → manifest/graph 自动支持（**graph 可遍历到模块级**）。dogfood：lib 一页 → 鸟瞰页 + 6 深度页（graph 1→7 节点）。设计见 `docs/superpowers/specs/2026-06-08-lore-content-quality-design.md`。余项（壳深度切换 UX、产出校验、文件级决策史分流）另立。
 
 ### lint：未打标 / 矛盾检查（母 §5）
 - 现 lint 三检（stale/orphan/missing）。加：未打标原子（只 component 缺 flow/theme，flow/theme 落地后才有意义）、矛盾（页「当前架构」声明 vs 更新原子冲突 → 轻 LLM）。

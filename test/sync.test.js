@@ -818,3 +818,57 @@ test('planSync --all 强制全量', () => {
     assert.equal(wl[0].reason, 'all');
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
+
+// --- deep pages (content-quality) ---
+function fzRepoDeep() {
+  const root = mkN(jN(tmpN(), 'lore-deep-'));
+  const git = (...a) => exN2('git', a, { cwd: root, stdio: 'pipe' }).toString().trim();
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  mdN(jN(root, 'lib'), { recursive: true });
+  wfN(jN(root, 'lib', 'sync.js'), 'export const a = 1;\n');
+  wfN(jN(root, 'lib', 'manifest.js'), 'export const b = 1;\n');
+  const lore = jN(root, '.lore');
+  mdN(jN(lore, 'wiki', 'component'), { recursive: true });
+  mdN(jN(lore, 'journal'), { recursive: true });
+  mdN(jN(lore, '.state'), { recursive: true });
+  wfN(jN(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n    deep:\n      lib: [sync, manifest]\n');
+  exN2('git', ['add', '-A'], { cwd: root, stdio: 'pipe' });
+  exN2('git', ['commit', '-q', '-m', 'init'], { cwd: root, stdio: 'pipe' });
+  return { root, loreDir: lore, git, sha: () => git('rev-parse', '--short', 'HEAD') };
+}
+
+test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {
+  const r = fzRepoDeep();
+  try {
+    const wl = pl(r.loreDir, { all: true }).worklist.filter(w => w.kind === 'deep');
+    assert.equal(wl.length, 2);
+    const s = wl.find(w => w.id === 'sync');
+    assert.equal(s.sourceFile, 'lib/sync.js');
+    assert.equal(s.path, 'component/sync.md');
+    assert.equal(s.reason, 'all');
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync 增量：深度页无指纹 → new 入；动其源文件 → code-changed', () => {
+  const r = fzRepoDeep();
+  try {
+    let deep = pl(r.loreDir).worklist.filter(w => w.kind === 'deep');
+    assert.equal(deep.length, 2);
+    assert.equal(deep.find(w => w.id === 'sync').reason, 'new');
+
+    wfN(jN(r.loreDir, 'wiki', 'component', 'sync.md'),
+      '---\ntitle: sync\nsummary: s\n---\n# component: sync\n\n## Current architecture\n\nv1\n');
+    wfN(jN(r.loreDir, 'wiki', 'component', 'manifest.md'),
+      '---\ntitle: manifest\nsummary: s\n---\n# component: manifest\n\n## Current architecture\n\nv1\n');
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    deep = pl(r.loreDir).worklist.filter(w => w.kind === 'deep');
+    assert.equal(deep.length, 0);                           // 都 fresh → 跳
+
+    wfN(jN(r.root, 'lib', 'sync.js'), 'export const a = 2;\n');
+    exN2('git', ['commit', '-aqm', 'touch sync'], { cwd: r.root, stdio: 'pipe' });
+    deep = pl(r.loreDir).worklist.filter(w => w.kind === 'deep');
+    assert.equal(deep.length, 1);
+    assert.equal(deep[0].id, 'sync');
+    assert.equal(deep[0].reason, 'code-changed');
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});

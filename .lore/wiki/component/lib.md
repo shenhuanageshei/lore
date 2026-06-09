@@ -1,10 +1,10 @@
 ---
 title: lib —— lore 引擎核心
-summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费（per-repo serve + 单机门户）+ lint 的全流程
-last_updated: 2026-06-07
-code_sha: c8f0721
-atoms: 114
-commits: 113
+summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
+last_updated: 2026-06-09
+code_sha: 35acc10
+atoms: 117
+commits: 116
 ---
 # component: lib
 
@@ -16,10 +16,11 @@ flowchart TD
   mine["mine.js · git log 回填"] --> J
   note["note.js · agent 决策"] --> J
   J --> fold["fold.js · 按 id 折叠 / 去 orphan"]
-  cfg["config.js · 组件/主题/流"] --> sync["sync.js · plan / finalize"]
+  cfg["config.js · 组件/主题/流/深度页"] --> sync["sync.js · plan / finalize"]
   fold --> sync
   sync --> manifest["manifest.js · .manifest.json"]
   sync --> gj["graph.js · .graph.json"]
+  sync --> fp["fingerprint.js · prose 指纹"]
   sync --> wiki["wiki 多轴页"]
   manifest --> serve["serve.js + server.js"]
   wiki --> serve
@@ -34,31 +35,35 @@ flowchart TD
 
 一句话：`lib/` 是 lore 的全部引擎——纯 Node 内置、零依赖，把仓库变更沿「捕获 → 合成 → 消费」单向流水线变成 wiki。
 
+> 📐 **本页是鸟瞰**，只讲模块间怎么拼。复杂模块各有**深度页**（完整机制 + 故障地图 + 测试锚点，点进去看）：
+> [[sync]] · [[manifest]] · [[fingerprint]] · [[hook]] · [[fold]] · [[mine]]。
+
 ### 捕获：每次变更记成 journal 原子
 
-- `hook.js` — post-commit 钩子，每次 commit 自动记一条原子（<50ms，不阻断 commit）。
-- `mine.js` — 从 `git log` 全量回填历史，按 sha 幂等。
+- [[hook]] — post-commit 钩子，每次 commit 自动记一条原子（<50ms、不阻断 commit），并触发后台机械刷新。
+- [[mine]] — 从 `git log` 全量回填历史，按 sha 幂等，据 config 打 component/theme/flow facet。
 - `note.js` — agent 当场记决策原子（带 why）。
 - `journal.js` — 三源都落成 append-only ndjson（按日分片、去重）。
-- `fold.js` — 读取层按 id 折叠（why 追加 / refs 并集 / ts 最早），丢弃 amend、rebase 留下的 orphan。
+- [[fold]] — 读取层按 id 折叠（why 追加 / refs 并集 / ts 最早），丢弃 amend、rebase 留下的 orphan。
 
 ### 合成：journal + 源码 → wiki
 
-`sync.js` 三步走：**plan**（机械列出要写的页）→ **写正文**（agent 读源码写「当前架构」）→ **finalize**（机械盖 frontmatter、折决策史、建 INDEX、产出 `.manifest.json` + `.graph.json`）。
+[[sync]] 三步走：**plan**（机械列页，增量）→ **写正文**（agent 读源码写「当前架构」）→ **finalize**（机械盖 frontmatter、折决策史、建 INDEX、产 `.manifest.json` + `.graph.json`）。
 
 配套模块：
 
-- `config.js` — 解析组件 / 主题 / 数据流配置，驱动多轴打标。
-- `manifest.js`、`graph.js` — 产出给壳和 agent 用的索引与图谱。
+- `config.js` — 解析组件 / 主题 / 数据流 / **深度页**配置，驱动多轴打标。
+- [[manifest]] · `graph.js` — 产出给壳和 agent 用的索引（含诚实 `stale`）与图谱。
+- [[fingerprint]] — prose 指纹，解耦「正文新鲜度」与「机械 finalize」。
 - `home.js` — HOME 首页 + 机械状态块（版本 / sha / 轴 / 语言）。
 - `docs.js` — 把 `docs/` 等物化成 docs 轴（零 LLM）。
 - `i18n.js` + `translate.js` — 双语翻译页（按需生成、防陈旧）。
 
 ### 消费：人读 + agent 读
 
-- **人读 · 单仓**：`serve.js`（本地静态服务器 + 浏览器壳）+ `registry.js`（中央登记）+ `stablePort`（每仓固定端口）。
-- **人读 · 门户**（v0.6 新）：`portal.js` 一个常驻端口 `7842` 聚合本机所有仓库；`repos.js` 发现各仓；`createPortalServer` 按 `/<仓库>/` 路由。只读、仅绑本机。
-- **agent 读**：`ask.js`（关键词检索）+ `mcp.js`（MCP 工具，顺 `.graph.json` 图谱推理）。
+- **人读 · 单仓**：`serve.js`（本地静态服务器 + 浏览器壳）+ `registry.js`（中央登记）+ 每仓稳定端口。
+- **人读 · 门户**（v0.6）：`portal.js` 一个常驻端口 `7842` 聚合本机所有仓库；`repos.js` 发现各仓；按 `/<仓库>/` 路由。只读、仅绑本机。
+- **agent 读**：`ask.js`（关键词检索）+ `mcp.js`（MCP 工具，顺 `.graph.json` 图谱推理）。深度页让图谱可遍历到**模块级**。
 
 ### 检查
 
@@ -71,6 +76,9 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(sync): finalize maps deep pages to per-file staleScopes (honest per-module stale)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (7e37b19, 2026-06-08)
+- **feat(sync): planSync lists per-file deep-page worklist items (incremental by source file)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (b94e048, 2026-06-08)
+- **feat(config): parseConfigDeep — per-file deep-page declarations** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (6335e61, 2026-06-08)
 - **feat(init): auto-register repo in ~/.lore/repos.json on init CLI (best-effort)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (57a30e7, 2026-06-07)
 - **feat(portal): portal lifecycle CLI (start/stop/list) on fixed port 7842** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (e7de56d, 2026-06-07)
 - **feat(repos): ~/.lore/repos.json repo registry for portal discovery** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (6a45fe5, 2026-06-07)
@@ -189,4 +197,4 @@ flowchart TD
 
 ## Cross-links
 
-- 唯一组件；横切主线见 INDEX 的 theme / flow 轴（按需在 `config.yml` 声明）。
+- 深度页：[[sync]] · [[manifest]] · [[fingerprint]] · [[hook]] · [[fold]] · [[mine]]

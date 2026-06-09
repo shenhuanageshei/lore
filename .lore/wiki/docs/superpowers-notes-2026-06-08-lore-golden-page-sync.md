@@ -1,3 +1,11 @@
+---
+title: GOLDEN PAGE 样例 —— component: sync
+summary: > 这是 lore「内容质量（C）」设计探索的 **golden page 标杆**，不是正式 wiki 页。 > 目的：把「**概览档 + 折叠机制档 + 符号锚点**」两档结构落成真实 markdown，作为 C 内容标准的具象。 > 对照物：`.lore/wiki/component/lib.md` 现已升级为鸟瞰页 + 深度页；本样例就是 `sync` 深度页的蓝本。 > > 评判这...
+source_path: docs/superpowers/notes/2026-06-08-lore-golden-page-sync.md
+last_updated: 2026-06-08
+---
+> 源文档：`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.md`
+
 # GOLDEN PAGE 样例 —— component: sync
 
 > 这是 lore「内容质量（C）」设计探索的 **golden page 标杆**，不是正式 wiki 页。
@@ -140,3 +148,4 @@ stateDiagram-v2
 | **⑤ 依赖/邻居** | 末段 + graph 可遍历 |
 | **符号锚点** | 全程 `符号 @ 文件`（如 `resolveProseSha @ lib/sync.js`）—— 人查 BUG / agent 精确定位都能跳到源码，**且改代码不会 stale**（不锚行号） |
 | **两层粒度** | 本页是 `sync` **深度页**；`lib` 留作**鸟瞰页**，钻取关系见 Cross-links |
+

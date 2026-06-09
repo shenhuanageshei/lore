@@ -7,6 +7,8 @@ axes:
   component:                 # 内置轴 + 自动发现
     discover: auto
     code_roots: [lib]
+    deep:                      # 源文件级深度页（内容质量 C）：每个子模块一页 component/<mod>.md
+      lib: [sync, manifest, fingerprint, hook, fold, mine]
   flow:                      # 声明轴 — "数据怎么端到端跑"（示例，按需填）
     values: []
     # - { id: article-pipeline, spans: [lib] }

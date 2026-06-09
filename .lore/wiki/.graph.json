@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-07T16:11:03.467Z",
+  "generated": "2026-06-09T03:42:58.314Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -9,11 +9,88 @@
       "path": "HOME.md"
     },
     {
+      "id": "page:component/fingerprint",
+      "type": "page",
+      "axis": "component",
+      "title": "fingerprint —— 每页 prose 指纹",
+      "path": "component/fingerprint.md"
+    },
+    {
+      "id": "page:component/fold",
+      "type": "page",
+      "axis": "component",
+      "title": "fold —— journal 的去重对账员",
+      "path": "component/fold.md"
+    },
+    {
+      "id": "page:component/hook",
+      "type": "page",
+      "axis": "component",
+      "title": "hook —— 提交即记录·提交即刷新",
+      "path": "component/hook.md"
+    },
+    {
       "id": "page:component/lib",
       "type": "page",
       "axis": "component",
       "title": "lib —— lore 引擎核心",
       "path": "component/lib.md"
+    },
+    {
+      "id": "page:component/manifest",
+      "type": "page",
+      "axis": "component",
+      "title": "manifest —— wiki 总目录与「新鲜度」体检",
+      "path": "component/manifest.md"
+    },
+    {
+      "id": "page:component/mine",
+      "type": "page",
+      "axis": "component",
+      "title": "mine —— git 历史考古队",
+      "path": "component/mine.md"
+    },
+    {
+      "id": "page:component/sync",
+      "type": "page",
+      "axis": "component",
+      "title": "sync —— 合成总装线",
+      "path": "component/sync.md"
+    },
+    {
+      "id": "page:docs/superpowers-notes-2026-06-08-lore-golden-page-sync",
+      "type": "page",
+      "axis": "docs",
+      "title": "GOLDEN PAGE 样例 —— component: sync",
+      "path": "docs/superpowers-notes-2026-06-08-lore-golden-page-sync.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-08-lore-content-quality",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 内容质量（两档好页 + 源文件级深度页）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-08-lore-content-quality.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-08-lore-low-friction-sync",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 低摩擦合成（增量 sync + 提交即机械刷新）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-08-lore-low-friction-sync.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-08-lore-content-quality-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 内容质量（两档好页 + 源文件级深度页）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-08-lore-content-quality-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-08-lore-low-friction-sync-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 低摩擦合成（增量 sync + 提交即机械刷新）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-08-lore-low-friction-sync-design.md"
     },
     {
       "id": "page:docs/changelog",
@@ -1911,6 +1988,62 @@
       "kind": "commit",
       "title": "chore(lore): journal skeleton atoms from portal work (dogfood)",
       "ts": "2026-06-07T08:20:16-07:00"
+    },
+    {
+      "id": "commit:7de5966765f2a5d95d921e837f395096cb8e2830",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): content quality (two-tier pages + per-file deep pages) — C of A/B/C",
+      "ts": "2026-06-08T05:29:49-07:00"
+    },
+    {
+      "id": "commit:85e3a3f252091f14766671cdbe688c090d3856a1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): self-review — manifest 预期无需改 + 跨 code_root 同名 edge case",
+      "ts": "2026-06-08T05:35:43-07:00"
+    },
+    {
+      "id": "commit:f5da8d4cab49ccca875d7f372dd4dc0084a50119",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): content quality implementation plan (7 TDD tasks)",
+      "ts": "2026-06-08T05:46:13-07:00"
+    },
+    {
+      "id": "commit:6335e616057490e8154be97542e2c26773baae71",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parseConfigDeep — per-file deep-page declarations",
+      "ts": "2026-06-08T19:02:50-07:00"
+    },
+    {
+      "id": "commit:b94e048eb1cdd90d9ef1f8c55e00d54884d74af5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): planSync lists per-file deep-page worklist items (incremental by source file)",
+      "ts": "2026-06-08T19:12:17-07:00"
+    },
+    {
+      "id": "commit:7e37b195d7c163bf79db969a5536e5129a6b4300",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync): finalize maps deep pages to per-file staleScopes (honest per-module stale)",
+      "ts": "2026-06-08T19:15:50-07:00"
+    },
+    {
+      "id": "commit:c5426c51eea053078999640cc701cea92732ce28",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(sync): deep pages auto-flow into manifest + graph (no manifest/graph change needed)",
+      "ts": "2026-06-08T19:17:44-07:00"
+    },
+    {
+      "id": "commit:35acc107cf0a94e784104d79b5342f399ad1dc5a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(sync.md): two-tier page standard + deep-page guidance; golden page v1 drops decision-history",
+      "ts": "2026-06-08T19:25:38-07:00"
     }
   ],
   "edges": [
@@ -2481,6 +2614,21 @@
     },
     {
       "from": "commit:57a30e7afa907835191020da292a6d9833571f48",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:6335e616057490e8154be97542e2c26773baae71",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:b94e048eb1cdd90d9ef1f8c55e00d54884d74af5",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:7e37b195d7c163bf79db969a5536e5129a6b4300",
       "to": "page:component/lib",
       "type": "facet"
     }

@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-07T16:11:03.467Z",
-  "current_code_sha": "c8f0721",
+  "generated": "2026-06-09T03:42:58.314Z",
+  "current_code_sha": "35acc10",
   "language": {
     "default": "zh",
     "available": [
@@ -19,15 +19,15 @@
           "axis": "",
           "title": "首页",
           "summary": "仓库人读导航首页 —— 一句话定位 + 状态 + 知识流 + 入口",
-          "last_updated": "2026-06-07",
+          "last_updated": "2026-06-09",
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
-          "code_sha": "c8f0721",
+          "stale": 7,
+          "code_sha": "7de5966",
           "synthesized_from": {
-            "atoms": 226,
-            "commits": 225
+            "atoms": 234,
+            "commits": 233
           }
         }
       ]
@@ -41,15 +41,15 @@
           "axis": "",
           "title": "Index",
           "summary": "table of contents",
-          "last_updated": "2026-06-07",
+          "last_updated": "2026-06-09",
           "path": "INDEX.md",
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "c8f0721",
+          "code_sha": "35acc10",
           "synthesized_from": {
-            "atoms": 226,
-            "commits": 225
+            "atoms": 234,
+            "commits": 233
           }
         }
       ]
@@ -59,19 +59,115 @@
       "label": "Component",
       "pages": [
         {
+          "id": "fingerprint",
+          "axis": "component",
+          "title": "fingerprint —— 每页 prose 指纹",
+          "summary": "存每页 {prose_hash, prose_sha}，把「正文新鲜度」与「机械盖章」解耦；正文没动 → hash 不变 → prose_sha 保持 → stale 诚实",
+          "last_updated": "2026-06-09",
+          "path": "component/fingerprint.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "35acc10",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "fold",
+          "axis": "component",
+          "title": "fold —— journal 的去重对账员",
+          "summary": "读取层纯函数：同 id 多条原子折成一条（why 追加 / refs 并集 / ts 最早），按 git 可达性丢掉 amend·rebase 留下的 orphan commit；不碰 ndjson",
+          "last_updated": "2026-06-09",
+          "path": "component/fold.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "35acc10",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "hook",
+          "axis": "component",
+          "title": "hook —— 提交即记录·提交即刷新",
+          "summary": "每次 commit 后台记一条 journal 原子 + 触发机械 finalize；best-effort、detached、永不挡 commit",
+          "last_updated": "2026-06-09",
+          "path": "component/hook.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "35acc10",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
           "id": "lib",
           "axis": "component",
           "title": "lib —— lore 引擎核心",
-          "summary": "零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费（per-repo serve + 单机门户）+ lint 的全流程",
-          "last_updated": "2026-06-07",
+          "summary": "零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页",
+          "last_updated": "2026-06-09",
           "path": "component/lib.md",
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "c8f0721",
+          "code_sha": "35acc10",
           "synthesized_from": {
-            "atoms": 114,
-            "commits": 113
+            "atoms": 117,
+            "commits": 116
+          }
+        },
+        {
+          "id": "manifest",
+          "axis": "component",
+          "title": "manifest —— wiki 总目录与「新鲜度」体检",
+          "summary": "扫 wiki 各轴页成 .manifest.json；每页拿 frontmatter 的 code_sha 跟 HEAD 比，算出「落后几个 commit」的 stale",
+          "last_updated": "2026-06-09",
+          "path": "component/manifest.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "35acc10",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "mine",
+          "axis": "component",
+          "title": "mine —— git 历史考古队",
+          "summary": "把整部 git log 全量挖成 journal 原子，按文件路径→组件、关键词→主题、组件→数据流打 facet；按 sha 幂等回填，确定性、可反复跑",
+          "last_updated": "2026-06-09",
+          "path": "component/mine.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "35acc10",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "sync",
+          "axis": "component",
+          "title": "sync —— 合成总装线",
+          "summary": "plan 列工单 → agent 写正文 → finalize 机械盖章；prose 指纹让 stale 诚实、增量只重写动过的页",
+          "last_updated": "2026-06-09",
+          "path": "component/sync.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "35acc10",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
           }
         }
       ]
@@ -80,6 +176,86 @@
       "id": "docs",
       "label": "Docs",
       "pages": [
+        {
+          "id": "superpowers-notes-2026-06-08-lore-golden-page-sync",
+          "axis": "docs",
+          "title": "GOLDEN PAGE 样例 —— component: sync",
+          "summary": "> 这是 lore「内容质量（C）」设计探索的 **golden page 标杆**，不是正式 wiki 页。 > 目的：把「**概览档 + 折叠机制档 + 符号锚点**」两档结构落成真实 markdown，作为 C 内容标准的具象。 > 对照物：`.lore/wiki/component/lib.md` 现已升级为鸟瞰页 + 深度页；本样例就是 `sync` 深度页的蓝本。 > > 评判这...",
+          "last_updated": "2026-06-08",
+          "path": "docs/superpowers-notes-2026-06-08-lore-golden-page-sync.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-08-lore-content-quality",
+          "axis": "docs",
+          "title": "lore 内容质量（两档好页 + 源文件级深度页）Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-08",
+          "path": "docs/superpowers-plans-2026-06-08-lore-content-quality.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-plans-2026-06-08-lore-low-friction-sync",
+          "axis": "docs",
+          "title": "lore 低摩擦合成（增量 sync + 提交即机械刷新）Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-08",
+          "path": "docs/superpowers-plans-2026-06-08-lore-low-friction-sync.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-08-lore-content-quality-design",
+          "axis": "docs",
+          "title": "lore 内容质量（两档好页 + 源文件级深度页）—— 设计",
+          "summary": "- 日期：2026-06-08 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**内容质量 / 完整性**（粒度太粗、深度不足、概览预设黑话） - 前置（已在 main）：**A 低摩擦合成**（`fingerprint.js` 指纹 / 增量 `planSync` / 提交即机械 `finalize`）、`graph.js` + `mcp.js...",
+          "last_updated": "2026-06-08",
+          "path": "docs/superpowers-specs-2026-06-08-lore-content-quality-design.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
+        {
+          "id": "superpowers-specs-2026-06-08-lore-low-friction-sync-design",
+          "axis": "docs",
+          "title": "lore 低摩擦合成（增量 sync + 提交即机械刷新）—— 设计",
+          "summary": "- 日期：2026-06-08 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**运维负担**（不实时、得手动盯） - 前置（已在 main）：`sync.js`（plan/finalize）、`manifest.js`（stale）、`hook.js`（post-commit）、`journal.js`/`fold.js`、`i18n.js`（...",
+          "last_updated": "2026-06-08",
+          "path": "docs/superpowers-specs-2026-06-08-lore-low-friction-sync-design.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          }
+        },
         {
           "id": "changelog",
           "axis": "docs",

@@ -104,8 +104,8 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 让 agent **grep / 读大文件排查前先查 `.lore/wiki/INDEX.md` + 相关 facet 页**。
 - 形态：插件注入 CLAUDE.md 规则 / PreToolUse 提醒（plugin 打包 / hook 配置活，非可测 lib）。把 `/lore:ask` 的「按需查」升级成「always-on 纪律」。
 
-### 增量 sync（母 §5「增量合成」）
-- 现全量重建（每 sync 重渲所有页）。加 `.state/` 每页指纹 `{code_sha, journal_offset}`；只重建被碰的页 → 只有变动页重新 LLM。控成本。
+### 增量 sync（母 §5「增量合成」）✅ 已实现（低摩擦合成 A）
+- 已实现：`.state/fingerprints.json` 每页 `{prose_hash, prose_sha}`（`prose_hash` 复用 `translationSourceHash`）；finalize 只在正文变了才推进 `prose_sha`、frontmatter `code_sha` 盖 `prose_sha` → `stale` 诚实（按 code_root 精确）；`planSync` 只挑动过 code_root 的 component 页（`--all` 兜底）；post-commit hook detached 跑机械 `finalize`。设计见 `docs/superpowers/specs/2026-06-08-lore-low-friction-sync-design.md`。余项（B 前端控制台/档位、C 质量打磨）另立 spec。
 
 ### lint：未打标 / 矛盾检查（母 §5）
 - 现 lint 三检（stale/orphan/missing）。加：未打标原子（只 component 缺 flow/theme，flow/theme 落地后才有意义）、矛盾（页「当前架构」声明 vs 更新原子冲突 → 轻 LLM）。

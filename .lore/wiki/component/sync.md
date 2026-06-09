@@ -1,18 +1,10 @@
-# GOLDEN PAGE 样例 —— component: sync
-
-> 这是 lore「内容质量（C）」设计探索的 **golden page 标杆**，不是正式 wiki 页。
-> 目的：把「**概览档 + 折叠机制档 + 符号锚点**」两档结构落成真实 markdown，作为 C 内容标准的具象。
-> 对照物：`.lore/wiki/component/lib.md` 现已升级为鸟瞰页 + 深度页；本样例就是 `sync` 深度页的蓝本。
->
-> 评判这页时请重点感受：① 概览档能不能让人 30 秒进入；② 机制档展开后够不够查 BUG/改代码；
-> ③ **符号锚点** `符号 @ 文件` 能不能一跳到源码（且改代码后不会像行号那样 stale）；④ 同一页同时喂饱「想了解的人/agent」和「查 BUG 的人/agent」。
-
----
-
-```markdown
 ---
 title: sync —— 合成总装线
 summary: plan 列工单 → agent 写正文 → finalize 机械盖章；prose 指纹让 stale 诚实、增量只重写动过的页
+last_updated: 2026-06-09
+code_sha: 35acc10
+atoms: 0
+commits: 0
 ---
 # component: sync
 
@@ -123,20 +115,3 @@ stateDiagram-v2
 - [[lib]]（鸟瞰页）· [[manifest]] · [[fingerprint]] · [[hook]]
 
 > 深度页 v1 **不放** `## Decision history`：决策史汇总在鸟瞰页 [[lib]]（按文件分流决策史 = ROADMAP 未来项，需文件级 facet）。
-```
-
----
-
-## 这页示范了哪些 C 标准（对照检查表）
-
-| C 维度 | 在本页的落点 |
-|---|---|
-| **两档深度** | 「概览」段（默认展开）+ 「机制详解」段（`<details>` 折叠）|
-| **切换 = `<details>`** | 5 个机制小节各自折叠，点开即深挖，markdown 原生、壳零改 |
-| **① 接口/能力面** | 机制档导出签名表 |
-| **② 数据流（模块内）** | 概览主干图 + 机制档 finalize 6 步 |
-| **③ 数据契约** | 机制档 fingerprints schema |
-| **④ 设计意图（为什么）** | 概览「两阶段为什么分开」+ 场景串讲 |
-| **⑤ 依赖/邻居** | 末段 + graph 可遍历 |
-| **符号锚点** | 全程 `符号 @ 文件`（如 `resolveProseSha @ lib/sync.js`）—— 人查 BUG / agent 精确定位都能跳到源码，**且改代码不会 stale**（不锚行号） |
-| **两层粒度** | 本页是 `sync` **深度页**；`lib` 留作**鸟瞰页**，钻取关系见 Cross-links |

@@ -1,17 +1,28 @@
 ---
 title: Index
 summary: table of contents
-last_updated: 2026-06-07
-code_sha: c8f0721
-atoms: 226
-commits: 225
+last_updated: 2026-06-09
+code_sha: 35acc10
+atoms: 234
+commits: 233
 ---
 # lore wiki — index
 
 ## Component
+- [[fingerprint]]
+- [[fold]]
+- [[hook]]
 - [[lib]]
+- [[manifest]]
+- [[mine]]
+- [[sync]]
 
 ## Docs
+- [[superpowers-notes-2026-06-08-lore-golden-page-sync]]
+- [[superpowers-plans-2026-06-08-lore-content-quality]]
+- [[superpowers-plans-2026-06-08-lore-low-friction-sync]]
+- [[superpowers-specs-2026-06-08-lore-content-quality-design]]
+- [[superpowers-specs-2026-06-08-lore-low-friction-sync-design]]
 - [[changelog]]
 - [[superpowers-plans-2026-06-07-lore-mcp-server]]
 - [[superpowers-plans-2026-06-07-lore-portal]]

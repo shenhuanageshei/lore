@@ -3,6 +3,8 @@ title: lore 单机共享门户（portal）—— 设计
 summary: - 日期：2026-06-07 - 状态：设计已批，待写实施计划（**实现另起会话**） - 前置：#3 server 踏脚石（`lib/registry.js`、`stablePort`、`serve list/stop-all`）已并入 main；`server.js` `createServer`；`site/` 壳 - 北极星：人读友好 wiki —— 多 repo 聚合门户（roa...
 source_path: docs/superpowers/specs/2026-06-07-lore-portal-design.md
 last_updated: 2026-06-07
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-07-lore-portal
 ---
 > 源文档：`docs/superpowers/specs/2026-06-07-lore-portal-design.md`
 

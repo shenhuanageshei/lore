@@ -3,6 +3,7 @@ title: lore 同步控制台 B1（档位 + 控制 API + 壳控制台）Implementa
 summary: > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...
 source_path: docs/superpowers/plans/2026-06-09-lore-sync-console.md
 last_updated: 2026-06-09
+group: 设计与计划
 ---
 > 源文档：`docs/superpowers/plans/2026-06-09-lore-sync-console.md`
 

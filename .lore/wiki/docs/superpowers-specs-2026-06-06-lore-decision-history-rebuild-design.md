@@ -3,6 +3,8 @@ title: lore 决策史 section 重建（foldJournal 哨兵化）—— 设计
 summary: - 日期：2026-06-06 - 状态：设计已批，待写实施计划 - 前置：`docs/superpowers/specs/2026-06-06-lore-journal-fold-design.md`（原子层 fold，已实现）；`lib/home.js` `finalizeHomeText`（哨兵区间蓝本） - 北极星：人读友好 wiki（决策史去重，本轮收口页面层）
 source_path: docs/superpowers/specs/2026-06-06-lore-decision-history-rebuild-design.md
 last_updated: 2026-06-06
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-06-lore-decision-history-rebuild
 ---
 > 源文档：`docs/superpowers/specs/2026-06-06-lore-decision-history-rebuild-design.md`
 

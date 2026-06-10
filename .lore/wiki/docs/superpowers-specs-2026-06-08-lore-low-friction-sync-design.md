@@ -3,6 +3,8 @@ title: lore 低摩擦合成（增量 sync + 提交即机械刷新）—— 设�
 summary: - 日期：2026-06-08 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**运维负担**（不实时、得手动盯） - 前置（已在 main）：`sync.js`（plan/finalize）、`manifest.js`（stale）、`hook.js`（post-commit）、`journal.js`/`fold.js`、`i18n.js`（...
 source_path: docs/superpowers/specs/2026-06-08-lore-low-friction-sync-design.md
 last_updated: 2026-06-08
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-08-lore-low-friction-sync
 ---
 > 源文档：`docs/superpowers/specs/2026-06-08-lore-low-friction-sync-design.md`
 

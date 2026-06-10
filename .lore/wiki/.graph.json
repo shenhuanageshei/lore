@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-10T10:33:32.277Z",
+  "generated": "2026-06-10T11:50:12.788Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -58,6 +58,34 @@
       "path": "component/fingerprint.md"
     },
     {
+      "id": "page:docs/changelog",
+      "type": "page",
+      "axis": "docs",
+      "title": "CHANGELOG",
+      "path": "docs/changelog.md"
+    },
+    {
+      "id": "page:docs/ROADMAP",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 路线图",
+      "path": "docs/ROADMAP.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-10-lore-docs-axis-regroup",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore docs 轴重构（分组置顶 + feature 配对 + 默认折叠）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-10-lore-docs-axis-regroup.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-10-lore-docs-axis-regroup-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore docs 轴重构（分组置顶 + feature 配对 + 默认折叠）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-10-lore-docs-axis-regroup-design.md"
+    },
+    {
       "id": "page:docs/superpowers-plans-2026-06-09-lore-shell-presentation",
       "type": "page",
       "axis": "docs",
@@ -86,13 +114,6 @@
       "path": "docs/superpowers-specs-2026-06-09-lore-sync-console-design.md"
     },
     {
-      "id": "page:docs/superpowers-notes-2026-06-08-lore-golden-page-sync",
-      "type": "page",
-      "axis": "docs",
-      "title": "GOLDEN PAGE 样例 —— component: sync",
-      "path": "docs/superpowers-notes-2026-06-08-lore-golden-page-sync.md"
-    },
-    {
       "id": "page:docs/superpowers-plans-2026-06-08-lore-content-quality",
       "type": "page",
       "axis": "docs",
@@ -119,13 +140,6 @@
       "axis": "docs",
       "title": "lore 低摩擦合成（增量 sync + 提交即机械刷新）—— 设计",
       "path": "docs/superpowers-specs-2026-06-08-lore-low-friction-sync-design.md"
-    },
-    {
-      "id": "page:docs/changelog",
-      "type": "page",
-      "axis": "docs",
-      "title": "CHANGELOG",
-      "path": "docs/changelog.md"
     },
     {
       "id": "page:docs/superpowers-plans-2026-06-07-lore-mcp-server",
@@ -338,13 +352,6 @@
       "path": "docs/superpowers-specs-2026-06-03-lore-theme-design.md"
     },
     {
-      "id": "page:docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap",
-      "type": "page",
-      "axis": "docs",
-      "title": "Roadmap note: codegraph integration + adjacent ideas",
-      "path": "docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap.md"
-    },
-    {
       "id": "page:docs/superpowers-plans-2026-06-02-lore-hook",
       "type": "page",
       "axis": "docs",
@@ -429,11 +436,18 @@
       "path": "docs/superpowers-specs-2026-05-31-lore-repo-wiki-design.md"
     },
     {
-      "id": "page:docs/ROADMAP",
+      "id": "page:docs/superpowers-notes-2026-06-08-lore-golden-page-sync",
       "type": "page",
       "axis": "docs",
-      "title": "lore 路线图",
-      "path": "docs/ROADMAP.md"
+      "title": "GOLDEN PAGE 样例 —— component: sync",
+      "path": "docs/superpowers-notes-2026-06-08-lore-golden-page-sync.md"
+    },
+    {
+      "id": "page:docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap",
+      "type": "page",
+      "axis": "docs",
+      "title": "Roadmap note: codegraph integration + adjacent ideas",
+      "path": "docs/superpowers-notes-2026-06-02-codegraph-integration-roadmap.md"
     },
     {
       "id": "commit:2a5cdcbf7d7790c64f1bcb924d4e618f5102679d",
@@ -2324,6 +2338,83 @@
       "kind": "commit",
       "title": "docs(roadmap): sync console B1 done — 7/7 e2e acceptance passed, 333 tests green",
       "ts": "2026-06-10T02:43:59-07:00"
+    },
+    {
+      "id": "commit:ef50bd98ab6c32a2af8dcf93b55837ff0507f419",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(journal): strip git trailers from decision-history why (Co-Authored-By noise)",
+      "ts": "2026-06-10T03:39:26-07:00"
+    },
+    {
+      "id": "commit:6d6f58ceca6dd6d9381eda5e6535eb03537afbd9",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): sweep stale entries — every 'known issue' was already fixed",
+      "ts": "2026-06-10T03:39:28-07:00"
+    },
+    {
+      "id": "commit:9fd5cc74a53f52ed190b5111072987a1fe199716",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): docs-axis regroup design (pinned status group + feature pairing + collapsed-by-default)",
+      "ts": "2026-06-10T04:06:50-07:00"
+    },
+    {
+      "id": "commit:7999258e7f4f2acf183e8d81e34b885dbcbe12f5",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): docs-axis regroup implementation plan (6 tasks, TDD)",
+      "ts": "2026-06-10T04:18:39-07:00"
+    },
+    {
+      "id": "commit:d382804e60ca2f0980585d060f94d4bb5fe569ea",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): docGroup heuristic + spec/plan pairing by date+slug",
+      "ts": "2026-06-10T04:28:53-07:00"
+    },
+    {
+      "id": "commit:31863763fa27dddf8b40e31e4ebd952b93888978",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(test): heredoc ate backslash escapes — restore octal-safe win-path literal",
+      "ts": "2026-06-10T04:32:01-07:00"
+    },
+    {
+      "id": "commit:f9b676228db9ffa1c70174c4049b94010d6ef65b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(docs): materialize group + paired_plan into docs-page frontmatter",
+      "ts": "2026-06-10T04:36:19-07:00"
+    },
+    {
+      "id": "commit:077b120190eaf7a0cd4a847c24b14b7525555a48",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): docs-axis group ordering + frontmatter group/paired_plan passthrough",
+      "ts": "2026-06-10T04:39:53-07:00"
+    },
+    {
+      "id": "commit:e3e69a342922dc72171994fe4c26abef732d10f8",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): docs-axis group ordering + frontmatter group/paired_plan passthrough (impl)",
+      "ts": "2026-06-10T04:43:04-07:00"
+    },
+    {
+      "id": "commit:b6a73658ccca8c4887bfd08d2ad762d03dd0f79f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): buildDocsRows (group segmentation, spec/plan pairing, title tail-strip)",
+      "ts": "2026-06-10T04:46:49-07:00"
+    },
+    {
+      "id": "commit:2a9a1b12d566103ffb785dfa3a334252f2e56836",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): docs sidebar groups (pinned status, collapsible, plan badge, search punch-through)",
+      "ts": "2026-06-10T04:49:31-07:00"
     }
   ],
   "edges": [
@@ -2959,6 +3050,26 @@
     },
     {
       "from": "commit:b87d27577cc9a902909947bc03c360235c12a844",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:ef50bd98ab6c32a2af8dcf93b55837ff0507f419",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:d382804e60ca2f0980585d060f94d4bb5fe569ea",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f9b676228db9ffa1c70174c4049b94010d6ef65b",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:e3e69a342922dc72171994fe4c26abef732d10f8",
       "to": "page:component/lib",
       "type": "facet"
     }

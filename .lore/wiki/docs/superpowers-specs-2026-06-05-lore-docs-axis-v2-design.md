@@ -3,6 +3,8 @@ title: lore docs 轴 v2 + mermaid 懒加载 —— 设计
 summary: - 日期：2026-06-05 - 状态：设计已批，待写实施计划 - 前置：`docs/superpowers/specs/2026-06-05-lore-docs-ingestion-design.md`（v1 docs 轴） - 北极星：人读友好 wiki（本轮主攻）+ agent 友好 wiki+graph（`docs/ROADMAP.md` 北极星节）
 source_path: docs/superpowers/specs/2026-06-05-lore-docs-axis-v2-design.md
 last_updated: 2026-06-05
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-05-lore-docs-axis-v2
 ---
 > 源文档：`docs/superpowers/specs/2026-06-05-lore-docs-axis-v2-design.md`
 

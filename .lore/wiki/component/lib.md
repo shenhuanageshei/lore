@@ -3,8 +3,8 @@ title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-10
 code_sha: b934c49
-atoms: 127
-commits: 126
+atoms: 131
+commits: 130
 ---
 # component: lib
 
@@ -76,6 +76,10 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(manifest): docs-axis group ordering + frontmatter group/paired_plan passthrough (impl)** — Prior commit 077b120 carried the red test only — parallel Edit+Bash misfire, (e3e69a3, 2026-06-10)
+- **feat(docs): materialize group + paired_plan into docs-page frontmatter** (f9b6762, 2026-06-10)
+- **feat(docs): docGroup heuristic + spec/plan pairing by date+slug** (d382804, 2026-06-10)
+- **fix(journal): strip git trailers from decision-history why (Co-Authored-By noise)** — stripTrailers lives in fold.js (data-cleaning layer): mine sanitizes new (ef50bd9, 2026-06-10)
 - **fix(serve): surface runtime on reuse; warn when --node is ignored by a live non-node server** (b87d275, 2026-06-09)
 - **docs(serve): mention --node in usage line** (cd6eead, 2026-06-09)
 - **feat(serve): --node flag forces bundled Node server (enables control API on monolingual repos)** (3abe597, 2026-06-09)

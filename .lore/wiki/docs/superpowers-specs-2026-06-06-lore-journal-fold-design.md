@@ -3,6 +3,8 @@ title: lore journal 折叠层（fold layer）—— 设计
 summary: - 日期：2026-06-06 - 状态：设计已批，待写实施计划 - 前置：v0.1 journal 基座（`lib/journal.js`）、`lib/sync.js` `finalizeSync` 决策史折叠 - 北极星：人读友好 wiki（决策史去重，本轮）；为 agent 端 graph 的决策边铺干净数据（间接） - roadmap 对应：「待修复」⭐ journal fold-b...
 source_path: docs/superpowers/specs/2026-06-06-lore-journal-fold-design.md
 last_updated: 2026-06-06
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-06-lore-journal-fold
 ---
 > 源文档：`docs/superpowers/specs/2026-06-06-lore-journal-fold-design.md`
 

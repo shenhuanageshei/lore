@@ -3,6 +3,7 @@ title: lore 内容质量（两档好页 + 源文件级深度页）Implementation
 summary: > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...
 source_path: docs/superpowers/plans/2026-06-08-lore-content-quality.md
 last_updated: 2026-06-08
+group: 设计与计划
 ---
 > 源文档：`docs/superpowers/plans/2026-06-08-lore-content-quality.md`
 

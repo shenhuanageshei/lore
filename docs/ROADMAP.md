@@ -85,7 +85,10 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 已实现：定义「好 wiki 页」**两档标准**（**概览档**零黑话 + **机制档** 9 节 `<details>` 折叠 + **锚点锚符号**），写进 `commands/sync.md` + golden page 标杆（`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.{html,md}`）；**两层粒度**——config `axes.component.deep.<root>:[子模块…]` 声明源文件级深度页，`planSync` 列深度页工单（增量按源文件）、`finalizeSync` 按源文件精确算 stale；深度页是普通 component 页 → manifest/graph 自动支持（**graph 可遍历到模块级**）。dogfood：lib 一页 → 鸟瞰页 + 6 深度页（graph 1→7 节点）。设计见 `docs/superpowers/specs/2026-06-08-lore-content-quality-design.md`。余项（壳深度切换 UX、产出校验、文件级决策史分流）另立。
 
 ### 壳呈现（mermaid 放大 + component 排序分组）✅ 已实现（C-呈现 ①）
-- 已实现：壳大 mermaid 图点击 → lightbox（弹层内拖拽 + 滚轮缩放，缩放圈在弹层内不扰正文；**按当前主题重渲染**，亮/暗主题大图节点色与正文逐字一致）；`config.deep` 升级分组 map（捕获/合成），`manifest` component 页按流水线序排（lib 鸟瞰置顶）+ 带 `group` 字段，壳侧栏插分组小标题。设计见 `docs/superpowers/specs/2026-06-09-lore-shell-presentation-design.md`。余项（docs 轴重构、mermaid 语法校验+br 统一、server.js 根文件组件+决策史分流）各自另立。
+- 已实现：壳大 mermaid 图点击 → lightbox（弹层内拖拽 + 滚轮缩放，缩放圈在弹层内不扰正文；**按当前主题重渲染**，亮/暗主题大图节点色与正文逐字一致）；`config.deep` 升级分组 map（捕获/合成），`manifest` component 页按流水线序排（lib 鸟瞰置顶）+ 带 `group` 字段，壳侧栏插分组小标题。设计见 `docs/superpowers/specs/2026-06-09-lore-shell-presentation-design.md`。余项（mermaid 语法校验+br 统一、server.js 根文件组件+决策史分流）各自另立。
+
+### docs 轴重构（分组置顶 + feature 配对 + 默认折叠）✅ 已实现（C-呈现 ②）
+- 已实现：docs 轴侧栏三组分流——「📌 项目状态」（changelog/ROADMAP/pitfalls）置顶常开、「📐 设计与计划」spec↔plan 按 date+slug 配对成行（plan 徽标直达，dogfood 25 对）默认折叠、「📝 notes」折叠；折叠态 localStorage 记忆；搜索穿透折叠组（data-search 含英文 slug）。group/paired_plan 由 `docs.js` 物化进 frontmatter，manifest 组间排序（单一来源），壳 `buildDocsRows` 纯函数可测。无 superpowers 结构 repo 零影响。设计见 `docs/superpowers/specs/2026-06-10-lore-docs-axis-regroup-design.md`。
 
 ### lint：未打标 / 矛盾检查（母 §5）
 - 现 lint 三检（stale/orphan/missing）。加：未打标原子（只 component 缺 flow/theme，flow/theme 落地后才有意义）、矛盾（页「当前架构」声明 vs 更新原子冲突 → 轻 LLM）。

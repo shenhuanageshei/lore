@@ -3,6 +3,8 @@ title: lore agent graph 数据层（buildGraph + .graph.json）—— 设计
 summary: - 日期：2026-06-06 - 状态：设计已批，待写实施计划 - 前置：fold 已合并（PR #5 → 主线，folded atoms 可用）、`lib/manifest.js`（节点表 + translations 边）、`lib/journal.js` - 北极星：**agent 友好 wiki + graph**（本轮兑现缺失的 agent 端第一步）
 source_path: docs/superpowers/specs/2026-06-06-lore-agent-graph-design.md
 last_updated: 2026-06-06
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-06-lore-agent-graph
 ---
 > 源文档：`docs/superpowers/specs/2026-06-06-lore-agent-graph-design.md`
 

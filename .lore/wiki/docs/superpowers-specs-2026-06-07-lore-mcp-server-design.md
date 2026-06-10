@@ -3,6 +3,8 @@ title: lore MCP 接口层（stdio server + lore_ask/page/neighbors）—— 设�
 summary: - 日期：2026-06-07 - 状态：设计已批，待写实施计划 - 前置：graph 数据层已并入 main（`wiki/.graph.json`）、`lib/manifest.js`（`searchPages` 在 `lib/ask.js`）、`lib/graph.js`（`buildGraph`） - 北极星：**agent 友好 wiki + graph** —— 子项 2：让 ag...
 source_path: docs/superpowers/specs/2026-06-07-lore-mcp-server-design.md
 last_updated: 2026-06-07
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-07-lore-mcp-server
 ---
 > 源文档：`docs/superpowers/specs/2026-06-07-lore-mcp-server-design.md`
 

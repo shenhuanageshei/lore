@@ -314,7 +314,7 @@ function buildSidebar() {
     return buildDocsRows(ax.pages).map(g => {
       const open = g.group in opened ? !!opened[g.group] : !g.collapsed;
       const rows = g.rows.map(r => `<a href="#${ax.id}/${r.page.id}" data-key="${ax.id}/${r.page.id}"
-         data-search="${(r.page.title + ' ' + (r.page.summary || '')).toLowerCase()}">
+         data-search="${(r.page.title + ' ' + (r.page.summary || '') + ' ' + r.page.id + (r.planPage ? ' ' + r.planPage.id : '')).toLowerCase()}">
         ${r.displayTitle}${r.planPage ? `<span class="plan-badge" data-plan="${ax.id}/${r.planPage.id}" title="查看实施计划">plan</span>` : ''}${r.page.last_updated ? `<span class="when">📅 ${r.page.last_updated}</span>` : ''}</a>`).join('');
       return `<div class="dgrp${open ? '' : ' closed'}" data-group="${g.group}">
         <div class="grp grp-toggle"><span class="caret">${open ? '▾' : '▸'}</span>${DOCS_ICON[g.group] ?? ''} ${g.group} (${g.rows.length})</div>

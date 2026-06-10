@@ -3,6 +3,7 @@ title: CHANGELOG
 summary: 8 个版本，最新 0.6.0
 source_path: CHANGELOG.md
 last_updated: 2026-06-07
+group: 项目状态
 ---
 > 源文档：`CHANGELOG.md`
 

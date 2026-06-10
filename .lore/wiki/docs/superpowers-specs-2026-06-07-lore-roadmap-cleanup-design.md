@@ -3,6 +3,8 @@ title: lore roadmap 收尾（#3 server 踏脚石 + #4/#5/#6 known issues）—�
 summary: - 日期：2026-06-07 - 状态：设计已批，待写实施计划 - 前置：fold + graph + MCP 已并入 main - 北极星：消费纪律 + 质量收尾（清 roadmap「待修复」+ server 运维踏脚石）
 source_path: docs/superpowers/specs/2026-06-07-lore-roadmap-cleanup-design.md
 last_updated: 2026-06-07
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-07-lore-roadmap-cleanup
 ---
 > 源文档：`docs/superpowers/specs/2026-06-07-lore-roadmap-cleanup-design.md`
 

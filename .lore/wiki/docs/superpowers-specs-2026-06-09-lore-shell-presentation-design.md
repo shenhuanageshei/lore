@@ -3,6 +3,8 @@ title: lore 壳呈现（mermaid 放大 + component 排序分组）—— 设计
 summary: - 日期：2026-06-09 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**呈现层（C-呈现）的图可读性 + 导航** - 前置（已在 main）：C-内容（两档好页 + 源文件级深度页）、`site/index.html`（壳 + vendored `mermaid.min.js`，`securityLevel: strict`）、`co...
 source_path: docs/superpowers/specs/2026-06-09-lore-shell-presentation-design.md
 last_updated: 2026-06-09
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-09-lore-shell-presentation
 ---
 > 源文档：`docs/superpowers/specs/2026-06-09-lore-shell-presentation-design.md`
 

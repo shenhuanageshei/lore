@@ -3,6 +3,8 @@ title: lore Human HOME + Persistent Translation Layer 设计
 summary: - 日期：2026-06-06 - 状态：设计已批准，待实施计划 - 基线代码：`v0.4.1` / `fb44b80 fix(shell): show last_updated date on docs sidebar links` - 北极星：人读友好的代码仓库 wiki + agent 友好的 wiki/graph，二者缺一不可
 source_path: docs/superpowers/specs/2026-06-06-lore-human-home-translation-design.md
 last_updated: 2026-06-06
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-06-lore-human-home-translation
 ---
 > 源文档：`docs/superpowers/specs/2026-06-06-lore-human-home-translation-design.md`
 

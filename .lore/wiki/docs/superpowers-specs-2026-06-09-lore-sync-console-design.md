@@ -3,6 +3,8 @@ title: lore 同步控制台 B1（档位 + 控制 API + 壳控制台）—— 设
 summary: - 日期：2026-06-09 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**可见性与控制面**（sync 状态一眼可见、一键可控） - 前置（已在 main）：A 低摩擦合成（增量 plan + prose 指纹 + post-commit 机械 finalize，`2026-06-08-lore-low-friction-sync-des...
 source_path: docs/superpowers/specs/2026-06-09-lore-sync-console-design.md
 last_updated: 2026-06-09
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-09-lore-sync-console
 ---
 > 源文档：`docs/superpowers/specs/2026-06-09-lore-sync-console-design.md`
 

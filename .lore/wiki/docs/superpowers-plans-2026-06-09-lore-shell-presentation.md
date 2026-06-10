@@ -3,6 +3,7 @@ title: lore 壳呈现（mermaid 放大 + component 排序分组）Implementation
 summary: > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...
 source_path: docs/superpowers/plans/2026-06-09-lore-shell-presentation.md
 last_updated: 2026-06-09
+group: 设计与计划
 ---
 > 源文档：`docs/superpowers/plans/2026-06-09-lore-shell-presentation.md`
 

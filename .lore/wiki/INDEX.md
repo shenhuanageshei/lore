@@ -2,9 +2,9 @@
 title: Index
 summary: table of contents
 last_updated: 2026-06-10
-code_sha: 3e0dafa
-atoms: 270
-commits: 269
+code_sha: 2a9a1b1
+atoms: 281
+commits: 280
 ---
 # lore wiki — index
 
@@ -18,6 +18,8 @@ commits: 269
 - [[sync]]
 
 ## Docs
+- [[superpowers-plans-2026-06-10-lore-docs-axis-regroup]]
+- [[superpowers-specs-2026-06-10-lore-docs-axis-regroup-design]]
 - [[superpowers-plans-2026-06-09-lore-shell-presentation]]
 - [[superpowers-plans-2026-06-09-lore-sync-console]]
 - [[superpowers-specs-2026-06-09-lore-shell-presentation-design]]

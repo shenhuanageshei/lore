@@ -3,6 +3,8 @@ title: lore 内容质量（两档好页 + 源文件级深度页）—— 设计
 summary: - 日期：2026-06-08 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**内容质量 / 完整性**（粒度太粗、深度不足、概览预设黑话） - 前置（已在 main）：**A 低摩擦合成**（`fingerprint.js` 指纹 / 增量 `planSync` / 提交即机械 `finalize`）、`graph.js` + `mcp.js...
 source_path: docs/superpowers/specs/2026-06-08-lore-content-quality-design.md
 last_updated: 2026-06-08
+group: 设计与计划
+paired_plan: superpowers-plans-2026-06-08-lore-content-quality
 ---
 > 源文档：`docs/superpowers/specs/2026-06-08-lore-content-quality-design.md`
 

@@ -3,6 +3,7 @@ title: lore Human HOME + Persistent Translation Layer Implementation Plan
 summary: > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...
 source_path: docs/superpowers/plans/2026-06-06-lore-human-home-translation.md
 last_updated: 2026-06-06
+group: 设计与计划
 ---
 > 源文档：`docs/superpowers/plans/2026-06-06-lore-human-home-translation.md`
 

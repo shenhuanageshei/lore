@@ -75,3 +75,21 @@ test('foldAtoms: amend biting — orphan(old) + reborn(new), same title diff id 
   const out = foldAtoms([oldA, reborn], { reachableShas: new Set(['new']) });
   assert.deepEqual(out.map(x => x.id), ['commit:new']);
 });
+
+import { stripTrailers } from '../lib/fold.js';
+
+test('stripTrailers: 剥掉 *-by: trailer 行，正文保留', () => {
+  const body = 'real why line\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nSigned-off-by: Dev <d@x.com>';
+  assert.equal(stripTrailers(body), 'real why line');
+});
+
+test('stripTrailers: 纯 trailer body → 空串；正文中段 trailer 也剥', () => {
+  assert.equal(stripTrailers('Co-Authored-By: Bot <b@x.com>'), '');
+  assert.equal(stripTrailers('Reviewed-by: R <r@x.com>\nactual rationale'), 'actual rationale');
+});
+
+test('stripTrailers: 普通冒号行不误伤（Note:/中文冒号/URL）', () => {
+  const body = 'Note: this matters\nsee https://x.com: path\n注意：边界';
+  assert.equal(stripTrailers(body), body);
+  assert.equal(stripTrailers(''), '');
+});

@@ -911,3 +911,14 @@ test('commands/sync.md documents two-tier page standard + deep pages', () => {
   assert.match(doc, /鸟瞰页/);
   assert.match(doc, /符号/);                    // 锚点锚符号
 });
+
+test('renderDecisionHistory: 旧原子 why 首行是 trailer → 渲染跳过噪音取真 why', () => {
+  const out = renderDecisionHistory([
+    { title: 'feat: y', why: 'Co-Authored-By: Bot <b@x.com>\nreal rationale', commit: 'aaa1234567', ts: '2026-06-09T08:00:00Z', kind: 'commit' },
+  ]);
+  assert.equal(out, '- **feat: y** — real rationale (aaa1234, 2026-06-09)');
+  const pure = renderDecisionHistory([
+    { title: 'docs: z', why: 'Co-Authored-By: Bot <b@x.com>', commit: 'bbb1234567', ts: '2026-06-09T09:00:00Z', kind: 'commit' },
+  ]);
+  assert.equal(pure, '- **docs: z** (bbb1234, 2026-06-09)');
+});

@@ -243,3 +243,13 @@ test('mine CLI reads config flows', () => {
     assert.deepEqual(a.facets.flow, ['pipe']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('commitAtom: why strips git trailers (Co-Authored-By noise)', () => {
+  const raw = {
+    sha: 'fff111222', ts: '2026-06-10T01:00:00Z', subject: 'feat: x',
+    body: 'because reasons\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>', files: ['lib/a.js'],
+  };
+  assert.equal(commitAtom(raw, ['lib']).why, 'because reasons');
+  const pure = { ...raw, body: 'Co-Authored-By: Bot <b@x.com>' };
+  assert.equal(commitAtom(pure, ['lib']).why, '');
+});

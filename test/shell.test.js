@@ -209,16 +209,19 @@ test('buildConsoleModel: 0 stale → fresh 绿灯', () => {
   assert.equal(m.lastFinalize, 't0');
 });
 
-test('buildConsoleModel: N stale → stale 黄灯 + 按 stale 降序', () => {
+test('buildConsoleModel: N stale → stale 黄灯 + 按 stale 降序 + 同分 key 字母序', () => {
   const m = buildConsoleModel(mkManifest([
-    { id: 'a', title: 'A', stale: 1, last_updated: 'd1' },
-    { id: 'b', title: 'B', stale: 5, last_updated: 'd2' },
+    { id: 'a', title: 'A', stale: 1, last_updated: 'd1', path: 'component/a.md' },
+    { id: 'b', title: 'B', stale: 5, last_updated: 'd2', path: 'component/b.md' },
     { id: 'c', title: 'C', stale: 0 },
+    { id: 'z', title: 'Z', stale: 1, last_updated: 'd3', path: 'component/z.md' },
   ]), { mode: 'notify', last_finalize: null });
   assert.equal(m.light, 'stale');
-  assert.equal(m.staleTotal, 2);
-  assert.deepEqual(m.stalePages.map(p => p.key), ['component/b', 'component/a']);
-  assert.equal(m.stalePages[0].stale, 5);
+  assert.equal(m.staleTotal, 3);
+  assert.deepEqual(m.stalePages.map(p => p.key), ['component/b', 'component/a', 'component/z']);  // 同分 a<z
+  // 整体形状钉死：path 是 T8/T9 排队按钮唯一依赖的字段，丢了 UI 会静默失效
+  assert.deepEqual(m.stalePages[0],
+    { key: 'component/b', title: 'B', stale: 5, last_updated: 'd2', path: 'component/b.md' });
 });
 
 test('buildConsoleModel: manual → off 灰灯但 stale 数照算（关自动 ≠ 藏信息）', () => {
@@ -231,6 +234,8 @@ test('buildConsoleModel: status null（python server / portal 无 API）→ 默�
   const m = buildConsoleModel(mkManifest([]), null);
   assert.equal(m.mode, 'notify');
   assert.equal(m.lastFinalize, null);
+  assert.equal(m.light, 'fresh');
+  assert.equal(m.staleTotal, 0);
 });
 
 test('pollDecide: generated 未变 → 全 false；变了 → 重建；当前页变了 → 提示条', () => {

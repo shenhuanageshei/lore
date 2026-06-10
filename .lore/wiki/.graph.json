@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-09T11:09:14.321Z",
+  "generated": "2026-06-10T09:37:27.128Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -65,11 +65,25 @@
       "path": "docs/superpowers-plans-2026-06-09-lore-shell-presentation.md"
     },
     {
+      "id": "page:docs/superpowers-plans-2026-06-09-lore-sync-console",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 同步控制台 B1（档位 + 控制 API + 壳控制台）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-09-lore-sync-console.md"
+    },
+    {
       "id": "page:docs/superpowers-specs-2026-06-09-lore-shell-presentation-design",
       "type": "page",
       "axis": "docs",
       "title": "lore 壳呈现（mermaid 放大 + component 排序分组）—— 设计",
       "path": "docs/superpowers-specs-2026-06-09-lore-shell-presentation-design.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-09-lore-sync-console-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 同步控制台 B1（档位 + 控制 API + 壳控制台）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-09-lore-sync-console-design.md"
     },
     {
       "id": "page:docs/superpowers-notes-2026-06-08-lore-golden-page-sync",
@@ -2128,6 +2142,181 @@
       "kind": "commit",
       "title": "feat(shell): click-to-zoom mermaid lightbox (theme-aware)",
       "ts": "2026-06-09T04:03:45-07:00"
+    },
+    {
+      "id": "commit:11628050beb8c3c1f2a947331ce1a59cd02f09ba",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): component sidebar group subheaders (▸ 捕获 / ▸ 合成)",
+      "ts": "2026-06-09T04:13:05-07:00"
+    },
+    {
+      "id": "commit:612e494480c39197ce94e646a024f5b1b41adee4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "dogfood(lore): deep grouped map (捕获/合成) → pipeline-ordered component sidebar",
+      "ts": "2026-06-09T04:13:06-07:00"
+    },
+    {
+      "id": "commit:e796fd1ec1693ca0b6ce6ae0783786e23b070640",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): shell presentation (C-呈现①) done — lightbox + sidebar grouping",
+      "ts": "2026-06-09T04:17:39-07:00"
+    },
+    {
+      "id": "commit:80375537f58b9560e1ae4cca566955fe5bd0dad3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): sync console B1 design (mode gears + control API + shell console)",
+      "ts": "2026-06-09T19:29:24-07:00"
+    },
+    {
+      "id": "commit:8af7c52bcc17dbb65a1a0dbcc9a88b77edb9af1c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): sync console B1 implementation plan (11 tasks, TDD)",
+      "ts": "2026-06-09T19:56:37-07:00"
+    },
+    {
+      "id": "commit:c44e73ddcd3f8cfdb442a9548f7ecf2aa044d1e2",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(syncstate): per-machine sync mode read/write (.state/sync.json, default notify)",
+      "ts": "2026-06-09T20:46:47-07:00"
+    },
+    {
+      "id": "commit:bbaeda5e51eba3816f5a03a59fd0aadc34e444f3",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(syncstate): lock on-disk JSON byte format in round-trip assertion",
+      "ts": "2026-06-09T20:54:23-07:00"
+    },
+    {
+      "id": "commit:79a30f25948d53e51282f9d783422a8942155534",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(syncstate): rewrite-request queue (ndjson append, per-page dedupe)",
+      "ts": "2026-06-09T21:11:27-07:00"
+    },
+    {
+      "id": "commit:432ba94e6fbe215766cc9a730d8982f30ff1b096",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(hook): manual mode skips commit-time auto finalize",
+      "ts": "2026-06-09T21:37:19-07:00"
+    },
+    {
+      "id": "commit:854e699c2d7a4c1345f5a6521c5db851b0605e21",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(server): sync status + mode control API (localhost-only, enum-guarded)",
+      "ts": "2026-06-09T21:55:18-07:00"
+    },
+    {
+      "id": "commit:852c5d50587cc4802f9526ac9e7613bda0f680be",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(server): finalize-spawn + rewrite-request queue API (safeWikiPage-guarded)",
+      "ts": "2026-06-09T22:23:12-07:00"
+    },
+    {
+      "id": "commit:0e78d2bab2027dcff76fc70a9bab556ef50501de",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(server): swallow async spawn errors on finalize endpoint; pin normalize-branch page rejection",
+      "ts": "2026-06-09T22:46:54-07:00"
+    },
+    {
+      "id": "commit:67aa44233a7baaa2a6e7d87452ab70fd65c03f25",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(server): pin normalize-branch page-escape rejection on rewrite endpoint",
+      "ts": "2026-06-09T22:48:54-07:00"
+    },
+    {
+      "id": "commit:3abe5975e86d55b3f2a188e8f21a935534a6d6da",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(serve): --node flag forces bundled Node server (enables control API on monolingual repos)",
+      "ts": "2026-06-09T22:58:06-07:00"
+    },
+    {
+      "id": "commit:cd6eeadc99c7e8511bec0ee28f8783de53d77b1c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(serve): mention --node in usage line",
+      "ts": "2026-06-09T23:05:45-07:00"
+    },
+    {
+      "id": "commit:b87d27577cc9a902909947bc03c360235c12a844",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(serve): surface runtime on reuse; warn when --node is ignored by a live non-node server",
+      "ts": "2026-06-09T23:14:31-07:00"
+    },
+    {
+      "id": "commit:720daadbfedf9e94aeaf9cc6354a156e5896a4d1",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): buildConsoleModel + pollDecide (console state pure-logic, tested)",
+      "ts": "2026-06-09T23:19:06-07:00"
+    },
+    {
+      "id": "commit:a88eaf26e4c91db7c3c080172256f489db80ab15",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(shell): pin stalePages full shape (path is the queue-button contract) + tie-break order",
+      "ts": "2026-06-09T23:51:10-07:00"
+    },
+    {
+      "id": "commit:0662ed5a4496187c2d9cb93103e1ac02f1506b75",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): topbar sync light + dropdown panel (mode switch, finalize, queue; theme-var only)",
+      "ts": "2026-06-10T00:02:46-07:00"
+    },
+    {
+      "id": "commit:bc0b76e6d297cc2f46c49941c70dd9be12d9da13",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): #console page + manifest polling (15s slow / 1s fast) + update bar",
+      "ts": "2026-06-10T00:53:36-07:00"
+    },
+    {
+      "id": "commit:d8e3177c3a71a4595574239cb6ded7c3856fa737",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(shell): T9 review follow-ups — no-store polling, sidebar state restore, console parity",
+      "ts": "2026-06-10T01:37:02-07:00"
+    },
+    {
+      "id": "commit:6bc671b78a75d43ae6b43395c48ba9cf65f41999",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(commands): consume rewrite-request queue in sync; mention --node in serve",
+      "ts": "2026-06-10T01:42:45-07:00"
+    },
+    {
+      "id": "commit:83e530ab961df681758eb03f9217622da5979825",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(e2e): manual-mode commit — hook must NOT finalize",
+      "ts": "2026-06-10T02:30:57-07:00"
+    },
+    {
+      "id": "commit:b420925129d52fe927e4962859c7cc28ef1fc79d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(e2e): notify-mode commit — hook SHOULD finalize",
+      "ts": "2026-06-10T02:31:35-07:00"
+    },
+    {
+      "id": "commit:6910fd441ddacb5557eff416c506f7719ef36f61",
+      "type": "atom",
+      "kind": "commit",
+      "title": "test(e2e): trigger HOME stale bump for update-bar acceptance",
+      "ts": "2026-06-10T02:37:25-07:00"
     }
   ],
   "edges": [
@@ -2728,6 +2917,41 @@
     },
     {
       "from": "commit:a29c43f741ee88b837a98fed4edc01f8b21ac21f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:c44e73ddcd3f8cfdb442a9548f7ecf2aa044d1e2",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:79a30f25948d53e51282f9d783422a8942155534",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:432ba94e6fbe215766cc9a730d8982f30ff1b096",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:852c5d50587cc4802f9526ac9e7613bda0f680be",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:3abe5975e86d55b3f2a188e8f21a935534a6d6da",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:cd6eeadc99c7e8511bec0ee28f8783de53d77b1c",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:b87d27577cc9a902909947bc03c360235c12a844",
       "to": "page:component/lib",
       "type": "facet"
     }

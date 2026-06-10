@@ -1,10 +1,10 @@
 ---
 title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
-last_updated: 2026-06-09
+last_updated: 2026-06-10
 code_sha: b934c49
-atoms: 120
-commits: 119
+atoms: 127
+commits: 126
 ---
 # component: lib
 
@@ -76,6 +76,13 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **fix(serve): surface runtime on reuse; warn when --node is ignored by a live non-node server** — Co-Authored-By: Claude Fable 5 <noreply@anthropic.com> (b87d275, 2026-06-09)
+- **docs(serve): mention --node in usage line** — Co-Authored-By: Claude Fable 5 <noreply@anthropic.com> (cd6eead, 2026-06-09)
+- **feat(serve): --node flag forces bundled Node server (enables control API on monolingual repos)** — Co-Authored-By: Claude Fable 5 <noreply@anthropic.com> (3abe597, 2026-06-09)
+- **feat(server): finalize-spawn + rewrite-request queue API (safeWikiPage-guarded)** — Polish from prior reviews: echo sanitized mode value, symmetric page guard (852c5d5, 2026-06-09)
+- **feat(hook): manual mode skips commit-time auto finalize** — Co-Authored-By: Claude Fable 5 <noreply@anthropic.com> (432ba94, 2026-06-09)
+- **feat(syncstate): rewrite-request queue (ndjson append, per-page dedupe)** — Also align spec wording: sync.json write is whole-file overwrite (torn reads (79a30f2, 2026-06-09)
+- **feat(syncstate): per-machine sync mode read/write (.state/sync.json, default notify)** — Co-Authored-By: Claude Fable 5 <noreply@anthropic.com> (c44e73d, 2026-06-09)
 - **feat(manifest): component pages ordered by componentOrder + group field (pipeline order)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (a29c43f, 2026-06-09)
 - **refactor(sync): consume parseConfigDeep .order (grouped-deep schema)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (3d63da4, 2026-06-09)
 - **feat(config): parseConfigDeep returns {order, groups} (grouped deep map + flat back-compat)** — Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> (6d42790, 2026-06-09)

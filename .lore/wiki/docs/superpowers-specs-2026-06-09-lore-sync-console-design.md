@@ -1,3 +1,11 @@
+---
+title: lore 同步控制台 B1（档位 + 控制 API + 壳控制台）—— 设计
+summary: - 日期：2026-06-09 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**可见性与控制面**（sync 状态一眼可见、一键可控） - 前置（已在 main）：A 低摩擦合成（增量 plan + prose 指纹 + post-commit 机械 finalize，`2026-06-08-lore-low-friction-sync-des...
+source_path: docs/superpowers/specs/2026-06-09-lore-sync-console-design.md
+last_updated: 2026-06-09
+---
+> 源文档：`docs/superpowers/specs/2026-06-09-lore-sync-console-design.md`
+
 # lore 同步控制台 B1（档位 + 控制 API + 壳控制台）—— 设计
 
 - 日期：2026-06-09
@@ -82,7 +90,7 @@ buildConsoleModel(manifest, status) -> {
   mode, lastFinalize,
 }
 pollDecide(prevGenerated, nowGenerated, currentPageEntryChanged) -> {
-  changed: bool, rebuildSidebar: bool, showUpdateBar: bool,   // changed 在 pollTick 里承担 console 重渲染职责
+  rebuildSidebar: bool, showUpdateBar: bool, refreshConsole: bool,
 }
 ```
 
@@ -151,3 +159,4 @@ pollDecide(prevGenerated, nowGenerated, currentPageEntryChanged) -> {
 ## 实现节奏
 
 spec → writing-plans → plan → TDD → 审查 → 合并。B2（LLM 运行器 + auto + schedule）另起 spec。
+

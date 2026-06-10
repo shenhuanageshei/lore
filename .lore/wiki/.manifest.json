@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-09T11:09:14.321Z",
-  "current_code_sha": "71d9f4a",
+  "generated": "2026-06-10T09:37:27.128Z",
+  "current_code_sha": "6910fd4",
   "language": {
     "default": "zh",
     "available": [
@@ -19,15 +19,15 @@
           "axis": "",
           "title": "首页",
           "summary": "仓库人读导航首页 —— 一句话定位 + 状态 + 知识流 + 入口",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 17,
+          "stale": 42,
           "code_sha": "7de5966",
           "synthesized_from": {
-            "atoms": 244,
-            "commits": 243
+            "atoms": 269,
+            "commits": 268
           },
           "group": ""
         }
@@ -42,15 +42,15 @@
           "axis": "",
           "title": "Index",
           "summary": "table of contents",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "INDEX.md",
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "71d9f4a",
+          "code_sha": "6910fd4",
           "synthesized_from": {
-            "atoms": 244,
-            "commits": 243
+            "atoms": 269,
+            "commits": 268
           },
           "group": ""
         }
@@ -65,15 +65,15 @@
           "axis": "component",
           "title": "lib —— lore 引擎核心",
           "summary": "零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/lib.md",
           "lang": "zh",
           "translations": [],
-          "stale": 3,
+          "stale": 10,
           "code_sha": "b934c49",
           "synthesized_from": {
-            "atoms": 120,
-            "commits": 119
+            "atoms": 127,
+            "commits": 126
           },
           "group": ""
         },
@@ -82,11 +82,11 @@
           "axis": "component",
           "title": "hook —— 提交即记录·提交即刷新",
           "summary": "每次 commit 后台记一条 journal 原子 + 触发机械 finalize；best-effort、detached、永不挡 commit",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/hook.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 1,
           "code_sha": "b934c49",
           "synthesized_from": {
             "atoms": 0,
@@ -99,7 +99,7 @@
           "axis": "component",
           "title": "mine —— git 历史考古队",
           "summary": "把整部 git log 全量挖成 journal 原子，按文件路径→组件、关键词→主题、组件→数据流打 facet；按 sha 幂等回填，确定性、可反复跑",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/mine.md",
           "lang": "zh",
           "translations": [],
@@ -116,7 +116,7 @@
           "axis": "component",
           "title": "fold —— journal 的去重对账员",
           "summary": "读取层纯函数：同 id 多条原子折成一条（why 追加 / refs 并集 / ts 最早），按 git 可达性丢掉 amend·rebase 留下的 orphan commit；不碰 ndjson",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/fold.md",
           "lang": "zh",
           "translations": [],
@@ -133,7 +133,7 @@
           "axis": "component",
           "title": "sync —— 合成总装线",
           "summary": "plan 列工单 → agent 写正文 → finalize 机械盖章；prose 指纹让 stale 诚实、增量只重写动过的页",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/sync.md",
           "lang": "zh",
           "translations": [],
@@ -150,7 +150,7 @@
           "axis": "component",
           "title": "manifest —— wiki 总目录与「新鲜度」体检",
           "summary": "扫 wiki 各轴页成 .manifest.json；每页拿 frontmatter 的 code_sha 跟 HEAD 比，算出「落后几个 commit」的 stale",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/manifest.md",
           "lang": "zh",
           "translations": [],
@@ -167,7 +167,7 @@
           "axis": "component",
           "title": "fingerprint —— 每页 prose 指纹",
           "summary": "存每页 {prose_hash, prose_sha}，把「正文新鲜度」与「机械盖章」解耦；正文没动 → hash 不变 → prose_sha 保持 → stale 诚实",
-          "last_updated": "2026-06-09",
+          "last_updated": "2026-06-10",
           "path": "component/fingerprint.md",
           "lang": "zh",
           "translations": [],
@@ -203,12 +203,46 @@
           "group": ""
         },
         {
+          "id": "superpowers-plans-2026-06-09-lore-sync-console",
+          "axis": "docs",
+          "title": "lore 同步控制台 B1（档位 + 控制 API + 壳控制台）Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-09",
+          "path": "docs/superpowers-plans-2026-06-09-lore-sync-console.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": ""
+        },
+        {
           "id": "superpowers-specs-2026-06-09-lore-shell-presentation-design",
           "axis": "docs",
           "title": "lore 壳呈现（mermaid 放大 + component 排序分组）—— 设计",
           "summary": "- 日期：2026-06-09 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**呈现层（C-呈现）的图可读性 + 导航** - 前置（已在 main）：C-内容（两档好页 + 源文件级深度页）、`site/index.html`（壳 + vendored `mermaid.min.js`，`securityLevel: strict`）、`co...",
           "last_updated": "2026-06-09",
           "path": "docs/superpowers-specs-2026-06-09-lore-shell-presentation-design.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": ""
+        },
+        {
+          "id": "superpowers-specs-2026-06-09-lore-sync-console-design",
+          "axis": "docs",
+          "title": "lore 同步控制台 B1（档位 + 控制 API + 壳控制台）—— 设计",
+          "summary": "- 日期：2026-06-09 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期专攻**可见性与控制面**（sync 状态一眼可见、一键可控） - 前置（已在 main）：A 低摩擦合成（增量 plan + prose 指纹 + post-commit 机械 finalize，`2026-06-08-lore-low-friction-sync-des...",
+          "last_updated": "2026-06-09",
+          "path": "docs/superpowers-specs-2026-06-09-lore-sync-console-design.md",
           "lang": "zh",
           "translations": [],
           "stale": 0,

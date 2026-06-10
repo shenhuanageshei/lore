@@ -99,6 +99,10 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 ### 增量 sync（母 §5「增量合成」）✅ 已实现（低摩擦合成 A）
 - 已实现：`.state/fingerprints.json` 每页 `{prose_hash, prose_sha}`（`prose_hash` 复用 `translationSourceHash`）；finalize 只在正文变了才推进 `prose_sha`、frontmatter `code_sha` 盖 `prose_sha` → `stale` 诚实（按 code_root 精确）；`planSync` 只挑动过 code_root 的 component 页（`--all` 兜底）；post-commit hook detached 跑机械 `finalize`。设计见 `docs/superpowers/specs/2026-06-08-lore-low-friction-sync-design.md`。余项（B 前端控制台/档位）另立 spec。
 
+### 同步控制台 B1（档位 + 控制 API + 壳控制台）✅ 已实现
+- 已实现：档位 `manual`/`notify`（`.state/sync.json`，per-machine，hook 真读分流——manual 档 commit 零后台动作）；控制 API 四端点（status / mode / finalize-spawn / rewrite-requests，localhost-only + safeWikiPage 防越狱，portal 仍只读 404）；壳顶栏状态灯（🟢/🟡/⚪ 三态）+ 下拉面板 + `#console` 整页（全 CSS 主题变量，三主题跟随）；manifest 轮询（15s 慢 + 操作后 1s 快，`no-store` 防 python 缓存）自动刷新灯/侧栏 + 当前页「⟳ 内容已更新」提示条；重写排队（ndjson 队列去重，`/lore:sync` 优先消化）。serve `--node` 给单语 repo 启用控制 API。7 项端到端验收全过（含「切 manual → commit → manifest 纹丝不动」反空壳）。设计见 `docs/superpowers/specs/2026-06-09-lore-sync-console-design.md`。
+- **B2（另立 spec）**：LLM 运行器（可插拔后端：默认 spawn claude CLI 无头 / 裸 Anthropic API / codex 扩展位）+ `auto` 档 + `schedule` 定时 + 质量门（机械校验+失败丢弃）+ 自动重写任务历史。
+
 ### 内容质量（两档好页 + 源文件级深度页）✅ 已实现（C-内容）
 - 已实现：定义「好 wiki 页」**两档标准**（**概览档**零黑话 + **机制档** 9 节 `<details>` 折叠 + **锚点锚符号**），写进 `commands/sync.md` + golden page 标杆（`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.{html,md}`）；**两层粒度**——config `axes.component.deep.<root>:[子模块…]` 声明源文件级深度页，`planSync` 列深度页工单（增量按源文件）、`finalizeSync` 按源文件精确算 stale；深度页是普通 component 页 → manifest/graph 自动支持（**graph 可遍历到模块级**）。dogfood：lib 一页 → 鸟瞰页 + 6 深度页（graph 1→7 节点）。设计见 `docs/superpowers/specs/2026-06-08-lore-content-quality-design.md`。余项（壳深度切换 UX、产出校验、文件级决策史分流）另立。
 

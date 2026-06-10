@@ -143,3 +143,33 @@ export function baseFromPathname(pathname) {
   const i = pathname.lastIndexOf('/site');
   return i >= 0 ? pathname.slice(0, i + 1) : '/';
 }
+
+// B1 控制台模型：灯三态 + stale 聚合（spec 2026-06-09-lore-sync-console）。
+// status 来自 GET /api/sync/status；python 静态 server / portal 下无 API → 传 null，降级默认。
+export function buildConsoleModel(manifest, status) {
+  const stalePages = [];
+  for (const ax of manifest.axes ?? []) {
+    for (const p of ax.pages ?? []) {
+      if ((p.stale ?? 0) > 0) {
+        stalePages.push({ key: `${ax.id}/${p.id}`, title: p.title ?? p.id, stale: p.stale, last_updated: p.last_updated ?? '', path: p.path });
+      }
+    }
+  }
+  stalePages.sort((a, b) => b.stale - a.stale || a.key.localeCompare(b.key));
+  const mode = status?.mode ?? 'notify';
+  return {
+    light: mode === 'manual' ? 'off' : (stalePages.length ? 'stale' : 'fresh'),
+    staleTotal: stalePages.length,
+    stalePages,
+    mode,
+    lastFinalize: status?.last_finalize ?? null,
+  };
+}
+
+// manifest 轮询判定：generated 变了 → 灯/侧栏重建；当前页条目也变了 → 正文提示条（不强刷、不丢滚动位置）。
+export function pollDecide(prevGenerated, nowGenerated, currentPageChanged) {
+  if (!nowGenerated || nowGenerated === prevGenerated) {
+    return { changed: false, rebuildSidebar: false, showUpdateBar: false };
+  }
+  return { changed: true, rebuildSidebar: true, showUpdateBar: !!currentPageChanged };
+}

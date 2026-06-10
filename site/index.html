@@ -12,18 +12,21 @@
     --green: #9ece6a; --yellow: #e0af68; --red: #f7768e;
     --border: #2a2e42; --code-bg: #1e202e;
     --comp: #7dcfff; --flow: #bb9af7; --theme: #ff9e64; --docs: var(--green);
+    --warn: #e0af68;
   }
   :root[data-theme="light"] {
     --bg:#ffffff; --sidebar:#f4f5f8; --panel:#eef0f4; --fg:#24283b; --fg-dim:#787c99;
     --fg-bright:#1a1b26; --accent:#3760bf; --accent-dim:#a4b3e0; --border:#dcdfe6;
     --code-bg:#eef0f4; --green:#587539; --yellow:#8c6c20; --red:#c64343;
     --comp:#2e7de9; --flow:#7847bd; --theme:#b15c00;
+    --warn: #b15c00;
   }
   :root[data-theme="sepia"] {
     --bg:#f4ecd8; --sidebar:#ece2c8; --panel:#e7dcc0; --fg:#5b4636; --fg-dim:#9c8b73;
     --fg-bright:#3b2f25; --accent:#9a6a3a; --accent-dim:#cdb892; --border:#d9c9a3;
     --code-bg:#e7dcc0; --green:#6b7536; --yellow:#9a6a20; --red:#a8443a;
     --comp:#7a6a3a; --flow:#8a5a6a; --theme:#9a6a3a;
+    --warn: #9a6a3a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font: 14px/1.6 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
@@ -42,8 +45,28 @@
   #theme, #language { background: var(--panel); border: 1px solid var(--border); color: var(--fg);
     padding: 6px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; }
   #theme:focus, #language:focus { outline: none; border-color: var(--accent); }
-  #serve-badge { margin-left: auto; font-size: 11px; color: var(--green);
-    background: rgba(158,206,106,.12); padding: 4px 10px; border-radius: 12px; }
+  #sync-light { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--fg);
+    cursor: pointer; font-size: 12px; user-select: none; white-space: nowrap; }
+  #sync-light:hover { border-color: var(--accent); }
+  #sync-light .ind { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  #sync-light.stale .ind { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  #sync-light.off .ind { background: var(--fg-dim); }
+  #sync-panel { position: absolute; top: 46px; right: 12px; z-index: 50; width: 280px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,.35); font-size: 12.5px; color: var(--fg); }
+  #sync-panel .row { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; gap: 8px; }
+  #sync-panel .dim { color: var(--fg-dim); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: none; border: none; padding: 3px 10px; cursor: pointer;
+    color: var(--fg); font-size: 12px; }
+  .seg button.on { background: var(--accent); color: var(--bg); font-weight: 600; }
+  .seg button:disabled { color: var(--fg-dim); cursor: not-allowed; opacity: .6; }
+  #sync-panel .actions button { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 10px; margin-right: 6px; margin-top: 8px; cursor: pointer; color: var(--fg); font-size: 12px; }
+  #sync-panel .actions button:hover { border-color: var(--accent); }
+  #sync-panel .actions button:disabled { color: var(--fg-dim); cursor: not-allowed; opacity: .6; }
+  #sync-panel[hidden] { display: none; }
 
   /* sidebar */
   #sidebar { background: var(--sidebar); border-right: 1px solid var(--border);
@@ -143,7 +166,23 @@
       <option value="light">☀ 亮</option>
       <option value="sepia">🌿 护眼</option>
     </select>
-    <div id="serve-badge">● serving</div>
+    <div id="sync-light" title="sync 状态"><span class="ind"></span><span id="sync-light-text">…</span></div>
+  </div>
+  <div id="sync-panel" hidden>
+    <div class="row"><span class="dim">档位</span>
+      <span class="seg">
+        <button data-mode="manual">手动</button>
+        <button data-mode="notify">提醒</button>
+        <button data-mode="auto" disabled title="B2 解锁">全自动 🔒</button>
+      </span>
+    </div>
+    <div class="row"><span class="dim">待重写</span><span id="sync-stale-summary">—</span></div>
+    <div class="row"><span class="dim">上次机械刷新</span><span id="sync-last">—</span></div>
+    <div class="actions">
+      <button id="sync-finalize">⟳ 立即刷新</button>
+      <button id="sync-queue-all">✍ 重写排队</button>
+      <button id="sync-detail">详情 →</button>
+    </div>
   </div>
   <nav id="sidebar"></nav>
   <main id="main">
@@ -166,7 +205,7 @@
 import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
-  baseFromPathname,
+  baseFromPathname, buildConsoleModel, pollDecide,
 } from './shell.mjs';
 
 // per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
@@ -206,6 +245,9 @@ async function boot() {
   wireSearch();
   wireTheme();
   wireLanguage();
+  await fetchSyncStatus();
+  wireSyncConsole();
+  renderSyncLight();
   window.addEventListener('hashchange', route);
   route();
 }
@@ -339,6 +381,83 @@ function wireTheme() {
       route();
     }
   });
+}
+
+// --- B1 同步控制台（spec 2026-06-09-lore-sync-console）---
+let SYNC_STATUS = null;        // GET /api/sync/status 结果；API 不可用（python/portal）→ null
+let SYNC_API_OK = false;
+let QUEUED_PAGES = new Set();  // 已排队 page path（渲染「已排队 ✓」）
+
+async function fetchSyncStatus() {
+  try {
+    const r = await fetch(BASE + 'api/sync/status');
+    if (!r.ok) throw new Error();
+    SYNC_STATUS = await r.json();
+    SYNC_API_OK = true;
+    const q = await (await fetch(BASE + 'api/sync/rewrite-requests')).json();
+    QUEUED_PAGES = new Set((q.requests ?? []).map(x => x.page));
+  } catch { SYNC_STATUS = null; SYNC_API_OK = false; }
+}
+
+function startFastPoll() {}    // Task 9 用真实现替换（manifest 快轮询）
+
+function renderSyncLight() {
+  const m = buildConsoleModel(MANIFEST, SYNC_STATUS);
+  const light = document.getElementById('sync-light');
+  light.className = m.light === 'fresh' ? '' : m.light;          // '' | 'stale' | 'off'
+  document.getElementById('sync-light-text').textContent =
+    m.light === 'off' ? `手动 · ${m.staleTotal} 待写`
+    : m.staleTotal ? `${m.staleTotal} 待重写` : '全新鲜';
+  document.querySelectorAll('#sync-panel .seg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.mode === m.mode));
+  document.getElementById('sync-stale-summary').textContent = m.staleTotal
+    ? m.stalePages.slice(0, 2).map(p => `${p.key.split('/').pop()} ⚠${p.stale}`).join(' · ') + (m.staleTotal > 2 ? ` 等${m.staleTotal}页` : '')
+    : '无';
+  document.getElementById('sync-last').textContent = m.lastFinalize
+    ? new Date(m.lastFinalize).toLocaleString() : '—';
+  for (const id of ['sync-finalize', 'sync-queue-all']) {
+    const btn = document.getElementById(id);
+    btn.disabled = !SYNC_API_OK;
+    btn.title = SYNC_API_OK ? '' : '只读模式（portal 或 python server）——本地 /lore:serve --node 可操作';
+  }
+  document.querySelectorAll('#sync-panel .seg button:not([data-mode="auto"])').forEach(b => {
+    if (!SYNC_API_OK) { b.disabled = true; b.title = '只读模式'; }
+  });
+}
+
+function wireSyncConsole() {
+  const light = document.getElementById('sync-light');
+  const panel = document.getElementById('sync-panel');
+  light.onclick = () => { panel.hidden = !panel.hidden; };
+  document.addEventListener('click', e => {
+    if (!panel.hidden && !panel.contains(e.target) && !light.contains(e.target)) panel.hidden = true;
+  });
+  document.querySelectorAll('#sync-panel .seg button[data-mode]').forEach(b => {
+    if (b.dataset.mode === 'auto') return;                       // B2
+    b.onclick = async () => {
+      try {
+        await fetch(BASE + 'api/sync/mode', { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ mode: b.dataset.mode }) });
+        await fetchSyncStatus(); renderSyncLight();              // 读回显示（硬约束②：存→读全链路）
+      } catch { /* 降级模式下按钮已禁用 */ }
+    };
+  });
+  document.getElementById('sync-finalize').onclick = async () => {
+    try {
+      await fetch(BASE + 'api/sync/finalize', { method: 'POST' });
+      startFastPoll();                                           // Task 9：快轮询秒级反馈
+    } catch { /* disabled in degraded mode */ }
+  };
+  document.getElementById('sync-queue-all').onclick = async () => {
+    const m = buildConsoleModel(MANIFEST, SYNC_STATUS);
+    for (const p of m.stalePages) {
+      if (p.path && !QUEUED_PAGES.has(p.path)) {
+        try { await fetch(BASE + 'api/sync/rewrite-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: p.path }) }); } catch {}
+      }
+    }
+    await fetchSyncStatus(); renderSyncLight();
+  };
+  document.getElementById('sync-detail').onclick = () => { panel.hidden = true; location.hash = 'console'; };
 }
 
 const LB = (() => {

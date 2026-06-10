@@ -10,6 +10,7 @@ description: 启动/停止本地 Web 服务器，在浏览器中浏览 lore wiki
 
 - `/lore:serve` —— 启动（默认端口 7842，被占用则自动改用空闲端口）
 - `/lore:serve --port 9000` —— 在指定端口启动
+- `/lore:serve --node` —— 强制用内置 Node 服务器（Python 静态服务器不支持同步控制 API；单语言仓库需要壳控制台时用它）
 - `/lore:serve --stop` —— 停止正在运行的服务器
 
 ## 行为

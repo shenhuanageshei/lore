@@ -24,6 +24,14 @@ description: 合成 wiki —— 读 config 组件 + 源码，每个 code_root �
    > 增量：`plan` 默认只列「代码动过」的 component 页（据 `.state/fingerprints.json` 指纹，`reason: new|code-changed`）；HOME/theme/flow 仍全列。要强制全量（首跑 / 大改后 / 兜底）：`node "${CLAUDE_PLUGIN_ROOT}/lib/sync.js" plan "$(pwd)/.lore" --all`。
    > 提交即刷新：装了 post-commit hook 的 repo，每次 commit 会后台自动跑机械 `finalize`（决策史 / docs / 状态 / `stale` 准实时、零 LLM、不挡 commit）；架构 prose 仍按 `plan` 增量、由 agent 重写。
 
+## 用户排队的重写请求（B1 控制台）
+
+plan 之前先读 `<loreDir>/.state/rewrite-requests.ndjson`（每行 `{ts, page}`；缺文件 = 无请求）：
+
+1. 队列里的页**优先**进 worklist——即使指纹判 fresh 也入（`reason: "user-requested"`）：用户点名 = 显式意图，高于机械判定。
+2. 每重写完一页，从队列移除该条目：读全文件 → 过滤掉该 page 的行 → 整体重写文件（队列小、无并发，覆盖写可接受）。
+3. 全部消化后若文件空，删除或留空文件皆可（readRewriteRequests 都按空处理）。
+
 2. **合成**（你来，逐 worklist 项）：读该 `codeRoot` 的实际源码，写 `.lore/wiki/<path>`，格式：
    ```markdown
    ---

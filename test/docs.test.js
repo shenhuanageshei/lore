@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { docsExtractor, changelogExtractor, pitfallsExtractor, buildDocsAxis } from '../lib/docs.js';
@@ -123,7 +123,7 @@ import { renderDocsPage } from '../lib/docs.js';
 
 test('renderDocsPage: spec with body → embeds body, plain-text source ref, no link, no # docs:', () => {
   const md = renderDocsPage({ id: 'a', title: 'Doc A', summary: 'about A', sourcePath: 'docs/a.md', date: '2026-06-04', body: '# Doc A\n\nfull content here.\n' });
-  assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\n---/);
+  assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\ngroup: 项目状态\n---/);
   assert.match(md, /> 源文档：`docs\/a\.md`/);     // plain-text reference
   assert.match(md, /# Doc A\n\nfull content here\./); // body embedded verbatim
   assert.doesNotMatch(md, /\]\(\.\.\/\.\.\/\.\.\//);  // NO markdown link → no 404
@@ -239,4 +239,29 @@ test('pairDocs: 同 date+slug 的 spec↔plan 配对；date 同 slug 异不配�
   assert.equal(specs[2].pairedPlan, undefined);    // 孤 spec（同日 plan 是别的 slug）
   assert.equal(specs[3].pairedPlan, undefined);    // 孤 plan 不标
   assert.equal(specs[4].pairedPlan, undefined);    // 非 superpowers 不参与
+});
+
+test('buildDocsAxis: 物化页 frontmatter 含 group；配对 spec 含 paired_plan', () => {
+  const root = tmp();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    mkdirSync(join(root, 'docs', 'superpowers', 'specs'), { recursive: true });
+    mkdirSync(join(root, 'docs', 'superpowers', 'plans'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'superpowers', 'specs', '2026-06-08-thing-design.md'), '# Thing 设计\n\nspec body\n');
+    writeFileSync(join(root, 'docs', 'superpowers', 'plans', '2026-06-08-thing.md'), '# Thing Plan\n\nplan body\n');
+    writeFileSync(join(root, 'docs', 'ROADMAP.md'), '# 路线图\n\nroadmap body\n');
+    buildDocsAxis(lore, root, { sources: ['docs'], docsGlob: 'docs/**/*.md' });
+
+    const spec = readFileSync(join(lore, 'wiki', 'docs', 'superpowers-specs-2026-06-08-thing-design.md'), 'utf8');
+    assert.match(spec, /^group: 设计与计划$/m);
+    assert.match(spec, /^paired_plan: superpowers-plans-2026-06-08-thing$/m);
+
+    const plan = readFileSync(join(lore, 'wiki', 'docs', 'superpowers-plans-2026-06-08-thing.md'), 'utf8');
+    assert.match(plan, /^group: 设计与计划$/m);
+    assert.doesNotMatch(plan, /paired_plan/);            // plan 侧不标
+
+    const rm = readFileSync(join(lore, 'wiki', 'docs', 'ROADMAP.md'), 'utf8');
+    assert.match(rm, /^group: 项目状态$/m);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

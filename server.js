@@ -147,8 +147,10 @@ export function createServer(rootDir, { spawnFn = spawn } = {}) {
     if (req.method === 'POST' && pathname === '/api/sync/finalize') {
       try {
         // 与 hook.maybeRefresh 同款 detached finalize（A 接缝③）。不加防抖：finalize 幂等、最后写赢。
+        // 刻意不 gate mode：manual 档关的是「自动」刷新，手动 ⟳ 正是 manual 档的用法——别给这里补 mode 检查。
         const child = spawnFn(process.execPath, [join(HERE, 'lib', 'sync.js'), 'finalize', root],
           { detached: true, stdio: 'ignore' });
+        child.once?.('error', () => {});   // 异步 spawn 失败（EMFILE 等）不能击落常驻 server
         child.unref();
         return sendJson(res, 200, { spawned: true });
       } catch { return sendJson(res, 500, { error: 'spawn failed' }); }

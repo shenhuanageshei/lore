@@ -149,3 +149,34 @@ test('maybeRefresh: spawn 抛错也不抛出（best-effort）', () => {
     assert.equal(r.spawned, false);                        // 吞掉异常、返回未 spawn
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+import { writeSyncMode } from '../lib/syncstate.js';
+
+test('maybeRefresh: mode=manual → 不 spawn（自动刷新关闭）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', '.manifest.json'), '{"axes":[]}');
+    writeSyncMode(join(lore, '.state'), 'manual');
+    let spawned = false;
+    const r = maybeRefresh({ loreDir: lore, spawnFn: () => { spawned = true; return { unref() {} }; } });
+    assert.equal(r.spawned, false);
+    assert.equal(r.reason, 'manual');
+    assert.equal(spawned, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('maybeRefresh: mode=notify（显式写入）→ spawn 照旧', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', '.manifest.json'), '{"axes":[]}');
+    writeSyncMode(join(lore, '.state'), 'notify');
+    const calls = [];
+    const r = maybeRefresh({ loreDir: lore, spawnFn: (cmd, args) => { calls.push(args); return { unref() {} }; } });
+    assert.equal(r.spawned, true);
+    assert.equal(calls.length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

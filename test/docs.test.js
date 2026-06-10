@@ -222,7 +222,7 @@ test('docGroup: superpowers specs/plans → 设计与计划；notes → notes；
   assert.equal(docGroup('docs/ROADMAP.md'), '项目状态');
   assert.equal(docGroup('CHANGELOG.md'), '项目状态');           // 折叠页 sourcePath
   assert.equal(docGroup('CLAUDE.md'), '项目状态');              // pitfalls
-  assert.equal(docGroup('docs\superpowers\specs\2026-06-08-w-design.md'), '设计与计划');   // win 反斜杠容错
+  assert.equal(docGroup('docs\\superpowers\\specs\\2026-06-08-w-design.md'), '设计与计划');   // win 反斜杠容错
 });
 
 test('pairDocs: 同 date+slug 的 spec↔plan 配对；date 同 slug 异不配；孤页不标', () => {

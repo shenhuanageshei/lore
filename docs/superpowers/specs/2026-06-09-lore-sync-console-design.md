@@ -46,7 +46,7 @@ B1 给 B2 留位：档位枚举 / UI / API 校验都认识 `auto` 但 B1 拒绝�
 
 ```
 readSyncMode(stateDir)  -> 'manual' | 'notify'        // 缺文件/坏 JSON → 'notify'（best-effort，同 registry 风格）
-writeSyncMode(stateDir, mode) -> void                  // 校验枚举（B1 拒 'auto'）+ 原子写 sync.json
+writeSyncMode(stateDir, mode) -> void                  // 校验枚举（B1 拒 'auto'）+ 整文件覆写 sync.json（撕裂读由 notify 默认兜底）
 appendRewriteRequest(stateDir, { page }) -> { queued } // 同页已在队列（未消化）→ 不重复 append，返回 queued:false
 readRewriteRequests(stateDir) -> [{ ts, page }]        // 缺文件 → []；坏行跳过
 ```

@@ -4,6 +4,7 @@ import { appendFileSync, createReadStream, mkdirSync, readFileSync, statSync, wr
 import { dirname, join, normalize, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { translationSourceHash } from './lib/i18n.js';
+import { readSyncMode, writeSyncMode, appendRewriteRequest, readRewriteRequests } from './lib/syncstate.js';
 
 const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
 
@@ -118,6 +119,25 @@ export function createServer(rootDir) {
         return sendJson(res, 200, { ok: true, request });
       } catch {
         return sendJson(res, 400, { error: 'bad request' });
+      }
+    }
+
+    // --- B1 同步控制 API（spec 2026-06-09-lore-sync-console）---
+    if (req.method === 'GET' && pathname === '/api/sync/status') {
+      const mode = readSyncMode(join(root, '.state'));
+      let lastFinalize = null;
+      try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
+      catch { /* 无 manifest（未 sync）→ null */ }
+      return sendJson(res, 200, { mode, last_finalize: lastFinalize });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/sync/mode') {
+      try {
+        const body = await readJson(req);
+        writeSyncMode(join(root, '.state'), String(body.mode ?? ''));   // 非法值 throw → 400
+        return sendJson(res, 200, { ok: true, mode: body.mode });
+      } catch {
+        return sendJson(res, 400, { error: 'invalid mode (B1: manual|notify; auto lands in B2)' });
       }
     }
 

@@ -1,7 +1,9 @@
 // test/server.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { writeSyncMode, readSyncMode } from '../lib/syncstate.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from '../server.js';
@@ -94,4 +96,55 @@ test('serves correctly when rootDir has a trailing slash', async () => {
   } finally {
     server.close(); rmSync(base, { recursive: true, force: true });
   }
+});
+
+function syncFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'lore-sync-api-'));
+  mkdirSync(join(root, 'wiki'), { recursive: true });
+  writeFileSync(join(root, 'wiki', '.manifest.json'),
+    JSON.stringify({ generated: '2026-06-09T05:00:00Z', axes: [] }));
+  return root;
+}
+
+test('GET /api/sync/status → mode + last_finalize', async () => {
+  const root = syncFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/sync/status`);
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.mode, 'notify');                              // 缺 sync.json → 默认
+    assert.equal(body.last_finalize, '2026-06-09T05:00:00Z');       // manifest.generated
+    writeSyncMode(join(root, '.state'), 'manual');
+    const r2 = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assert.equal(r2.mode, 'manual');
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/sync/mode：合法落盘；auto/非法 → 400；非 local Host → 403', async () => {
+  const root = syncFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const post = (body, headers = {}) => fetch(`http://127.0.0.1:${port}/api/sync/mode`, {
+      method: 'POST', headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+    const ok = await post({ mode: 'manual' });
+    assert.equal(ok.status, 200);
+    assert.equal(readSyncMode(join(root, '.state')), 'manual');     // 配置真实生效（硬约束②）
+    assert.equal((await post({ mode: 'auto' })).status, 400);       // B2 才解锁
+    assert.equal((await post({ mode: 'hyper' })).status, 400);
+    const status403 = await new Promise((resolve, reject) => {
+      const r = http.request(
+        { host: '127.0.0.1', port, path: '/api/sync/mode', method: 'POST',
+          headers: { 'content-type': 'application/json', host: 'evil.example' } },
+        res => { res.resume(); resolve(res.statusCode); });
+      r.on('error', reject);
+      r.end(JSON.stringify({ mode: 'notify' }));
+    });
+    assert.equal(status403, 403);
+    assert.equal(readSyncMode(join(root, '.state')), 'manual');     // 403/400 都没改盘
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });

@@ -212,3 +212,31 @@ test('buildDocsAxis: returns specs sorted by date desc (tiebreak id)', () => {
     assert.deepEqual(pages.map(p => p.id), ['2026-06-10-new', '2026-06-05-mid', '2026-06-01-old']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+import { docGroup, pairDocs } from '../lib/docs.js';
+
+test('docGroup: superpowers specs/plans → 设计与计划；notes → notes；其余 → 项目状态', () => {
+  assert.equal(docGroup('docs/superpowers/specs/2026-06-08-x-design.md'), '设计与计划');
+  assert.equal(docGroup('docs/superpowers/plans/2026-06-08-x.md'), '设计与计划');
+  assert.equal(docGroup('docs/superpowers/notes/2026-06-02-y.md'), 'notes');
+  assert.equal(docGroup('docs/ROADMAP.md'), '项目状态');
+  assert.equal(docGroup('CHANGELOG.md'), '项目状态');           // 折叠页 sourcePath
+  assert.equal(docGroup('CLAUDE.md'), '项目状态');              // pitfalls
+  assert.equal(docGroup('docs\superpowers\specs\2026-06-08-w-design.md'), '设计与计划');   // win 反斜杠容错
+});
+
+test('pairDocs: 同 date+slug 的 spec↔plan 配对；date 同 slug 异不配；孤页不标', () => {
+  const mk = (sourcePath, id) => ({ sourcePath, id });
+  const specs = [
+    mk('docs/superpowers/specs/2026-06-08-lore-content-quality-design.md', 'superpowers-specs-2026-06-08-lore-content-quality-design'),
+    mk('docs/superpowers/plans/2026-06-08-lore-content-quality.md', 'superpowers-plans-2026-06-08-lore-content-quality'),
+    mk('docs/superpowers/specs/2026-06-07-lore-portal-design.md', 'superpowers-specs-2026-06-07-lore-portal-design'),
+    mk('docs/superpowers/plans/2026-06-07-lore-roadmap-cleanup.md', 'superpowers-plans-2026-06-07-lore-roadmap-cleanup'),
+    mk('docs/ROADMAP.md', 'ROADMAP'),
+  ];
+  pairDocs(specs);
+  assert.equal(specs[0].pairedPlan, 'superpowers-plans-2026-06-08-lore-content-quality');   // 配上
+  assert.equal(specs[2].pairedPlan, undefined);    // 孤 spec（同日 plan 是别的 slug）
+  assert.equal(specs[3].pairedPlan, undefined);    // 孤 plan 不标
+  assert.equal(specs[4].pairedPlan, undefined);    // 非 superpowers 不参与
+});

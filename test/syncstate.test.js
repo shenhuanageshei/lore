@@ -15,8 +15,8 @@ test('writeSyncMode → readSyncMode round-trip', () => {
     assert.equal(readSyncMode(dir), 'manual');
     writeSyncMode(dir, 'notify');
     assert.equal(readSyncMode(dir), 'notify');
-    // 落盘格式可读（控制台/人都能看）
-    assert.deepEqual(JSON.parse(readFileSync(join(dir, 'sync.json'), 'utf8')), { mode: 'notify' });
+    // 落盘格式可读（控制台/人都能看）——锁字节格式：两空格缩进 + 尾换行
+    assert.equal(readFileSync(join(dir, 'sync.json'), 'utf8'), '{\n  "mode": "notify"\n}\n');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

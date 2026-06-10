@@ -196,3 +196,46 @@ test('baseFromPathname: portal (/<repo>/site/...) → "/<repo>/"', () => {
 test('baseFromPathname: 无 /site 段 → "/" 兜底', () => {
   assert.equal(baseFromPathname('/'), '/');
 });
+
+import { buildConsoleModel, pollDecide } from '../site/shell.mjs';
+
+const mkManifest = pages => ({ axes: [{ id: 'component', label: 'Component', pages }] });
+
+test('buildConsoleModel: 0 stale → fresh 绿灯', () => {
+  const m = buildConsoleModel(mkManifest([{ id: 'lib', title: 'lib', stale: 0 }]), { mode: 'notify', last_finalize: 't0' });
+  assert.equal(m.light, 'fresh');
+  assert.equal(m.staleTotal, 0);
+  assert.equal(m.mode, 'notify');
+  assert.equal(m.lastFinalize, 't0');
+});
+
+test('buildConsoleModel: N stale → stale 黄灯 + 按 stale 降序', () => {
+  const m = buildConsoleModel(mkManifest([
+    { id: 'a', title: 'A', stale: 1, last_updated: 'd1' },
+    { id: 'b', title: 'B', stale: 5, last_updated: 'd2' },
+    { id: 'c', title: 'C', stale: 0 },
+  ]), { mode: 'notify', last_finalize: null });
+  assert.equal(m.light, 'stale');
+  assert.equal(m.staleTotal, 2);
+  assert.deepEqual(m.stalePages.map(p => p.key), ['component/b', 'component/a']);
+  assert.equal(m.stalePages[0].stale, 5);
+});
+
+test('buildConsoleModel: manual → off 灰灯但 stale 数照算（关自动 ≠ 藏信息）', () => {
+  const m = buildConsoleModel(mkManifest([{ id: 'a', title: 'A', stale: 3 }]), { mode: 'manual', last_finalize: null });
+  assert.equal(m.light, 'off');
+  assert.equal(m.staleTotal, 1);
+});
+
+test('buildConsoleModel: status null（python server / portal 无 API）→ 默认 notify', () => {
+  const m = buildConsoleModel(mkManifest([]), null);
+  assert.equal(m.mode, 'notify');
+  assert.equal(m.lastFinalize, null);
+});
+
+test('pollDecide: generated 未变 → 全 false；变了 → 重建；当前页变了 → 提示条', () => {
+  assert.deepEqual(pollDecide('t1', 't1', false), { changed: false, rebuildSidebar: false, showUpdateBar: false });
+  assert.deepEqual(pollDecide('t1', null, false), { changed: false, rebuildSidebar: false, showUpdateBar: false });
+  assert.deepEqual(pollDecide('t1', 't2', false), { changed: true, rebuildSidebar: true, showUpdateBar: false });
+  assert.deepEqual(pollDecide('t1', 't2', true),  { changed: true, rebuildSidebar: true, showUpdateBar: true });
+});

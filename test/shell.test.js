@@ -244,3 +244,35 @@ test('pollDecide: generated 未变 → 全 false；变了 → 重建；当前页
   assert.deepEqual(pollDecide('t1', 't2', false), { changed: true, rebuildSidebar: true, showUpdateBar: false });
   assert.deepEqual(pollDecide('t1', 't2', true),  { changed: true, rebuildSidebar: true, showUpdateBar: true });
 });
+
+import { buildDocsRows } from '../site/shell.mjs';
+
+test('buildDocsRows: 按序分段 + 配对行 + 被配对 plan 剔除 + 剥尾 + 折叠默认值', () => {
+  const pages = [
+    { id: 'changelog', title: 'CHANGELOG', group: '项目状态', paired_plan: '' },
+    { id: 'spec-a', title: 'lore 同步控制台 B1（档位） —— 设计', group: '设计与计划', paired_plan: 'plan-a' },
+    { id: 'plan-a', title: 'lore 同步控制台 B1（档位）Implementation Plan', group: '设计与计划', paired_plan: '' },
+    { id: 'plan-orphan', title: '孤 plan Implementation Plan', group: '设计与计划', paired_plan: '' },
+    { id: 'note-1', title: 'golden page', group: 'notes', paired_plan: '' },
+  ];
+  const groups = buildDocsRows(pages);
+  assert.deepEqual(groups.map(g => g.group), ['项目状态', '设计与计划', 'notes']);
+  assert.deepEqual(groups.map(g => g.collapsed), [false, true, true]);
+  const dz = groups[1];
+  assert.deepEqual(dz.rows.map(r => r.page.id), ['spec-a', 'plan-orphan']);   // plan-a 被剔除
+  assert.equal(dz.rows[0].planPage.id, 'plan-a');                             // 配对解析
+  assert.equal(dz.rows[0].displayTitle, 'lore 同步控制台 B1（档位）');           // 剥「—— 设计」
+  assert.equal(dz.rows[1].displayTitle, '孤 plan');                           // 剥「Implementation Plan」
+  assert.equal(dz.rows[1].planPage, null);
+});
+
+test('buildDocsRows: paired_plan 指向不存在的页 → 当孤页；缺 group → 项目状态', () => {
+  const pages = [
+    { id: 's1', title: 'X —— 设计', group: '设计与计划', paired_plan: 'ghost' },
+    { id: 'p1', title: 'Y', paired_plan: '' },
+  ];
+  const groups = buildDocsRows(pages);
+  assert.equal(groups[0].rows[0].planPage, null);          // ghost 找不到 → 孤页
+  assert.equal(groups[1].group, '项目状态');                // 缺 group 兜底
+  assert.equal(groups[1].collapsed, false);
+});

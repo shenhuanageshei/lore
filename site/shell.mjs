@@ -173,3 +173,27 @@ export function pollDecide(prevGenerated, nowGenerated, currentPageChanged) {
   }
   return { changed: true, rebuildSidebar: true, showUpdateBar: !!currentPageChanged };
 }
+
+// docs 轴侧栏模型（spec 2026-06-10-lore-docs-axis-regroup）：按 manifest 给定顺序分段
+// （排序单一来源在 manifest），配对行合并、被配对 plan 剔除、显示名剥模板尾巴。
+export function buildDocsRows(pages) {
+  const byId = new Map(pages.map(p => [p.id, p]));
+  const paired = new Set(pages.filter(p => p.paired_plan && byId.has(p.paired_plan)).map(p => p.paired_plan));
+  const stripTail = t => (t ?? '')
+    .replace(/\s*(?:——|—|--)\s*设计\s*$/, '')
+    .replace(/\s+Implementation\s+Plan\s*$/i, '')
+    .trim();
+  const groups = [];
+  let cur = null;
+  for (const p of pages) {
+    if (paired.has(p.id)) continue;                       // 被配对的 plan 不占行（页本体仍可直链/搜索）
+    const g = p.group || '项目状态';
+    if (!cur || cur.group !== g) {
+      cur = { group: g, collapsed: g !== '项目状态', rows: [] };
+      groups.push(cur);
+    }
+    const planPage = p.paired_plan ? (byId.get(p.paired_plan) ?? null) : null;
+    cur.rows.push({ page: p, planPage, displayTitle: stripTail(p.title) });
+  }
+  return groups;
+}

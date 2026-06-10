@@ -3,10 +3,12 @@ import http from 'node:http';
 import { appendFileSync, createReadStream, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, appendRewriteRequest, readRewriteRequests } from './lib/syncstate.js';
 
 const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 async function readJson(req) {
   let body = '';
@@ -73,7 +75,7 @@ export function serveStatic(rootDir, rel, res) {
   stream.pipe(res);
 }
 
-export function createServer(rootDir) {
+export function createServer(rootDir, { spawnFn = spawn } = {}) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer(async (req, res) => {
     let pathname;
@@ -134,10 +136,35 @@ export function createServer(rootDir) {
     if (req.method === 'POST' && pathname === '/api/sync/mode') {
       try {
         const body = await readJson(req);
-        writeSyncMode(join(root, '.state'), String(body.mode ?? ''));   // 非法值 throw → 400
-        return sendJson(res, 200, { ok: true, mode: body.mode });
+        const mode = String(body.mode ?? '');
+        writeSyncMode(join(root, '.state'), mode);   // 非法值 throw → 400
+        return sendJson(res, 200, { ok: true, mode });
       } catch {
         return sendJson(res, 400, { error: 'invalid mode (B1: manual|notify; auto lands in B2)' });
+      }
+    }
+
+    if (req.method === 'POST' && pathname === '/api/sync/finalize') {
+      try {
+        // 与 hook.maybeRefresh 同款 detached finalize（A 接缝③）。不加防抖：finalize 幂等、最后写赢。
+        const child = spawnFn(process.execPath, [join(HERE, 'lib', 'sync.js'), 'finalize', root],
+          { detached: true, stdio: 'ignore' });
+        child.unref();
+        return sendJson(res, 200, { spawned: true });
+      } catch { return sendJson(res, 500, { error: 'spawn failed' }); }
+    }
+
+    if (pathname === '/api/sync/rewrite-requests') {
+      if (req.method === 'GET') {
+        return sendJson(res, 200, { requests: readRewriteRequests(join(root, '.state')) });
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = await readJson(req);
+          const page = String(body.page ?? '');
+          if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
+          return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page }) });
+        } catch { return sendJson(res, 400, { error: 'bad json' }); }
       }
     }
 

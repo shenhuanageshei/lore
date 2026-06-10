@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { writeSyncMode, readSyncMode } from '../lib/syncstate.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer } from '../server.js';
+import { createServer, createPortalServer } from '../server.js';
 
 function listen(server) {
   return new Promise(res => server.listen(0, '127.0.0.1', () => res(server.address().port)));
@@ -146,5 +146,78 @@ test('POST /api/sync/mode：合法落盘；auto/非法 → 400；非 local Host 
     });
     assert.equal(status403, 403);
     assert.equal(readSyncMode(join(root, '.state')), 'manual');     // 403/400 都没改盘
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/sync/finalize → detached spawn finalize（注入断言）', async () => {
+  const root = syncFixture();
+  const calls = [];
+  const server = createServer(root, { spawnFn: (cmd, args, opts) => { calls.push({ cmd, args, opts }); return { unref() {} }; } });
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/sync/finalize`, { method: 'POST' });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { spawned: true });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].cmd, process.execPath);
+    assert.equal(calls[0].args[0].endsWith('sync.js'), true);
+    assert.equal(calls[0].args[1], 'finalize');
+    assert.equal(calls[0].args[2], root);
+    assert.equal(calls[0].opts.detached, true);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GET/POST /api/sync/rewrite-requests：排队 + 读回 + 去重 + 非法 page 400', async () => {
+  const root = syncFixture();
+  mkdirSync(join(root, 'wiki', 'component'), { recursive: true });
+  writeFileSync(join(root, 'wiki', 'component', 'sync.md'), '# x');
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const post = page => fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page }),
+    });
+    const r1 = await post('component/sync.md');
+    assert.equal(r1.status, 200);
+    assert.equal((await r1.json()).queued, true);
+    assert.equal((await (await post('component/sync.md')).json()).queued, false);   // 去重
+    assert.equal((await post('../../etc/passwd')).status, 400);                     // 越狱拒绝
+    assert.equal((await post('not-md.txt')).status, 400);
+    const list = await (await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`)).json();
+    assert.equal(list.requests.length, 1);
+    assert.equal(list.requests[0].page, 'component/sync.md');
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('portal: /<name>/api/sync/status 仍 404（只读不变）', async () => {
+  const root = syncFixture();
+  const server = createPortalServer({ demo: root });
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/demo/api/sync/status`);
+    assert.equal(r.status, 404);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GET /api/sync/status: 无 manifest → last_finalize null', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-sync-api-'));
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assert.equal(body.mode, 'notify');
+    assert.equal(body.last_finalize, null);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/sync/mode: 坏 JSON body → 400', async () => {
+  const root = syncFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/sync/mode`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{',
+    });
+    assert.equal(r.status, 400);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });

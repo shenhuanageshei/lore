@@ -181,7 +181,8 @@ test('GET/POST /api/sync/rewrite-requests：排队 + 读回 + 去重 + 非法 pa
     assert.equal(r1.status, 200);
     assert.equal((await r1.json()).queued, true);
     assert.equal((await (await post('component/sync.md')).json()).queued, false);   // 去重
-    assert.equal((await post('../../etc/passwd')).status, 400);                     // 越狱拒绝
+    assert.equal((await post('../../etc/passwd')).status, 400);                     // 越狱拒绝（正则分支）
+    assert.equal((await post('../../evil.md')).status, 400);                        // 越狱拒绝（normalize 分支：过正则但出 wiki 根）
     assert.equal((await post('not-md.txt')).status, 400);
     const list = await (await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`)).json();
     assert.equal(list.requests.length, 1);

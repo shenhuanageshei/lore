@@ -90,7 +90,7 @@ buildConsoleModel(manifest, status) -> {
   mode, lastFinalize,
 }
 pollDecide(prevGenerated, nowGenerated, currentPageEntryChanged) -> {
-  rebuildSidebar: bool, showUpdateBar: bool, refreshConsole: bool,
+  changed: bool, rebuildSidebar: bool, showUpdateBar: bool,   // changed 在 pollTick 里承担 console 重渲染职责
 }
 ```
 

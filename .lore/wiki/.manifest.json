@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-10T09:37:27.128Z",
-  "current_code_sha": "6910fd4",
+  "generated": "2026-06-10T10:33:32.277Z",
+  "current_code_sha": "3e0dafa",
   "language": {
     "default": "zh",
     "available": [
@@ -23,11 +23,11 @@
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 42,
+          "stale": 43,
           "code_sha": "7de5966",
           "synthesized_from": {
-            "atoms": 269,
-            "commits": 268
+            "atoms": 270,
+            "commits": 269
           },
           "group": ""
         }
@@ -47,10 +47,10 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "6910fd4",
+          "code_sha": "3e0dafa",
           "synthesized_from": {
-            "atoms": 269,
-            "commits": 268
+            "atoms": 270,
+            "commits": 269
           },
           "group": ""
         }

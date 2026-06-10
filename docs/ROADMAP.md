@@ -19,23 +19,17 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - **v0.5.0** 人读 **HOME 首页**（HOME 轴）· 持久化**双语层 i18n**（语言配置 + 翻译 sidecar + `/lore:translate` 命令 + 语言切换器 + 本地 state API + Host-guard 安全）。注：翻译**按需生成**（非 sync 自动），未译时回退源页显「missing」。
 - **v0.6.0（portal MVP）** 单机共享门户 —— 固定端口 `7842` 一个常驻 server 聚合本机所有 lore repo（`~/.lore/repos.json` 发现 + init 自动登记 + `/<name>/` 路由 + `/` repo 选择器 + 只读 + 白名单/穿越防护）。`/lore:portal start|stop|list`，与 per-repo `/lore:serve` 共存。设计见 `docs/superpowers/specs/2026-06-07-lore-portal-design.md`。
 
-## 当前迭代（决策 2026-06-06）
+## 当前迭代（决策 2026-06-06）✅ 全部收尾（2026-06-10 核实）
 
-人读端已四连更（v0.2→v0.5），边际收益递减；而北极星的 **agent 端（graph + MCP）仍是 0**。本轮按「先清债 → 再补 agent 半边天」推进，已知问题一条不丢、分别归位到下方各节：
+当时排的三项均已落地：① journal fold-by-id（`lib/fold.js`：孤儿过滤+按 id 合并，sync 消费，8 测试）② agent 端 graph+MCP（见下节 ✅）③ server 运维踏脚石（`serve --list/--stop-all` + `stablePort` 均已在 `lib/serve.js`）。
 
-1. **journal fold-by-id**（清 ⭐ biting 债，且是 note-enrich / 跨轴折叠的前置）→ 见「待修复」⭐ 与「note enrich 骨架 + journal fold-by-id」。
-2. **agent 友好 graph + MCP 暴露**（兑现北极星缺失的另一半）→ 见「待办（北极星 agent 端）」。
-3. **server 运维踏脚石**（`serve --list/--stop-all` + `hash(loreDir)→稳定端口`，低风险穿插）→ 见「单机共享 server」的「踏脚石」。
+## 待修复（known issues）✅ 全部已修（2026-06-10 逐条核实，此前条目长期陈旧）
 
-排期收尾（不丢）：HOME 翻译过度 stale、defaultHomePage 空段、docs 页 chips → 见下「待修复」。
-
-## 待修复（known issues）
-
-- **journal fold-by-id（决策史重复）⭐ 已实测 biting** —— amend 的 commit 在 journal 留 pre/post 两条 sha 原子 → 决策史出现重复条目（dogfood `component/lib` 页可见）。按 id 折叠取最新即修（见下「note enrich + fold-by-id」）。
-- **HOME 翻译过度 stale** —— `translation_source_hash` 含机械状态块 → 每次 sync 状态变都让 HOME 翻译 stale。应把状态块排除出 hash。
-- **defaultHomePage 空段** —— 无 pitfalls/ROADMAP/changelog 的 repo，HOME「排查/决策」段空标题无 bullet。条件渲染。
-- **docs 页 chips** —— 「0 atoms · code_sha —」对文档页怪（`buildMeta` 区分 docs 页）。
-- **server 堆积** —— 每 repo 独立 server 占端口、易堆（见中期「单机共享 server」+ `serve --list/--stop-all`）。
+- ~~journal fold-by-id（决策史重复）~~ ✅ A 轮 `lib/fold.js` 实现（孤儿过滤 + mergeById + why 演化追加）；本轮补刀 `stripTrailers`——决策史 why 不再显示 Co-Authored-By 等 commit trailer 噪音（mine 源头净化 + renderDecisionHistory 防御旧原子）。
+- ~~HOME 翻译过度 stale~~ ✅ `i18n.js` `SENTINEL_RE` 把所有 `LORE_*` 机械哨兵区剔出 `translationSourceHash`。
+- ~~defaultHomePage 空段~~ ✅ `home.js` `section()` 空段整段省略（含标题）。
+- ~~docs 页 chips~~ ✅ `shell.mjs` `buildMeta` docs 轴单独返回 `📄 last-updated` chip。
+- ~~server 堆积~~ ✅ 大半解决：portal v0.6 聚合 + `stablePort`（同 repo URL 恒定）+ `--list/--stop-all`；余项见「单机共享 server」。
 
 ## 北极星 agent 端 —— ✅ 基本已实现
 
@@ -50,7 +44,7 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
   - **X · journal 原子 + 跨轴折叠**：让 doc 决策按 facet 露在相关 component/theme 页决策史。依赖下面的 `journal fold-by-id`。
   - **agent 摘要页**：每文档 LLM 写 2-3 行抽象（比机械薄页丰富）。
   - **增量指纹**：现每 sync 全量 nuke-rebuild docs 页；大 `docs/` 时加每页指纹、只重建变动页。
-  - **docs 页 chips**：`buildMeta` 区分 docs 页，去掉「0 atoms · code_sha —」的怪显示。
+  - ~~docs 页 chips~~ ✅ 已修（`buildMeta` docs 分支）。
   - **小项**：折叠页 id 碰撞前缀（doc 名撞 `changelog`/`pitfalls`）、源链本地壳可点（现仅 github 仓库浏览可点）、pitfalls 标签集对齐 threat-intel 实测格式。
 
 ### per-facet confidence 显示（母 §4 line 190）
@@ -58,39 +52,23 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 改为 **per-facet confidence**；`renderDecisionHistory` / serve 壳给 INFERRED facet 显「(推断)」；`/lore:lint` 把 AMBIGUOUS 推人确认。
 - 小改动，完成 facet 质量故事。
 
-### note enrich 骨架 + journal fold-by-id（母 §4② 后半）
+### note enrich 骨架（母 §4② 后半）· fold-by-id 半边已实现
 - `/lore:note` 现只产新 decision 原子。加 **enrich 已有 commit 骨架**：同 `commit:<hash>` append 新行补 `why`（append-only 神圣，不改旧行）。
-- 配套 **journal fold-by-id**：`readAllAtoms` 之上加按 id 折叠（取并集/最新）；sync / ask / lint 消费 folded 原子。保留 骨架→enriched 演化轨迹，审计友好。
-- 中等：碰 journal 读层 + 所有消费者。
+- ~~配套 journal fold-by-id~~ ✅ 已实现（`lib/fold.js` mergeById：同 id 合并、why 演化追加、refs 并集，sync 消费）——enrich 落地时折叠层零改动直接可用。注：ask 读 manifest、lint 读 frontmatter，均不消费原子，无需接入。
 
 ## 呈现（wiki 渲染，⭐ 用户明确要）
 
-### mermaid 架构图 + 数据流图
-- **现状**：页「当前架构」全文字；壳 `renderMarkdown`（site/shell.mjs）把 ```mermaid``` 当普通代码块渲染（纯文本）。
-- **做**：(a) 壳 `renderMarkdown` 识别 ```mermaid``` → `<div class="mermaid">`；vendored `mermaid.min.js` 随 `site/` 由 init 拷入。**不破零依赖**——零依赖是 Node runtime 不变量，静态壳资产不算；vendor 而非 CDN → 保持离线 + 127-only。(b) `/lore:sync` 指引 agent：component 页出架构图、flow 页出数据流图、theme 页涉及流程时也出图。
-- **为什么好**：mermaid 是文本 → git 可 diff、随 journal/commit 一起演进（远胜二进制 PNG），完全契合 lore git-native 哲学。flow 轴（m1→m5）天然就是 flowchart。
-- 高价值、接缝干净（壳 + sync 命令层，lib 几乎不动）。
+### ~~mermaid 架构图 + 数据流图~~ ✅ 已实现（v0.2 + C-呈现①增强）
+- vendored 客户端渲染 + securityLevel strict（v0.2）；点击 lightbox 放大 + 主题感知重渲染（C-呈现①）。余项：mermaid 语法校验 lint + `<br/>` 统一（另立）。
 
-### 双语切换（中/EN）
-- **现状**：壳有主题切换（暗/亮/护眼）但无语言概念；页是单语（agent 写啥语言就啥）。
-- **做**：(a) 壳加 `#lang` 选择器（localStorage，同 `wireTheme` 模式）。(b) agent 写页时出双语 prose —— 配对段（`## Current architecture` + `## 当前架构`）或配对文件（`lib.md`/`lib.en.md`），壳按 lang 切显。
-- **诚实约束**：决策历史是 journal 折叠 = commit message 原文（不可变事实），不机械翻译 → 决策史保持源语言（或未来 LLM 翻译折叠，贵）。双语只覆盖 agent 写的「当前架构/状态」prose。
-- 中等：agent 2× prose 成本（sync 时）；壳 + sync 模板改。
+### ~~双语切换（中/EN）~~ ✅ 已实现（v0.5 持久化双语层）
+- 语言配置 + 翻译 sidecar + `/lore:translate` + 切换器 + state API（v0.5）。决策史保持源语言（诚实约束已落实）。
 
 ## 中期（消费纪律 + 质量）
 
 ### 单机共享 wiki server（多 repo 聚合门户）✅ MVP 已实现（v0.6）· 余项待迭代
 > MVP 已实现（见上「已完成 v0.6.0」）：单进程聚合 + 中央 registry + `/<name>/` 路由 + repo 选择器 + 只读白名单。**余项（后续迭代）**：跨 repo 全局搜索、write API 多路由、壳内「切 repo」下拉、per-repo serve 自动迁移/端口回收、namespace 高级冲突策略。
-- **现状痛点**：每 repo 独立 server，各占一个端口（7842 先到先得、其余随机），`detached` 常驻 → 易堆积、无 stop-all、2+ repo 端口不固定、无中央登记。
-- **目标**：**单机一个常驻 server** 聚合本机所有 lore repo；顶层先选 repo → 再进该 repo 的多轴 wiki（按 repo 切分页/导航）。
-- **待定（brainstorm 项）**：
-  - 注册表：server 怎么发现本机各 repo 的 `.lore/`？中央 `~/.lore/registry.json`（init 时登记）vs 扫描 vs 手动 add。
-  - 路由 + namespace：`/<repo>/wiki/…` 路径前缀？manifest 怎么按 repo 命名空间聚合。
-  - 单一稳定端口（固定 7842）+ 单进程生命周期（替代 per-repo `.state/serve.pid`）。
-  - 安全：仍只绑 `127.0.0.1`；跨 repo 只读；repo 路径白名单 + 防目录穿越（聚合多路径放大攻击面）。
-  - 壳改造：顶层 repo 选择器 UI；跨 repo 搜索（全局 vs 当前 repo）。
-  - 与现有 per-repo serve 的兼容/迁移（保留单 repo fallback？）。
-- **踏脚石（低风险过渡）**：先做 `/lore:serve --list` / `--stop-all`（扫已知 `.state/serve.pid`）+ 每 repo 稳定端口（`hash(loreDir)→7000-7999`，同 repo URL 永远一致），再演进到聚合门户。
+- ~~现状痛点 / 待定 / 踏脚石~~ ✅ 均已被 v0.6 MVP + `serve --list/--stop-all` + `stablePort` 落地（旧计划文本删除，2026-06-10 清理）。
 
 ### resident-mode（母 §5 消费）
 - 让 agent **grep / 读大文件排查前先查 `.lore/wiki/INDEX.md` + 相关 facet 页**。

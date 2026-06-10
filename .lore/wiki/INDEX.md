@@ -2,9 +2,9 @@
 title: Index
 summary: table of contents
 last_updated: 2026-06-10
-code_sha: 6910fd4
-atoms: 269
-commits: 268
+code_sha: 3e0dafa
+atoms: 270
+commits: 269
 ---
 # lore wiki — index
 

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-10T09:37:27.128Z",
+  "generated": "2026-06-10T10:33:32.277Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -2317,6 +2317,13 @@
       "kind": "commit",
       "title": "test(e2e): trigger HOME stale bump for update-bar acceptance",
       "ts": "2026-06-10T02:37:25-07:00"
+    },
+    {
+      "id": "commit:3e0dafaadfceeb7278f6a070d555e96b32672726",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): sync console B1 done — 7/7 e2e acceptance passed, 333 tests green",
+      "ts": "2026-06-10T02:43:59-07:00"
     }
   ],
   "edges": [

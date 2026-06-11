@@ -177,6 +177,25 @@ export function pollDecide(prevGenerated, nowGenerated, currentPageChanged) {
   return { changed: true, rebuildSidebar: true, showUpdateBar: !!currentPageChanged };
 }
 
+// 跨 repo 搜索索引（portal 形态）：各 repo manifest 拍平成 {repo, key, title, search}。
+// 搜索域 = title + summary + id（英文 slug 可搜，同 docs 行的教训）。坏 manifest 容错跳过。
+export function buildCrossRepoIndex(entries) {
+  const out = [];
+  for (const { repo, manifest } of entries ?? []) {
+    for (const ax of manifest?.axes ?? []) {
+      for (const p of ax.pages ?? []) {
+        out.push({
+          repo,
+          key: `${ax.id}/${p.id}`,
+          title: p.title ?? p.id,
+          search: `${p.title ?? ''} ${p.summary ?? ''} ${p.id}`.trim().toLowerCase(),
+        });
+      }
+    }
+  }
+  return out;
+}
+
 // docs 轴侧栏模型（spec 2026-06-10-lore-docs-axis-regroup）：按 manifest 给定顺序分段
 // （排序单一来源在 manifest），配对行合并、被配对 plan 剔除、显示名剥模板尾巴。
 export function buildDocsRows(pages) {

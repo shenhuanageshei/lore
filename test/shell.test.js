@@ -279,6 +279,22 @@ test('buildDocsRows: 按序分段 + 配对行 + 被配对 plan 剔除 + 剥尾 +
   assert.equal(dz.rows[1].planPage, null);
 });
 
+import { buildCrossRepoIndex } from '../site/shell.mjs';
+
+test('buildCrossRepoIndex: 多 repo manifest 拍平成可搜索索引（搜索域含 title/summary/id）', () => {
+  const mkM = pages => ({ axes: [{ id: 'component', pages }] });
+  const idx = buildCrossRepoIndex([
+    { repo: 'lore', manifest: mkM([{ id: 'sync', title: '合成总装线', summary: 'plan/finalize' }]) },
+    { repo: 'ti', manifest: mkM([{ id: 'ioc', title: '情报抽取', summary: '' }]) },
+  ]);
+  assert.equal(idx.length, 2);
+  assert.deepEqual(idx[0], { repo: 'lore', key: 'component/sync', title: '合成总装线', search: '合成总装线 plan/finalize sync' });
+  assert.equal(idx[1].repo, 'ti');
+  assert.match(idx[1].search, /ioc/);                       // id 进搜索域（英文 slug 可搜）
+  assert.deepEqual(buildCrossRepoIndex([]), []);
+  assert.deepEqual(buildCrossRepoIndex([{ repo: 'x', manifest: {} }]), []);   // 坏 manifest 容错
+});
+
 test('buildDocsRows: paired_plan 指向不存在的页 → 当孤页；缺 group → 项目状态', () => {
   const pages = [
     { id: 's1', title: 'X —— 设计', group: '设计与计划', paired_plan: 'ghost' },

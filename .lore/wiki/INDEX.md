@@ -2,9 +2,9 @@
 title: Index
 summary: table of contents
 last_updated: 2026-06-11
-code_sha: 3413d62
-atoms: 307
-commits: 306
+code_sha: 9e3f187
+atoms: 317
+commits: 316
 ---
 # lore wiki — index
 
@@ -15,10 +15,15 @@ commits: 306
 - [[lib]]
 - [[manifest]]
 - [[mine]]
+- [[runner]]
 - [[server.js]]
 - [[sync]]
+- [[syncstate]]
 
 ## Docs
+- [[changelog]]
+- [[superpowers-plans-2026-06-11-lore-agent-residency]]
+- [[superpowers-specs-2026-06-11-lore-agent-residency-design]]
 - [[superpowers-plans-2026-06-10-lore-auto-rewrite]]
 - [[superpowers-plans-2026-06-10-lore-docs-axis-regroup]]
 - [[superpowers-specs-2026-06-10-lore-auto-rewrite-design]]
@@ -32,7 +37,6 @@ commits: 306
 - [[superpowers-plans-2026-06-08-lore-low-friction-sync]]
 - [[superpowers-specs-2026-06-08-lore-content-quality-design]]
 - [[superpowers-specs-2026-06-08-lore-low-friction-sync-design]]
-- [[changelog]]
 - [[superpowers-plans-2026-06-07-lore-mcp-server]]
 - [[superpowers-plans-2026-06-07-lore-portal]]
 - [[superpowers-plans-2026-06-07-lore-roadmap-cleanup]]

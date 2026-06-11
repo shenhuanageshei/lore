@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-11T10:25:31.927Z",
+  "generated": "2026-06-11T12:13:03.563Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -65,6 +65,20 @@
       "path": "component/fingerprint.md"
     },
     {
+      "id": "page:component/syncstate",
+      "type": "page",
+      "axis": "component",
+      "title": "syncstate —— 同步控制状态层",
+      "path": "component/syncstate.md"
+    },
+    {
+      "id": "page:component/runner",
+      "type": "page",
+      "axis": "component",
+      "title": "runner —— 自动重写运行器",
+      "path": "component/runner.md"
+    },
+    {
       "id": "page:docs/changelog",
       "type": "page",
       "axis": "docs",
@@ -77,6 +91,20 @@
       "axis": "docs",
       "title": "lore 路线图",
       "path": "docs/ROADMAP.md"
+    },
+    {
+      "id": "page:docs/superpowers-plans-2026-06-11-lore-agent-residency",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore agent 常驻消费（resident-mode + 节级检索 + deep 补录）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-11-lore-agent-residency.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-11-lore-agent-residency-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore agent 常驻消费（resident-mode + 节级检索 + deep 补录）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-11-lore-agent-residency-design.md"
     },
     {
       "id": "page:docs/superpowers-plans-2026-06-10-lore-auto-rewrite",
@@ -2618,6 +2646,76 @@
       "kind": "commit",
       "title": "feat(shell): cross-repo search — sidebar '🌐 other repos' hits via lazy manifest aggregation",
       "ts": "2026-06-11T03:25:30-07:00"
+    },
+    {
+      "id": "commit:69b7664c211a55fc250b88f098bfd32394deb71c",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: v0.7.0 — changelog, README refresh (auto tier, portal evolution, engine inventory), roadmap leftovers settled",
+      "ts": "2026-06-11T03:36:43-07:00"
+    },
+    {
+      "id": "commit:2aa48518bed8c0ef358d1328d155897818b5b650",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): agent residency design — cold-start experiment findings, resident-mode A+B, section-level retrieval, deep backfill",
+      "ts": "2026-06-11T04:18:24-07:00"
+    },
+    {
+      "id": "commit:2dfca036d90035a8fb7f77669f85b9bb9acbcd07",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): agent residency implementation plan (8 tasks, TDD, cold-start re-test as final gate)",
+      "ts": "2026-06-11T04:30:52-07:00"
+    },
+    {
+      "id": "commit:04a7f3bf1c80fe41acd53012b6982bf27e72e93b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(section): section extraction/slicing/agent-view pure functions",
+      "ts": "2026-06-11T04:42:31-07:00"
+    },
+    {
+      "id": "commit:6297491e80b59b381cee6828c72d774fb027172a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(manifest): per-page section index (headings + mechanism-detail summaries)",
+      "ts": "2026-06-11T04:46:15-07:00"
+    },
+    {
+      "id": "commit:15e8de2ab7853482b2fcddc6581862a676f9f0ec",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(ask): section-level hits (+id in search haystack)",
+      "ts": "2026-06-11T04:51:07-07:00"
+    },
+    {
+      "id": "commit:eb00d0ffa1c6e989c2213fc9a1a345ac2f09ec8d",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(mcp): trigger-word descriptions, lore_page view=agent/section, lore_ask section slices",
+      "ts": "2026-06-11T04:54:59-07:00"
+    },
+    {
+      "id": "commit:0a77c03c79e4fc71fbff58ca4aab33f08923e66a",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(resident): CLAUDE.md marker-section install/refresh/remove + .mcp.json merge + residentStats",
+      "ts": "2026-06-11T04:58:25-07:00"
+    },
+    {
+      "id": "commit:5e52da66f8e69827bf92c8f3639d0b396f95417e",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(config): parseConfigResident (resident:false opt-out, default on)",
+      "ts": "2026-06-11T05:02:16-07:00"
+    },
+    {
+      "id": "commit:9e3f187bd4181b898ad425a905ea612504be83ae",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(init,sync): wire resident-mode (inject on init, refresh on finalize, resident:false opt-out)",
+      "ts": "2026-06-11T05:09:17-07:00"
     }
   ],
   "edges": [
@@ -3358,6 +3456,41 @@
     },
     {
       "from": "commit:a217597ce1aa2451d226c57530a4523ad910ca2b",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:04a7f3bf1c80fe41acd53012b6982bf27e72e93b",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:6297491e80b59b381cee6828c72d774fb027172a",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:15e8de2ab7853482b2fcddc6581862a676f9f0ec",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:eb00d0ffa1c6e989c2213fc9a1a345ac2f09ec8d",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:0a77c03c79e4fc71fbff58ca4aab33f08923e66a",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:5e52da66f8e69827bf92c8f3639d0b396f95417e",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:9e3f187bd4181b898ad425a905ea612504be83ae",
       "to": "page:component/lib",
       "type": "facet"
     }

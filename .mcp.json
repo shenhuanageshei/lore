@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "lore": {
+      "command": "node",
+      "args": [
+        "D:\\workspace\\lore\\lib\\mcp.js"
+      ]
+    }
+  }
+}

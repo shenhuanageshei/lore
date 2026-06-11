@@ -3,8 +3,8 @@ title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-11
 code_sha: b4d0003
-atoms: 141
-commits: 140
+atoms: 148
+commits: 147
 ---
 # component: lib
 
@@ -121,6 +121,13 @@ flowchart LR
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(init,sync): wire resident-mode (inject on init, refresh on finalize, resident:false opt-out)** (9e3f187, 2026-06-11)
+- **feat(config): parseConfigResident (resident:false opt-out, default on)** — Prior commit 0a77c03 missed this — parallel Edit+Bash misfire again. (5e52da6, 2026-06-11)
+- **feat(resident): CLAUDE.md marker-section install/refresh/remove + .mcp.json merge + residentStats** (0a77c03, 2026-06-11)
+- **feat(mcp): trigger-word descriptions, lore_page view=agent/section, lore_ask section slices** (eb00d0f, 2026-06-11)
+- **feat(ask): section-level hits (+id in search haystack)** (15e8de2, 2026-06-11)
+- **feat(manifest): per-page section index (headings + mechanism-detail summaries)** (6297491, 2026-06-11)
+- **feat(section): section extraction/slicing/agent-view pure functions** (04a7f3b, 2026-06-11)
 - **fix(runner): non-empty rewrite queue counts as pending — queueing alone triggers auto after debounce** (a217597, 2026-06-11)
 - **feat(portal): route /api per repo + take over auto ticker — console fully operational behind portal** — v0.6 'portal read-only' flipped by user need: all local APIs extracted into (14ec7cc, 2026-06-11)
 - **fix: windowsHide on every execFileSync — git.exe spawned its own console inside hidden detached processes** — The detached node windows were already hidden, but git/taskkill/python (e1b89eb, 2026-06-11)

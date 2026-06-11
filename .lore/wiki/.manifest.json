@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-11T10:25:31.927Z",
-  "current_code_sha": "3413d62",
+  "generated": "2026-06-11T12:13:03.563Z",
+  "current_code_sha": "9e3f187",
   "language": {
     "default": "zh",
     "available": [
@@ -23,14 +23,36 @@
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 10,
+          "stale": 20,
           "code_sha": "fb13a5b",
           "synthesized_from": {
-            "atoms": 307,
-            "commits": 306
+            "atoms": 317,
+            "commits": 316
           },
           "group": "",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Status",
+              "line": 5
+            },
+            {
+              "heading": "知识流",
+              "line": 15
+            },
+            {
+              "heading": "理解项目",
+              "line": 31
+            },
+            {
+              "heading": "排查问题",
+              "line": 36
+            },
+            {
+              "heading": "决策与时间线",
+              "line": 40
+            }
+          ]
         }
       ]
     },
@@ -48,13 +70,23 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "3413d62",
+          "code_sha": "9e3f187",
           "synthesized_from": {
-            "atoms": 307,
-            "commits": 306
+            "atoms": 317,
+            "commits": 316
           },
           "group": "",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Component",
+              "line": 2
+            },
+            {
+              "heading": "Docs",
+              "line": 14
+            }
+          ]
         }
       ]
     },
@@ -71,14 +103,48 @@
           "path": "component/lib.md",
           "lang": "zh",
           "translations": [],
-          "stale": 4,
+          "stale": 11,
           "code_sha": "b4d0003",
           "synthesized_from": {
-            "atoms": 141,
-            "commits": 140
+            "atoms": 148,
+            "commits": 147
           },
           "group": "",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 35
+            },
+            {
+              "heading": "① 模块清单",
+              "line": 38
+            },
+            {
+              "heading": "② 流水线契约",
+              "line": 70
+            },
+            {
+              "heading": "③ 不变量 / 边界",
+              "line": 82
+            },
+            {
+              "heading": "④ 一次性脚手架",
+              "line": 94
+            },
+            {
+              "heading": "Decision history",
+              "line": 112
+            },
+            {
+              "heading": "Cross-links",
+              "line": 265
+            }
+          ]
         },
         {
           "id": "server.js",
@@ -96,7 +162,45 @@
             "commits": 7
           },
           "group": "",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 31
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 34
+            },
+            {
+              "heading": "② 请求路由",
+              "line": 46
+            },
+            {
+              "heading": "③ 安全模型",
+              "line": 65
+            },
+            {
+              "heading": "④ 边界 / 坑",
+              "line": 74
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 84
+            },
+            {
+              "heading": "Cross-links",
+              "line": 90
+            },
+            {
+              "heading": "Decision history",
+              "line": 94
+            }
+          ]
         },
         {
           "id": "hook",
@@ -114,7 +218,53 @@
             "commits": 0
           },
           "group": "捕获",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 39
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 60
+            },
+            {
+              "heading": "② 数据流",
+              "line": 72
+            },
+            {
+              "heading": "③ 关键数据契约",
+              "line": 98
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 123
+            },
+            {
+              "heading": "⑥ 故障地图",
+              "line": 137
+            },
+            {
+              "heading": "⑦ 测试锚点",
+              "line": 151
+            },
+            {
+              "heading": "⑧ 不变量",
+              "line": 173
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 184
+            },
+            {
+              "heading": "Cross-links",
+              "line": 191
+            }
+          ]
         },
         {
           "id": "mine",
@@ -132,7 +282,57 @@
             "commits": 0
           },
           "group": "捕获",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 34
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 58
+            },
+            {
+              "heading": "② 数据流",
+              "line": 76
+            },
+            {
+              "heading": "③ 数据契约",
+              "line": 96
+            },
+            {
+              "heading": "④ facet 打标规则",
+              "line": 128
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 141
+            },
+            {
+              "heading": "⑥ 故障地图",
+              "line": 155
+            },
+            {
+              "heading": "⑦ 测试锚点",
+              "line": 171
+            },
+            {
+              "heading": "⑧ 不变量",
+              "line": 187
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 198
+            },
+            {
+              "heading": "Cross-links",
+              "line": 204
+            }
+          ]
         },
         {
           "id": "fold",
@@ -150,7 +350,57 @@
             "commits": 0
           },
           "group": "捕获",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 30
+            },
+            {
+              "heading": "① 接口签名",
+              "line": 43
+            },
+            {
+              "heading": "② 折叠数据流",
+              "line": 62
+            },
+            {
+              "heading": "③ 数据契约",
+              "line": 81
+            },
+            {
+              "heading": "④ 合并规则表",
+              "line": 110
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 127
+            },
+            {
+              "heading": "⑥ 故障地图",
+              "line": 138
+            },
+            {
+              "heading": "⑦ 测试锚点",
+              "line": 151
+            },
+            {
+              "heading": "⑧ 不变量",
+              "line": 169
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 180
+            },
+            {
+              "heading": "Cross-links",
+              "line": 186
+            }
+          ]
         },
         {
           "id": "sync",
@@ -161,14 +411,52 @@
           "path": "component/sync.md",
           "lang": "zh",
           "translations": [],
-          "stale": 1,
+          "stale": 2,
           "code_sha": "fb13a5b",
           "synthesized_from": {
             "atoms": 0,
             "commits": 0
           },
           "group": "合成",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 28
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 31
+            },
+            {
+              "heading": "② finalize 数据流",
+              "line": 43
+            },
+            {
+              "heading": "③ 关键数据契约",
+              "line": 57
+            },
+            {
+              "heading": "④ 指纹状态机",
+              "line": 71
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 90
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 98
+            },
+            {
+              "heading": "Cross-links",
+              "line": 104
+            }
+          ]
         },
         {
           "id": "manifest",
@@ -179,14 +467,64 @@
           "path": "component/manifest.md",
           "lang": "zh",
           "translations": [],
-          "stale": 1,
+          "stale": 2,
           "code_sha": "fb13a5b",
           "synthesized_from": {
             "atoms": 0,
             "commits": 0
           },
           "group": "合成",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 37
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 60
+            },
+            {
+              "heading": "② 模块内数据流",
+              "line": 77
+            },
+            {
+              "heading": "③ 关键数据契约",
+              "line": 100
+            },
+            {
+              "heading": "④ stale 判定三态",
+              "line": 138
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 164
+            },
+            {
+              "heading": "⑥ 故障地图",
+              "line": 176
+            },
+            {
+              "heading": "⑦ 测试锚点",
+              "line": 191
+            },
+            {
+              "heading": "⑧ 不变量",
+              "line": 212
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 222
+            },
+            {
+              "heading": "Cross-links",
+              "line": 229
+            }
+          ]
         },
         {
           "id": "fingerprint",
@@ -204,7 +542,153 @@
             "commits": 0
           },
           "group": "合成",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 47
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 63
+            },
+            {
+              "heading": "② 数据流",
+              "line": 77
+            },
+            {
+              "heading": "③ 数据契约",
+              "line": 91
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 112
+            },
+            {
+              "heading": "⑥ 故障地图",
+              "line": 122
+            },
+            {
+              "heading": "⑦ 测试锚点",
+              "line": 135
+            },
+            {
+              "heading": "⑧ 不变量",
+              "line": 147
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 158
+            },
+            {
+              "heading": "Cross-links",
+              "line": 165
+            }
+          ]
+        },
+        {
+          "id": "syncstate",
+          "axis": "component",
+          "title": "syncstate —— 同步控制状态层",
+          "summary": "档位/auto 配置/重写队列/runner 锁/任务历史五类 .state 文件的读写；全员 best-effort——删文件 = 回默认，永不损坏",
+          "last_updated": "2026-06-11",
+          "path": "component/syncstate.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "9e3f187",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": "合成",
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 25
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 28
+            },
+            {
+              "heading": "② 五个文件的契约",
+              "line": 42
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 55
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 65
+            },
+            {
+              "heading": "Cross-links",
+              "line": 71
+            }
+          ]
+        },
+        {
+          "id": "runner",
+          "axis": "component",
+          "title": "runner —— 自动重写运行器",
+          "summary": "ticker 判触发 → 只读 claude CLI 吐新页 → 机械质量门过门才写盘 → 历史落盘 → finalize 收尾；LLM 零写权限",
+          "last_updated": "2026-06-11",
+          "path": "component/runner.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "9e3f187",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": "合成",
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 2
+            },
+            {
+              "heading": "机制详解",
+              "line": 26
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 29
+            },
+            {
+              "heading": "② 触发链路",
+              "line": 43
+            },
+            {
+              "heading": "③ runAuto 主流程",
+              "line": 57
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 67
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 78
+            },
+            {
+              "heading": "Cross-links",
+              "line": 84
+            }
+          ]
         }
       ]
     },
@@ -216,8 +700,8 @@
           "id": "changelog",
           "axis": "docs",
           "title": "CHANGELOG",
-          "summary": "8 个版本，最新 0.6.0",
-          "last_updated": "2026-06-07",
+          "summary": "9 个版本，最新 0.7.0",
+          "last_updated": "2026-06-11",
           "path": "docs/changelog.md",
           "lang": "zh",
           "translations": [],
@@ -228,7 +712,137 @@
             "commits": 0
           },
           "group": "项目状态",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "[0.7.0] — 2026-06-11",
+              "line": 7
+            },
+            {
+              "heading": "新增",
+              "line": 9
+            },
+            {
+              "heading": "修复",
+              "line": 18
+            },
+            {
+              "heading": "安全",
+              "line": 24
+            },
+            {
+              "heading": "[0.6.0] — 2026-06-07",
+              "line": 27
+            },
+            {
+              "heading": "新增",
+              "line": 29
+            },
+            {
+              "heading": "安全",
+              "line": 34
+            },
+            {
+              "heading": "[0.5.1] — 2026-06-06",
+              "line": 37
+            },
+            {
+              "heading": "修复",
+              "line": 39
+            },
+            {
+              "heading": "[0.5.0] — 2026-06-06",
+              "line": 42
+            },
+            {
+              "heading": "新增",
+              "line": 44
+            },
+            {
+              "heading": "安全",
+              "line": 50
+            },
+            {
+              "heading": "[0.4.1] — 2026-06-05",
+              "line": 53
+            },
+            {
+              "heading": "修复",
+              "line": 55
+            },
+            {
+              "heading": "[0.4.0] — 2026-06-05",
+              "line": 58
+            },
+            {
+              "heading": "变更",
+              "line": 60
+            },
+            {
+              "heading": "性能",
+              "line": 64
+            },
+            {
+              "heading": "[0.3.0] — 2026-06-05",
+              "line": 67
+            },
+            {
+              "heading": "新增",
+              "line": 69
+            },
+            {
+              "heading": "修复",
+              "line": 72
+            },
+            {
+              "heading": "[0.2.0] — 2026-06-04",
+              "line": 75
+            },
+            {
+              "heading": "新增",
+              "line": 77
+            },
+            {
+              "heading": "修复",
+              "line": 81
+            },
+            {
+              "heading": "[0.1.0] — 2026-06-03",
+              "line": 85
+            },
+            {
+              "heading": "捕获（三源）",
+              "line": 91
+            },
+            {
+              "heading": "journal 基座",
+              "line": 96
+            },
+            {
+              "heading": "合成（三轴）",
+              "line": 99
+            },
+            {
+              "heading": "消费",
+              "line": 104
+            },
+            {
+              "heading": "检查",
+              "line": 108
+            },
+            {
+              "heading": "脚手架",
+              "line": 111
+            },
+            {
+              "heading": "工程",
+              "line": 115
+            },
+            {
+              "heading": "不变量（测试守）",
+              "line": 120
+            }
+          ]
         },
         {
           "id": "ROADMAP",
@@ -246,7 +860,277 @@
             "commits": 0
           },
           "group": "项目状态",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "北极星（项目目标 —— 缺一不可）",
+              "line": 8
+            },
+            {
+              "heading": "已完成（v0.2 → v0.5，均 spec→plan→TDD→两段审查→opus 终审→合并）",
+              "line": 15
+            },
+            {
+              "heading": "当前迭代（决策 2026-06-06）✅ 全部收尾（2026-06-10 核实）",
+              "line": 23
+            },
+            {
+              "heading": "待修复（known issues）✅ 全部已修（2026-06-10 逐条核实，此前条目长期陈旧）",
+              "line": 27
+            },
+            {
+              "heading": "北极星 agent 端 —— ✅ 基本已实现",
+              "line": 35
+            },
+            {
+              "heading": "近期（高价值、自洽）",
+              "line": 39
+            },
+            {
+              "heading": "文档摄取 —— docs/ + changelog + pitfalls（捕获第 4 源，🚧 进行中 v0.2.x）",
+              "line": 41
+            },
+            {
+              "heading": "per-facet confidence 显示（母 §4 line 190）⏸ 依赖 flow/theme 启用",
+              "line": 51
+            },
+            {
+              "heading": "~~note enrich 骨架（母 §4② 后半）~~ ✅ 已实现（2026-06-10）",
+              "line": 56
+            },
+            {
+              "heading": "呈现（wiki 渲染，⭐ 用户明确要）",
+              "line": 60
+            },
+            {
+              "heading": "~~mermaid 架构图 + 数据流图~~ ✅ 已实现（v0.2 + C-呈现①增强 + 语法校验）",
+              "line": 62
+            },
+            {
+              "heading": "~~双语切换（中/EN）~~ ✅ 已实现（v0.5 持久化双语层）",
+              "line": 65
+            },
+            {
+              "heading": "中期（消费纪律 + 质量）",
+              "line": 68
+            },
+            {
+              "heading": "单机共享 wiki server（多 repo 聚合门户）✅ MVP 已实现（v0.6）· 余项待迭代",
+              "line": 70
+            },
+            {
+              "heading": "resident-mode（母 §5 消费）",
+              "line": 74
+            },
+            {
+              "heading": "增量 sync（母 §5「增量合成」）✅ 已实现（低摩擦合成 A）",
+              "line": 78
+            },
+            {
+              "heading": "同步控制台 B1（档位 + 控制 API + 壳控制台）✅ 已实现",
+              "line": 81
+            },
+            {
+              "heading": "自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）✅ 已实现",
+              "line": 83
+            },
+            {
+              "heading": "内容质量（两档好页 + 源文件级深度页）✅ 已实现（C-内容）",
+              "line": 86
+            },
+            {
+              "heading": "壳呈现（mermaid 放大 + component 排序分组）✅ 已实现（C-呈现 ①）",
+              "line": 89
+            },
+            {
+              "heading": "docs 轴重构（分组置顶 + feature 配对 + 默认折叠）✅ 已实现（C-呈现 ②）",
+              "line": 92
+            },
+            {
+              "heading": "lint：未打标 / 矛盾检查（母 §5）",
+              "line": 95
+            },
+            {
+              "heading": "远期（结构接地 + 集成）",
+              "line": 98
+            },
+            {
+              "heading": "codegraph 可选集成（AST 接地架构段）",
+              "line": 100
+            },
+            {
+              "heading": "MCP 暴露",
+              "line": 105
+            },
+            {
+              "heading": "其他生态 / 检索升级",
+              "line": 108
+            },
+            {
+              "heading": "不做（明确 out of scope）",
+              "line": 113
+            }
+          ]
+        },
+        {
+          "id": "superpowers-plans-2026-06-11-lore-agent-residency",
+          "axis": "docs",
+          "title": "lore agent 常驻消费（resident-mode + 节级检索 + deep 补录）Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-11",
+          "path": "docs/superpowers-plans-2026-06-11-lore-agent-residency.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": "设计与计划",
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 18
+            },
+            {
+              "heading": "Task 1: `lib/section.js` —— 节操作纯函数",
+              "line": 41
+            },
+            {
+              "heading": "概览",
+              "line": 59
+            },
+            {
+              "heading": "机制详解",
+              "line": 65
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 68
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 77
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 83
+            },
+            {
+              "heading": "Decision history",
+              "line": 87
+            },
+            {
+              "heading": "Task 2: manifest 节索引",
+              "line": 195
+            },
+            {
+              "heading": "① 接口",
+              "line": 207
+            },
+            {
+              "heading": "Task 3: ask v2 节级命中",
+              "line": 228
+            },
+            {
+              "heading": "Task 4: mcp —— 描述触发词 + view/section 参数 + ask 带切片",
+              "line": 282
+            },
+            {
+              "heading": "① 接口",
+              "line": 291
+            },
+            {
+              "heading": "Task 5: `lib/resident.js` —— CLAUDE.md 注入 + .mcp.json merge",
+              "line": 363
+            },
+            {
+              "heading": "lore wiki（本仓库的活文档）",
+              "line": 455
+            },
+            {
+              "heading": "Task 6: init / finalize 接线",
+              "line": 519
+            },
+            {
+              "heading": "Task 7: deep 补录 + 勾稽指引 + dogfood",
+              "line": 590
+            },
+            {
+              "heading": "Task 8: 终验（冷启动复测）+ ROADMAP + 回归",
+              "line": 612
+            },
+            {
+              "heading": "Self-Review（已执行）",
+              "line": 621
+            }
+          ]
+        },
+        {
+          "id": "superpowers-specs-2026-06-11-lore-agent-residency-design",
+          "axis": "docs",
+          "title": "lore agent 常驻消费（resident-mode + 节级检索 + deep 补录）—— 设计",
+          "summary": "- 日期：2026-06-11 - 状态：设计已批（对话内逐段确认），待写实施计划 - 北极星：agent 友好的 wiki + graph——本期从「agent 可用」推进到「agent 在用、且用得起」 - 前置（已在 main）：v0.7.0 全量（MCP 三工具、graph、两档页、deep 页、诚实 stale、auto 档）",
+          "last_updated": "2026-06-11",
+          "path": "docs/superpowers-specs-2026-06-11-lore-agent-residency-design.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": "设计与计划",
+          "paired_plan": "superpowers-plans-2026-06-11-lore-agent-residency",
+          "sections": [
+            {
+              "heading": "背景：一次诚实的冷启动对照实验（2026-06-11）",
+              "line": 9
+            },
+            {
+              "heading": "决策（已锁，对话内逐项确认）",
+              "line": 31
+            },
+            {
+              "heading": "设计",
+              "line": 45
+            },
+            {
+              "heading": "A · resident-mode（lib/init.js + commands + mcp）",
+              "line": 47
+            },
+            {
+              "heading": "lore wiki（本仓库的活文档）",
+              "line": 55
+            },
+            {
+              "heading": "B · 节级检索 + agent 视图（manifest + ask + mcp）",
+              "line": 74
+            },
+            {
+              "heading": "① …",
+              "line": 76
+            },
+            {
+              "heading": "C · deep 补录 + 决策勾稽（dogfood + commands/sync.md）",
+              "line": 82
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 87
+            },
+            {
+              "heading": "测试",
+              "line": 95
+            },
+            {
+              "heading": "实现节奏",
+              "line": 105
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-10-lore-auto-rewrite",
@@ -264,7 +1148,49 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 18
+            },
+            {
+              "heading": "Task 1: syncstate 扩展（auto 进枚举 + config + pending/pid/runs）",
+              "line": 37
+            },
+            {
+              "heading": "Task 2: runner 纯函数（shouldRunAuto + qualityGate）",
+              "line": 171
+            },
+            {
+              "heading": "Task 3: runner 主流程（claudeBackend + runAuto + CLI）",
+              "line": 283
+            },
+            {
+              "heading": "Task 4: hook auto 分支（写 pending）",
+              "line": 459
+            },
+            {
+              "heading": "Task 5: server（auto 放开 + status 扩展 + GET runs + ticker）",
+              "line": 504
+            },
+            {
+              "heading": "Task 6: 壳（busy 灯 + auto 解锁 + 任务历史表）",
+              "line": 606
+            },
+            {
+              "heading": "Task 7: 文档 + ROADMAP + 全量回归 + 端到端",
+              "line": 642
+            },
+            {
+              "heading": "自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）✅ 已实现",
+              "line": 650
+            },
+            {
+              "heading": "Self-Review（已执行）",
+              "line": 660
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-10-lore-docs-axis-regroup",
@@ -282,7 +1208,45 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 18
+            },
+            {
+              "heading": "Task 1: `docs.js` —— `docGroup` + `pairDocs`",
+              "line": 33
+            },
+            {
+              "heading": "Task 2: `docs.js` —— 物化集成（frontmatter 增写 group / paired_plan）",
+              "line": 117
+            },
+            {
+              "heading": "Task 3: `manifest.js` —— frontmatter 透传 + docs 组排序",
+              "line": 182
+            },
+            {
+              "heading": "Task 4: `shell.mjs` —— `buildDocsRows`",
+              "line": 256
+            },
+            {
+              "heading": "Task 5: 壳渲染 —— docs 分支 + 折叠 + 搜索穿透",
+              "line": 339
+            },
+            {
+              "heading": "Task 6: dogfood 验收 + ROADMAP + 全量回归",
+              "line": 446
+            },
+            {
+              "heading": "docs 轴重构（分组置顶 + feature 配对 + 默认折叠）✅ 已实现（C-呈现 ②）",
+              "line": 478
+            },
+            {
+              "heading": "Self-Review（已执行）",
+              "line": 496
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-10-lore-auto-rewrite-design",
@@ -300,7 +1264,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-10-lore-auto-rewrite"
+          "paired_plan": "superpowers-plans-2026-06-10-lore-auto-rewrite",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 10
+            },
+            {
+              "heading": "决策（已锁，含 B1 时预锁项）",
+              "line": 14
+            },
+            {
+              "heading": "设计",
+              "line": 31
+            },
+            {
+              "heading": "A · 配置层（`lib/syncstate.js` 扩展）",
+              "line": 33
+            },
+            {
+              "heading": "B · 触发链路",
+              "line": 45
+            },
+            {
+              "heading": "C · runner（新 `lib/runner.js`）",
+              "line": 61
+            },
+            {
+              "heading": "D · API / UI",
+              "line": 89
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 96
+            },
+            {
+              "heading": "测试",
+              "line": 106
+            },
+            {
+              "heading": "改动清单",
+              "line": 117
+            },
+            {
+              "heading": "实现节奏",
+              "line": 126
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-10-lore-docs-axis-regroup-design",
@@ -318,7 +1328,73 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-10-lore-docs-axis-regroup"
+          "paired_plan": "superpowers-plans-2026-06-10-lore-docs-axis-regroup",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 10
+            },
+            {
+              "heading": "决策（已锁，mockup 已确认）",
+              "line": 18
+            },
+            {
+              "heading": "设计",
+              "line": 33
+            },
+            {
+              "heading": "A · 数据层（`lib/docs.js`）",
+              "line": 35
+            },
+            {
+              "heading": "B · manifest（`lib/manifest.js`）",
+              "line": 52
+            },
+            {
+              "heading": "C · 壳纯函数（`site/shell.mjs`）",
+              "line": 57
+            },
+            {
+              "heading": "D · 壳渲染（`site/index.html`）",
+              "line": 70
+            },
+            {
+              "heading": "不动",
+              "line": 81
+            },
+            {
+              "heading": "测试",
+              "line": 86
+            },
+            {
+              "heading": "`test/docs.test.js`（扩展）",
+              "line": 88
+            },
+            {
+              "heading": "`test/manifest.test.js`（扩展）",
+              "line": 93
+            },
+            {
+              "heading": "`test/shell.test.js`（扩展）",
+              "line": 96
+            },
+            {
+              "heading": "dogfood 手动清单",
+              "line": 99
+            },
+            {
+              "heading": "改动清单",
+              "line": 105
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 115
+            },
+            {
+              "heading": "实现节奏",
+              "line": 122
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-09-lore-shell-presentation",
@@ -336,7 +1412,49 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: `config.js` —— `parseConfigDeep` 升级为分组 map",
+              "line": 32
+            },
+            {
+              "heading": "Task 2: `sync.js` —— `planSync` + `finalizeSync` 改用 `.order`",
+              "line": 142
+            },
+            {
+              "heading": "Task 3: `manifest.js` —— component 按 order 排 + `group` 字段",
+              "line": 205
+            },
+            {
+              "heading": "Task 4: 壳 S1 —— mermaid 放大（lightbox + pan/zoom）",
+              "line": 403
+            },
+            {
+              "heading": "Task 5: 壳 S2 —— component 侧栏分组小标题",
+              "line": 523
+            },
+            {
+              "heading": "Task 6: dogfood —— `config.deep` 改分组 map + 验证",
+              "line": 583
+            },
+            {
+              "heading": "Task 7: ROADMAP + 全量验证",
+              "line": 632
+            },
+            {
+              "heading": "壳呈现（mermaid 放大 + component 排序分组）✅ 已实现（C-呈现 ①）",
+              "line": 643
+            },
+            {
+              "heading": "Self-Review（计划自查，已执行）",
+              "line": 661
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-09-lore-sync-console",
@@ -354,7 +1472,69 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 21
+            },
+            {
+              "heading": "Task 1: `lib/syncstate.js` —— mode 读写",
+              "line": 40
+            },
+            {
+              "heading": "Task 2: `lib/syncstate.js` —— rewrite 队列",
+              "line": 156
+            },
+            {
+              "heading": "Task 3: hook 分流 —— manual 档不 spawn",
+              "line": 253
+            },
+            {
+              "heading": "Task 4: server API —— `GET /api/sync/status` + `POST /api/sync/mode`",
+              "line": 331
+            },
+            {
+              "heading": "Task 5: server API —— `POST /api/sync/finalize` + `GET/POST /api/sync/rewrite-requests`",
+              "line": 442
+            },
+            {
+              "heading": "Task 6: serve `--node` 旗标（单语 repo 控制 API 逃生门）",
+              "line": 576
+            },
+            {
+              "heading": "Task 7: `site/shell.mjs` —— `buildConsoleModel` + `pollDecide`",
+              "line": 625
+            },
+            {
+              "heading": "Task 8: 壳 UI —— 顶栏灯 + 下拉面板",
+              "line": 735
+            },
+            {
+              "heading": "Task 9: 壳 —— `#console` 整页 + manifest 轮询 + 提示条",
+              "line": 946
+            },
+            {
+              "heading": "Task 10: `commands/sync.md` —— rewrite 队列消化指引",
+              "line": 1134
+            },
+            {
+              "heading": "用户排队的重写请求（B1 控制台）",
+              "line": 1144
+            },
+            {
+              "heading": "Task 11: dogfood 验收 + ROADMAP + 全量回归",
+              "line": 1167
+            },
+            {
+              "heading": "同步控制台 B1（档位 + 控制 API + 壳控制台）✅ 已实现",
+              "line": 1194
+            },
+            {
+              "heading": "Self-Review（已执行）",
+              "line": 1213
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-09-lore-shell-presentation-design",
@@ -372,7 +1552,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-09-lore-shell-presentation"
+          "paired_plan": "superpowers-plans-2026-06-09-lore-shell-presentation",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 10
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 17
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 29
+            },
+            {
+              "heading": "设计",
+              "line": 39
+            },
+            {
+              "heading": "S1 · mermaid 放大（C 组合）",
+              "line": 41
+            },
+            {
+              "heading": "S2 · component 排序 + 分组（A）",
+              "line": 49
+            },
+            {
+              "heading": "测试",
+              "line": 63
+            },
+            {
+              "heading": "改动清单",
+              "line": 71
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 81
+            },
+            {
+              "heading": "讨论轨迹 / 决策演变",
+              "line": 89
+            },
+            {
+              "heading": "实现节奏",
+              "line": 96
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-09-lore-sync-console-design",
@@ -390,7 +1616,81 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-09-lore-sync-console"
+          "paired_plan": "superpowers-plans-2026-06-09-lore-sync-console",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 10
+            },
+            {
+              "heading": "B1 / B2 分期（已锁）",
+              "line": 18
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 27
+            },
+            {
+              "heading": "设计",
+              "line": 44
+            },
+            {
+              "heading": "A · 状态层（新 `lib/syncstate.js`，纯函数 + 路径注入）",
+              "line": 46
+            },
+            {
+              "heading": "B · 控制 API（`server.js` `createServer` 扩展）",
+              "line": 58
+            },
+            {
+              "heading": "C · hook 分流（`lib/hook.js`）",
+              "line": 71
+            },
+            {
+              "heading": "D · 壳（`site/index.html` + `site/shell.mjs`）",
+              "line": 75
+            },
+            {
+              "heading": "E · agent 消化（`commands/sync.md`）",
+              "line": 100
+            },
+            {
+              "heading": "测试",
+              "line": 104
+            },
+            {
+              "heading": "`test/syncstate.test.js`",
+              "line": 106
+            },
+            {
+              "heading": "`test/server.test.js`（扩展）",
+              "line": 112
+            },
+            {
+              "heading": "`test/hook.test.js`（扩展）",
+              "line": 119
+            },
+            {
+              "heading": "`test/shell.test.js`（扩展）",
+              "line": 122
+            },
+            {
+              "heading": "端到端验收（dogfood 手动清单）",
+              "line": 126
+            },
+            {
+              "heading": "改动清单",
+              "line": 131
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 143
+            },
+            {
+              "heading": "实现节奏",
+              "line": 152
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-08-lore-content-quality",
@@ -408,7 +1708,49 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: `config.js` —— `parseConfigDeep`",
+              "line": 35
+            },
+            {
+              "heading": "Task 2: `sync.js` `planSync` —— 深度页工单 + 增量",
+              "line": 116
+            },
+            {
+              "heading": "Task 3: `sync.js` `finalizeSync` —— 深度页 `staleScopes`",
+              "line": 235
+            },
+            {
+              "heading": "Task 4: `manifest` / `graph` —— 深度页节点（确认无需改）",
+              "line": 298
+            },
+            {
+              "heading": "Task 5: A —— `commands/sync.md` prompt 标准 + golden page 调整",
+              "line": 338
+            },
+            {
+              "heading": "内容质量标准（两档好页 + 深度页）",
+              "line": 370
+            },
+            {
+              "heading": "Task 6: dogfood —— config `deep` + 重写鸟瞰页 + 6 深度页",
+              "line": 403
+            },
+            {
+              "heading": "Task 7: 文档 + 全量验证",
+              "line": 458
+            },
+            {
+              "heading": "Self-Review（计划自查，已执行）",
+              "line": 484
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-08-lore-low-friction-sync",
@@ -426,7 +1768,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: `lib/fingerprint.js` —— 指纹层",
+              "line": 35
+            },
+            {
+              "heading": "Task 2: `manifest.js` —— `countCommitsSince` 支持 pathspec",
+              "line": 147
+            },
+            {
+              "heading": "Task 3: `manifest.js` —— 把 `staleScopes` 串进 stale 计算",
+              "line": 240
+            },
+            {
+              "heading": "Task 4: `sync.js` `finalizeSync` —— 指纹化 + 盖 prose_sha + GC + staleScopes",
+              "line": 414
+            },
+            {
+              "heading": "Task 5: `sync.js` `planSync` —— 增量 + `--all`",
+              "line": 648
+            },
+            {
+              "heading": "Task 6: `hook.js` —— 提交即 detached 机械刷新",
+              "line": 775
+            },
+            {
+              "heading": "Task 7: 文档同步 + 全量验证",
+              "line": 900
+            },
+            {
+              "heading": "增量 sync（母 §5「增量合成」）",
+              "line": 920
+            },
+            {
+              "heading": "增量 sync（母 §5「增量合成」）✅ 已实现（低摩擦合成 A）",
+              "line": 927
+            },
+            {
+              "heading": "Self-Review（计划自查，已执行）",
+              "line": 977
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-08-lore-content-quality-design",
@@ -444,7 +1832,57 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-08-lore-content-quality"
+          "paired_plan": "superpowers-plans-2026-06-08-lore-content-quality",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 11
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 23
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 38
+            },
+            {
+              "heading": "设计",
+              "line": 52
+            },
+            {
+              "heading": "A · prompt 标准（`commands/sync.md`，零引擎改动）",
+              "line": 54
+            },
+            {
+              "heading": "B · 粒度配置（源文件级深度页）",
+              "line": 64
+            },
+            {
+              "heading": "标杆样例（golden page）",
+              "line": 90
+            },
+            {
+              "heading": "测试",
+              "line": 94
+            },
+            {
+              "heading": "改动清单",
+              "line": 106
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 118
+            },
+            {
+              "heading": "讨论轨迹 / 决策演变（记录「为什么这么定」）",
+              "line": 126
+            },
+            {
+              "heading": "实现节奏",
+              "line": 136
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-08-lore-low-friction-sync-design",
@@ -462,7 +1900,85 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-08-lore-low-friction-sync"
+          "paired_plan": "superpowers-plans-2026-06-08-lore-low-friction-sync",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 10
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 18
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 32
+            },
+            {
+              "heading": "设计",
+              "line": 47
+            },
+            {
+              "heading": "A · 指纹层（新 `lib/fingerprint.js`，纯函数 + 路径注入）",
+              "line": 49
+            },
+            {
+              "heading": "B · finalize 改造（`sync.js`）",
+              "line": 60
+            },
+            {
+              "heading": "C · stale 精确化（`manifest.js`）",
+              "line": 75
+            },
+            {
+              "heading": "D · 增量 plan（`sync.js` `planSync`）",
+              "line": 82
+            },
+            {
+              "heading": "E · 提交即机械刷新（`hook.js`）",
+              "line": 90
+            },
+            {
+              "heading": "与 B 的接口（A 留缝、不实现 B）",
+              "line": 97
+            },
+            {
+              "heading": "测试",
+              "line": 104
+            },
+            {
+              "heading": "`test/fingerprint.test.js`",
+              "line": 106
+            },
+            {
+              "heading": "`test/sync.test.js`（扩展）",
+              "line": 110
+            },
+            {
+              "heading": "`test/manifest.test.js`（扩展）",
+              "line": 117
+            },
+            {
+              "heading": "`test/hook.test.js`（扩展）",
+              "line": 121
+            },
+            {
+              "heading": "回归",
+              "line": 124
+            },
+            {
+              "heading": "改动清单",
+              "line": 127
+            },
+            {
+              "heading": "不变量 / 风险",
+              "line": 136
+            },
+            {
+              "heading": "实现节奏",
+              "line": 143
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-07-lore-mcp-server",
@@ -480,7 +1996,33 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: graph 查询纯函数 `neighbors` + `resolvePagePath`",
+              "line": 28
+            },
+            {
+              "heading": "Task 2: `lib/mcp.js` stdio JSON-RPC server",
+              "line": 126
+            },
+            {
+              "heading": "Task 3: 插件注册 `mcpServers`",
+              "line": 332
+            },
+            {
+              "heading": "Task 4: 冒烟 + 收尾（非 TDD）",
+              "line": 371
+            },
+            {
+              "heading": "Spec 覆盖核对（self-review 映射）",
+              "line": 389
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-07-lore-portal",
@@ -498,7 +2040,93 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 18
+            },
+            {
+              "heading": "Task 1: `lib/repos.js` —— 仓库登记表（纯函数）",
+              "line": 41
+            },
+            {
+              "heading": "Task 2: `server.js` —— 提取 `serveStatic`（重构，回归保护）",
+              "line": 198
+            },
+            {
+              "heading": "Task 3: `server.js` —— `createPortalServer`（聚合路由）",
+              "line": 307
+            },
+            {
+              "heading": "Task 4: `lib/portal.js` —— 门户生命周期 + CLI",
+              "line": 480
+            },
+            {
+              "heading": "Task 5: 壳 base 前缀感知（`site/shell.mjs` + `site/index.html`）",
+              "line": 686
+            },
+            {
+              "heading": "Task 6: `lib/init.js` —— init 自动登记本 repo",
+              "line": 819
+            },
+            {
+              "heading": "Task 7: `commands/portal.md` —— `/lore:portal` slash 命令",
+              "line": 931
+            },
+            {
+              "heading": "用法",
+              "line": 951
+            },
+            {
+              "heading": "行为",
+              "line": 957
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 979
+            },
+            {
+              "heading": "Task 8: 文档同步（CHANGELOG / README / ROADMAP）",
+              "line": 997
+            },
+            {
+              "heading": "[0.5.1] — 2026-06-06",
+              "line": 1007
+            },
+            {
+              "heading": "[0.6.0] — 2026-06-07",
+              "line": 1013
+            },
+            {
+              "heading": "新增",
+              "line": 1015
+            },
+            {
+              "heading": "安全",
+              "line": 1020
+            },
+            {
+              "heading": "[0.5.1] — 2026-06-06",
+              "line": 1023
+            },
+            {
+              "heading": "单机共享 wiki server（多 repo 聚合门户）⚑ 待头脑风暴",
+              "line": 1080
+            },
+            {
+              "heading": "单机共享 wiki server（多 repo 聚合门户）✅ MVP 已实现（v0.6）· 余项待迭代",
+              "line": 1086
+            },
+            {
+              "heading": "Task 9: 全量验证 + 手动冒烟",
+              "line": 1099
+            },
+            {
+              "heading": "Self-Review（计划自查，已执行）",
+              "line": 1153
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-07-lore-roadmap-cleanup",
@@ -516,7 +2144,41 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: `lib/registry.js`（#3 registry）",
+              "line": 31
+            },
+            {
+              "heading": "Task 2: `serve.js` stablePort + list/stop-all（#3）",
+              "line": 123
+            },
+            {
+              "heading": "Task 3: `i18n.js` 翻译 hash 剔哨兵（#4）",
+              "line": 253
+            },
+            {
+              "heading": "Task 4: `home.js` 空段省略（#5）",
+              "line": 295
+            },
+            {
+              "heading": "Task 5: docs 页 chips（#6 · `manifest.js` + `shell.mjs`）",
+              "line": 348
+            },
+            {
+              "heading": "Task 6: 全量回归 + dogfood（收尾）",
+              "line": 426
+            },
+            {
+              "heading": "Spec 覆盖核对（self-review 映射）",
+              "line": 441
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-07-lore-mcp-server-design",
@@ -534,7 +2196,61 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-07-lore-mcp-server"
+          "paired_plan": "superpowers-plans-2026-06-07-lore-mcp-server",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 13
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 25
+            },
+            {
+              "heading": "设计",
+              "line": 38
+            },
+            {
+              "heading": "A · 纯查询函数（`lib/graph.js` 追加）",
+              "line": 40
+            },
+            {
+              "heading": "B · 工具逻辑（`lib/mcp.js` 内，每个读最新数据）",
+              "line": 50
+            },
+            {
+              "heading": "C · 协议壳（`lib/mcp.js`）",
+              "line": 60
+            },
+            {
+              "heading": "D · 注册（`.claude-plugin/plugin.json`）",
+              "line": 73
+            },
+            {
+              "heading": "E · 不变量",
+              "line": 79
+            },
+            {
+              "heading": "测试",
+              "line": 83
+            },
+            {
+              "heading": "`test/graph.test.js`（追加纯函数）",
+              "line": 85
+            },
+            {
+              "heading": "`test/mcp.test.js`（集成，spawn server）",
+              "line": 90
+            },
+            {
+              "heading": "改动清单",
+              "line": 99
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-07-lore-portal-design",
@@ -552,7 +2268,69 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-07-lore-portal"
+          "paired_plan": "superpowers-plans-2026-06-07-lore-portal",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 13
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 24
+            },
+            {
+              "heading": "设计",
+              "line": 37
+            },
+            {
+              "heading": "A · repos registry（新 `lib/repos.js`，纯函数 + 路径注入，复用 registry.js 模式）",
+              "line": 39
+            },
+            {
+              "heading": "B · portal server（`server.js` 重构 + 新 `createPortalServer`）",
+              "line": 56
+            },
+            {
+              "heading": "C · portal CLI（新 `lib/portal.js`）",
+              "line": 66
+            },
+            {
+              "heading": "D · 壳改造（`site/index.html` + `site/shell.mjs`）",
+              "line": 73
+            },
+            {
+              "heading": "E · 安全 / 不变量",
+              "line": 78
+            },
+            {
+              "heading": "测试",
+              "line": 85
+            },
+            {
+              "heading": "`test/repos.test.js`（纯函数）",
+              "line": 87
+            },
+            {
+              "heading": "`test/portal.test.js`（集成，spawn 或 createPortalServer + fetch）",
+              "line": 91
+            },
+            {
+              "heading": "`test/serve.test.js`（回归）",
+              "line": 97
+            },
+            {
+              "heading": "改动清单",
+              "line": 100
+            },
+            {
+              "heading": "实现节奏",
+              "line": 107
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-07-lore-roadmap-cleanup-design",
@@ -570,7 +2348,45 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-07-lore-roadmap-cleanup"
+          "paired_plan": "superpowers-plans-2026-06-07-lore-roadmap-cleanup",
+          "sections": [
+            {
+              "heading": "背景",
+              "line": 9
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 13
+            },
+            {
+              "heading": "设计",
+              "line": 24
+            },
+            {
+              "heading": "#3 server 踏脚石（`lib/serve.js` + 新 `lib/registry.js`）",
+              "line": 26
+            },
+            {
+              "heading": "#4 HOME 翻译 stale（`lib/i18n.js`）",
+              "line": 44
+            },
+            {
+              "heading": "#5 defaultHomePage 空段（`lib/home.js`）",
+              "line": 52
+            },
+            {
+              "heading": "#6 docs 页 chips（`lib/manifest.js` + `site/shell.mjs`）",
+              "line": 67
+            },
+            {
+              "heading": "测试",
+              "line": 77
+            },
+            {
+              "heading": "改动清单",
+              "line": 86
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-06-lore-agent-graph",
@@ -588,7 +2404,33 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: `buildGraph` 纯函数",
+              "line": 34
+            },
+            {
+              "heading": "Task 2: `runManifestCli` 返回 `{ manifestPath, manifest }`",
+              "line": 179
+            },
+            {
+              "heading": "Task 3: `finalizeSync` 落盘 `.graph.json`",
+              "line": 279
+            },
+            {
+              "heading": "Task 4: dogfood 验证 + `.lore` 同步提交（收尾，非 TDD）",
+              "line": 366
+            },
+            {
+              "heading": "Spec 覆盖核对（self-review 映射）",
+              "line": 400
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-06-lore-decision-history-rebuild",
@@ -606,7 +2448,25 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: foldJournal 改为 section 重建 + 哨兵",
+              "line": 28
+            },
+            {
+              "heading": "Task 2: dogfood 自愈 lib.md + 收口 .lore",
+              "line": 208
+            },
+            {
+              "heading": "Spec 覆盖核对（self-review 映射）",
+              "line": 251
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-06-lore-human-home-translation",
@@ -624,7 +2484,73 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: Language Config Parsing",
+              "line": 36
+            },
+            {
+              "heading": "Task 2: i18n Helpers",
+              "line": 151
+            },
+            {
+              "heading": "Task 3: Manifest HOME and Translation Metadata",
+              "line": 322
+            },
+            {
+              "heading": "Task 4: HOME Generation and Sync Integration",
+              "line": 500
+            },
+            {
+              "heading": "Task 5: Init Config Language Defaults",
+              "line": 768
+            },
+            {
+              "heading": "Task 6: Manifest CLI Reads Language and Preferences",
+              "line": 830
+            },
+            {
+              "heading": "Task 7: Shell Language Resolution",
+              "line": 930
+            },
+            {
+              "heading": "Task 8: Shell UI for Language Switching and Translation Requests",
+              "line": 1042
+            },
+            {
+              "heading": "Task 9: Local Server APIs",
+              "line": 1195
+            },
+            {
+              "heading": "Task 10: Translation Plan and Finalize Command",
+              "line": 1366
+            },
+            {
+              "heading": "Task 11: Serve Runtime Preference",
+              "line": 1563
+            },
+            {
+              "heading": "Task 12: Sync Command Prompt Updates",
+              "line": 1651
+            },
+            {
+              "heading": "HOME page",
+              "line": 1662
+            },
+            {
+              "heading": "Task 13: Full Verification and Manual Browser Check",
+              "line": 1710
+            },
+            {
+              "heading": "Self-Review",
+              "line": 1798
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-06-lore-journal-fold",
@@ -642,7 +2568,33 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: `foldAtoms` 骨架 + 同 id 合并（mergeById）",
+              "line": 47
+            },
+            {
+              "heading": "Task 2: 可达性丢孤儿（dropOrphans）",
+              "line": 203
+            },
+            {
+              "heading": "Task 3: `sync.js` 接入 + 端到端集成测试",
+              "line": 284
+            },
+            {
+              "heading": "Task 4: dogfood 验证 + `.lore` 同步提交（收尾，非 TDD）",
+              "line": 401
+            },
+            {
+              "heading": "Spec 覆盖核对（self-review 映射）",
+              "line": 436
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-06-lore-agent-graph-design",
@@ -660,7 +2612,57 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-06-lore-agent-graph"
+          "paired_plan": "superpowers-plans-2026-06-06-lore-agent-graph",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 18
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 29
+            },
+            {
+              "heading": "设计",
+              "line": 42
+            },
+            {
+              "heading": "A · `lib/graph.js`（新，纯函数）",
+              "line": 44
+            },
+            {
+              "heading": "B · schema（`wiki/.graph.json`）",
+              "line": 58
+            },
+            {
+              "heading": "C · 生成接缝（`lib/manifest.js` + `lib/sync.js`）",
+              "line": 74
+            },
+            {
+              "heading": "D · 不变量",
+              "line": 83
+            },
+            {
+              "heading": "测试",
+              "line": 88
+            },
+            {
+              "heading": "`test/graph.test.js`（纯函数，无 git）",
+              "line": 90
+            },
+            {
+              "heading": "`test/sync.test.js`（集成，临时 git repo）",
+              "line": 98
+            },
+            {
+              "heading": "改动清单",
+              "line": 101
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-06-lore-decision-history-rebuild-design",
@@ -678,7 +2680,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-06-lore-decision-history-rebuild"
+          "paired_plan": "superpowers-plans-2026-06-06-lore-decision-history-rebuild",
+          "sections": [
+            {
+              "heading": "背景 / 问题（v0.5 dogfood 实测）",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 20
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 30
+            },
+            {
+              "heading": "设计",
+              "line": 44
+            },
+            {
+              "heading": "A · `foldJournal(text, md, { page, warn })` 重写（`lib/sync.js`）",
+              "line": 46
+            },
+            {
+              "heading": "B · 自愈（数据修复）",
+              "line": 71
+            },
+            {
+              "heading": "C · 不变量",
+              "line": 75
+            },
+            {
+              "heading": "测试",
+              "line": 81
+            },
+            {
+              "heading": "`test/sync.test.js` — `foldJournal` 单测（重写旧 6 个 token 测试）",
+              "line": 83
+            },
+            {
+              "heading": "`test/sync.test.js` — `finalizeSync` 集成",
+              "line": 93
+            },
+            {
+              "heading": "改动清单",
+              "line": 96
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-06-lore-human-home-translation-design",
@@ -696,7 +2744,121 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-06-lore-human-home-translation"
+          "paired_plan": "superpowers-plans-2026-06-06-lore-human-home-translation",
+          "sections": [
+            {
+              "heading": "背景",
+              "line": 9
+            },
+            {
+              "heading": "用户已确认的方向",
+              "line": 21
+            },
+            {
+              "heading": "目标",
+              "line": 46
+            },
+            {
+              "heading": "目标 1：把 HOME 变成第一阅读入口",
+              "line": 48
+            },
+            {
+              "heading": "目标 2：建立持久化双语模型",
+              "line": 60
+            },
+            {
+              "heading": "目标 3：翻译可由页面触发，但生成仍保持 agent 可审查",
+              "line": 70
+            },
+            {
+              "heading": "非目标",
+              "line": 81
+            },
+            {
+              "heading": "HOME 设计",
+              "line": 89
+            },
+            {
+              "heading": "文件与路由",
+              "line": 91
+            },
+            {
+              "heading": "HOME 内容结构",
+              "line": 116
+            },
+            {
+              "heading": "Knowledge flow",
+              "line": 131
+            },
+            {
+              "heading": "Understand the project",
+              "line": 143
+            },
+            {
+              "heading": "Debug a problem",
+              "line": 148
+            },
+            {
+              "heading": "Decisions and timeline",
+              "line": 153
+            },
+            {
+              "heading": "HOME 状态块",
+              "line": 160
+            },
+            {
+              "heading": "Status",
+              "line": 165
+            },
+            {
+              "heading": "双语设计",
+              "line": 178
+            },
+            {
+              "heading": "repo 语言配置",
+              "line": 180
+            },
+            {
+              "heading": "用户偏好",
+              "line": 197
+            },
+            {
+              "heading": "页面 sidecar",
+              "line": 214
+            },
+            {
+              "heading": "manifest 语言字段",
+              "line": 247
+            },
+            {
+              "heading": "stale 规则",
+              "line": 283
+            },
+            {
+              "heading": "页面切换行为",
+              "line": 295
+            },
+            {
+              "heading": "页面触发翻译",
+              "line": 311
+            },
+            {
+              "heading": "agent-friendly graph 预留",
+              "line": 334
+            },
+            {
+              "heading": "安全与兼容",
+              "line": 346
+            },
+            {
+              "heading": "测试策略",
+              "line": 354
+            },
+            {
+              "heading": "成功标准",
+              "line": 363
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-06-lore-journal-fold-design",
@@ -714,7 +2876,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-06-lore-journal-fold"
+          "paired_plan": "superpowers-plans-2026-06-06-lore-journal-fold",
+          "sections": [
+            {
+              "heading": "背景 / 问题（v0.5 dogfood 实测）",
+              "line": 10
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 23
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 35
+            },
+            {
+              "heading": "设计",
+              "line": 48
+            },
+            {
+              "heading": "A · `lib/fold.js`（新）—— 纯折叠函数",
+              "line": 50
+            },
+            {
+              "heading": "B · `lib/sync.js`（改）—— 可达集合 + 接入",
+              "line": 68
+            },
+            {
+              "heading": "C · 不变量",
+              "line": 91
+            },
+            {
+              "heading": "测试",
+              "line": 98
+            },
+            {
+              "heading": "`test/fold.test.js`（纯函数，无 git）",
+              "line": 100
+            },
+            {
+              "heading": "`test/sync.test.js`（集成，临时 git repo）",
+              "line": 110
+            },
+            {
+              "heading": "改动清单",
+              "line": 113
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-05-lore-docs-axis-v2",
@@ -732,7 +2940,45 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: extractors 加 `body`（TDD）",
+              "line": 26
+            },
+            {
+              "heading": "Task 2: renderDocsPage 嵌入正文 + 纯文本源引用（TDD）",
+              "line": 91
+            },
+            {
+              "heading": "Task 3: buildDocsAxis 按 date 降序（TDD）",
+              "line": 149
+            },
+            {
+              "heading": "Task 4: manifest docs 轴按 last_updated 降序（TDD）",
+              "line": 192
+            },
+            {
+              "heading": "Task 5: mermaid 懒加载（`site/index.html`，浏览器手验）",
+              "line": 234
+            },
+            {
+              "heading": "约束（Task 1-5）",
+              "line": 304
+            },
+            {
+              "heading": "Task 6: 端到端验证 + 全套绿 + dogfood（控制器做）",
+              "line": 310
+            },
+            {
+              "heading": "Self-Review（plan 对照 spec）",
+              "line": 319
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-05-lore-docs-ingestion",
@@ -750,7 +2996,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: config — parseConfigDocsAxis（TDD）",
+              "line": 30
+            },
+            {
+              "heading": "Task 2: docs.js — docsExtractor + 助手（TDD）",
+              "line": 84
+            },
+            {
+              "heading": "Task 3: docs.js — changelogExtractor（TDD）",
+              "line": 212
+            },
+            {
+              "heading": "Task 4: docs.js — pitfallsExtractor（TDD）",
+              "line": 285
+            },
+            {
+              "heading": "Task 5: docs.js — renderDocsPage（TDD）",
+              "line": 366
+            },
+            {
+              "heading": "Task 6: docs.js — buildDocsAxis（TDD, nuke-rebuild）",
+              "line": 426
+            },
+            {
+              "heading": "Task 7: 接线 — manifest AXIS_ORDER + sync finalize/buildIndex（TDD）",
+              "line": 491
+            },
+            {
+              "heading": "Task 8: 壳 + init + 命令文档（无测试）",
+              "line": 567
+            },
+            {
+              "heading": "Task 9: 端到端验证 + 全套绿",
+              "line": 602
+            },
+            {
+              "heading": "Self-Review（plan 对照 spec）",
+              "line": 616
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-05-lore-docs-axis-v2-design",
@@ -768,7 +3060,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-05-lore-docs-axis-v2"
+          "paired_plan": "superpowers-plans-2026-06-05-lore-docs-axis-v2",
+          "sections": [
+            {
+              "heading": "背景 / 问题（v0.3.0 serve 实测暴露）",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 18
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 24
+            },
+            {
+              "heading": "设计",
+              "line": 33
+            },
+            {
+              "heading": "A · 嵌入文档全文（`lib/docs.js`）",
+              "line": 35
+            },
+            {
+              "heading": "B · docs 轴时间降序",
+              "line": 60
+            },
+            {
+              "heading": "C · mermaid 懒加载（`site/index.html`，壳 only）",
+              "line": 67
+            },
+            {
+              "heading": "测试（node:test 确定性部分）",
+              "line": 90
+            },
+            {
+              "heading": "不变量",
+              "line": 99
+            },
+            {
+              "heading": "风险 / 注记",
+              "line": 105
+            },
+            {
+              "heading": "文件结构",
+              "line": 111
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-05-lore-docs-ingestion-design",
@@ -786,7 +3124,61 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-05-lore-docs-ingestion"
+          "paired_plan": "superpowers-plans-2026-06-05-lore-docs-ingestion",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 13
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 19
+            },
+            {
+              "heading": "弃用的架构",
+              "line": 28
+            },
+            {
+              "heading": "设计",
+              "line": 31
+            },
+            {
+              "heading": "① config（`lib/config.js` 加解析器）",
+              "line": 33
+            },
+            {
+              "heading": "② 三个 extractor（新 `lib/docs.js`，纯函数）",
+              "line": 46
+            },
+            {
+              "heading": "③ 露出接线",
+              "line": 90
+            },
+            {
+              "heading": "测试（node:test，全确定性）",
+              "line": 98
+            },
+            {
+              "heading": "不变量",
+              "line": 110
+            },
+            {
+              "heading": "风险 / 注记",
+              "line": 117
+            },
+            {
+              "heading": "文件结构",
+              "line": 124
+            },
+            {
+              "heading": "接缝小结",
+              "line": 135
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-04-lore-mermaid-diagrams",
@@ -804,7 +3196,41 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 16
+            },
+            {
+              "heading": "Task 1: 壳渲染 mermaid fence（纯函数，TDD）",
+              "line": 28
+            },
+            {
+              "heading": "Task 2: vendor mermaid.min.js 资产",
+              "line": 110
+            },
+            {
+              "heading": "Task 3: init 拷贝 mermaid（SHELL_FILES，TDD）",
+              "line": 144
+            },
+            {
+              "heading": "Task 4: index.html 加载 + 渲染 mermaid（浏览器，手验）",
+              "line": 202
+            },
+            {
+              "heading": "Task 5: sync 命令引导 agent 出图（文档）",
+              "line": 268
+            },
+            {
+              "heading": "Task 6: 端到端验证 + 全套绿",
+              "line": 317
+            },
+            {
+              "heading": "Self-Review（plan 对照 spec）",
+              "line": 337
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-04-lore-mermaid-diagrams-design",
@@ -822,7 +3248,61 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-04-lore-mermaid-diagrams"
+          "paired_plan": "superpowers-plans-2026-06-04-lore-mermaid-diagrams",
+          "sections": [
+            {
+              "heading": "背景 / 问题",
+              "line": 9
+            },
+            {
+              "heading": "目标 / 非目标",
+              "line": 15
+            },
+            {
+              "heading": "决策（已锁）",
+              "line": 27
+            },
+            {
+              "heading": "弃用的方案",
+              "line": 36
+            },
+            {
+              "heading": "设计：4 处改动",
+              "line": 40
+            },
+            {
+              "heading": "① vendor 资产 + init 拷贝（`lib/init.js`）",
+              "line": 42
+            },
+            {
+              "heading": "② 壳渲染：识别 mermaid fence（`site/shell.mjs` `renderMarkdown`）",
+              "line": 47
+            },
+            {
+              "heading": "③ index.html：加载 + 渲染（`site/index.html`）",
+              "line": 54
+            },
+            {
+              "heading": "④ sync 命令层引导（`commands/sync.md`）",
+              "line": 63
+            },
+            {
+              "heading": "不变量（全保住）",
+              "line": 68
+            },
+            {
+              "heading": "测试（node:test，仅确定性部分）",
+              "line": 76
+            },
+            {
+              "heading": "风险 / 注记",
+              "line": 86
+            },
+            {
+              "heading": "接缝小结",
+              "line": 92
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-03-lore-ask",
@@ -840,7 +3320,41 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Task 1: lib/ask.js — searchPages + CLI",
+              "line": 16
+            },
+            {
+              "heading": "Task 2: command + README",
+              "line": 134
+            },
+            {
+              "heading": "用法",
+              "line": 149
+            },
+            {
+              "heading": "行为",
+              "line": 153
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 161
+            },
+            {
+              "heading": "`/lore:ask`（已实现）",
+              "line": 177
+            },
+            {
+              "heading": "Task 3: integration",
+              "line": 190
+            },
+            {
+              "heading": "Self-Review",
+              "line": 240
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-03-lore-flow",
@@ -858,7 +3372,57 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Task 1: config.parseConfigFlows",
+              "line": 16
+            },
+            {
+              "heading": "Task 2: mine.tagFlows",
+              "line": 66
+            },
+            {
+              "heading": "Task 3: commitAtom flows param",
+              "line": 107
+            },
+            {
+              "heading": "Task 4: mineCommits/mine/CLI thread flows",
+              "line": 154
+            },
+            {
+              "heading": "Task 5: hook captureHead flows",
+              "line": 198
+            },
+            {
+              "heading": "Task 6: planSync flow worklist + SYNC_AXES += flow",
+              "line": 227
+            },
+            {
+              "heading": "Task 7: command lore-sync.md — flow pages",
+              "line": 282
+            },
+            {
+              "heading": "End-to-end path",
+              "line": 298
+            },
+            {
+              "heading": "Decision history",
+              "line": 302
+            },
+            {
+              "heading": "Cross-links",
+              "line": 306
+            },
+            {
+              "heading": "Task 8: integration + README",
+              "line": 322
+            },
+            {
+              "heading": "Self-Review",
+              "line": 363
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-03-lore-lint",
@@ -876,7 +3440,49 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Task 1: manifest.js — export git helpers",
+              "line": 16
+            },
+            {
+              "heading": "Task 2: lint.js — pure orphan/missing checks",
+              "line": 65
+            },
+            {
+              "heading": "Task 3: lint.js — lintStale + componentPages + lint orchestrator",
+              "line": 125
+            },
+            {
+              "heading": "Task 4: lint CLI",
+              "line": 263
+            },
+            {
+              "heading": "Task 5: command + README + integration",
+              "line": 327
+            },
+            {
+              "heading": "用法",
+              "line": 342
+            },
+            {
+              "heading": "行为",
+              "line": 346
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 354
+            },
+            {
+              "heading": "`/lore:lint`（已实现）",
+              "line": 368
+            },
+            {
+              "heading": "Self-Review",
+              "line": 414
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-03-lore-note",
@@ -894,7 +3500,45 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Task 1: lib/note.js — noteAtom + CLI",
+              "line": 16
+            },
+            {
+              "heading": "Task 2: renderDecisionHistory — omit sha for commit-less atoms",
+              "line": 140
+            },
+            {
+              "heading": "Task 3: command + README",
+              "line": 187
+            },
+            {
+              "heading": "用法",
+              "line": 202
+            },
+            {
+              "heading": "行为",
+              "line": 206
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 216
+            },
+            {
+              "heading": "`/lore:note`（已实现）",
+              "line": 231
+            },
+            {
+              "heading": "Task 4: integration — note → sync folds it into the page",
+              "line": 244
+            },
+            {
+              "heading": "Self-Review",
+              "line": 304
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-03-lore-theme",
@@ -912,7 +3556,61 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Task 1: config.parseConfigThemes",
+              "line": 16
+            },
+            {
+              "heading": "Task 2: mine.tagThemes",
+              "line": 66
+            },
+            {
+              "heading": "Task 3: commitAtom themes param",
+              "line": 107
+            },
+            {
+              "heading": "Task 4: mineCommits + mine + CLI thread config themes",
+              "line": 153
+            },
+            {
+              "heading": "Task 5: hook captureHead reads config themes",
+              "line": 230
+            },
+            {
+              "heading": "Task 6: planSync theme worklist",
+              "line": 274
+            },
+            {
+              "heading": "Task 7: finalizeSync + buildIndex multi-axis",
+              "line": 325
+            },
+            {
+              "heading": "Task 8: command lore-sync.md — theme pages",
+              "line": 437
+            },
+            {
+              "heading": "Current state",
+              "line": 452
+            },
+            {
+              "heading": "Decision history",
+              "line": 456
+            },
+            {
+              "heading": "Cross-links",
+              "line": 460
+            },
+            {
+              "heading": "Task 9: integration + README",
+              "line": 475
+            },
+            {
+              "heading": "Self-Review",
+              "line": 518
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-03-lore-ask-design",
@@ -930,7 +3628,45 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-03-lore-ask"
+          "paired_plan": "superpowers-plans-2026-06-03-lore-ask",
+          "sections": [
+            {
+              "heading": "0. 背景",
+              "line": 6
+            },
+            {
+              "heading": "1. 范围（用户拍板 A）",
+              "line": 9
+            },
+            {
+              "heading": "2. 检索（纯，锁定）",
+              "line": 15
+            },
+            {
+              "heading": "3. CLI",
+              "line": 21
+            },
+            {
+              "heading": "4. 命令 /lore:ask",
+              "line": 26
+            },
+            {
+              "heading": "5. 测试（确定性 node:test）",
+              "line": 29
+            },
+            {
+              "heading": "6. 验收",
+              "line": 34
+            },
+            {
+              "heading": "7. 不在范围",
+              "line": 40
+            },
+            {
+              "heading": "8. 开放问题",
+              "line": 43
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-03-lore-flow-design",
@@ -948,7 +3684,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-03-lore-flow"
+          "paired_plan": "superpowers-plans-2026-06-03-lore-flow",
+          "sections": [
+            {
+              "heading": "0. 背景",
+              "line": 6
+            },
+            {
+              "heading": "1. 范围",
+              "line": 9
+            },
+            {
+              "heading": "2. config flow 解析",
+              "line": 17
+            },
+            {
+              "heading": "3. flow 打标（层2，纯）",
+              "line": 20
+            },
+            {
+              "heading": "4. producer 打标",
+              "line": 23
+            },
+            {
+              "heading": "5. sync",
+              "line": 28
+            },
+            {
+              "heading": "6. 命令改（`commands/lore-sync.md`）",
+              "line": 32
+            },
+            {
+              "heading": "7. 测试（确定性 node:test）",
+              "line": 35
+            },
+            {
+              "heading": "8. 验收",
+              "line": 45
+            },
+            {
+              "heading": "9. 不在范围",
+              "line": 51
+            },
+            {
+              "heading": "10. 开放问题",
+              "line": 54
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-03-lore-lint-design",
@@ -966,7 +3748,41 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-03-lore-lint"
+          "paired_plan": "superpowers-plans-2026-06-03-lore-lint",
+          "sections": [
+            {
+              "heading": "0. 背景",
+              "line": 7
+            },
+            {
+              "heading": "1. 范围（用户拍板 A）",
+              "line": 10
+            },
+            {
+              "heading": "2. 模块 API（锁定）",
+              "line": 21
+            },
+            {
+              "heading": "3. CLI / 行为",
+              "line": 35
+            },
+            {
+              "heading": "4. 测试（确定性 node:test）",
+              "line": 42
+            },
+            {
+              "heading": "5. 验收",
+              "line": 50
+            },
+            {
+              "heading": "6. 不在范围",
+              "line": 57
+            },
+            {
+              "heading": "7. 开放问题",
+              "line": 60
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-03-lore-note-design",
@@ -984,7 +3800,49 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-03-lore-note"
+          "paired_plan": "superpowers-plans-2026-06-03-lore-note",
+          "sections": [
+            {
+              "heading": "0. 背景",
+              "line": 7
+            },
+            {
+              "heading": "1. 范围（MVP，用户拍板 A）",
+              "line": 10
+            },
+            {
+              "heading": "2. note atom（decision kind）",
+              "line": 16
+            },
+            {
+              "heading": "3. CLI",
+              "line": 26
+            },
+            {
+              "heading": "4. 命令 /lore:note",
+              "line": 31
+            },
+            {
+              "heading": "5. renderDecisionHistory 小改",
+              "line": 34
+            },
+            {
+              "heading": "6. 测试（确定性 node:test）",
+              "line": 40
+            },
+            {
+              "heading": "7. 验收",
+              "line": 47
+            },
+            {
+              "heading": "8. 不在范围",
+              "line": 53
+            },
+            {
+              "heading": "9. 开放问题",
+              "line": 56
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-03-lore-theme-design",
@@ -1002,7 +3860,53 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-03-lore-theme"
+          "paired_plan": "superpowers-plans-2026-06-03-lore-theme",
+          "sections": [
+            {
+              "heading": "0. 背景",
+              "line": 7
+            },
+            {
+              "heading": "1. 范围（用户拍板 A + match=子串）",
+              "line": 10
+            },
+            {
+              "heading": "2. config theme 解析",
+              "line": 18
+            },
+            {
+              "heading": "3. theme 打标（层2，纯）",
+              "line": 21
+            },
+            {
+              "heading": "4. producer 打标",
+              "line": 24
+            },
+            {
+              "heading": "5. sync 多轴泛化（核心）",
+              "line": 29
+            },
+            {
+              "heading": "6. 命令改（`commands/lore-sync.md`）",
+              "line": 35
+            },
+            {
+              "heading": "7. 测试（确定性 node:test）",
+              "line": 38
+            },
+            {
+              "heading": "8. 验收",
+              "line": 49
+            },
+            {
+              "heading": "9. 不在范围",
+              "line": 55
+            },
+            {
+              "heading": "10. 开放问题",
+              "line": 58
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-02-lore-hook",
@@ -1020,7 +3924,37 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "Task 1: mine.js — export GIT_FORMAT + commitAtom source param",
+              "line": 18
+            },
+            {
+              "heading": "Task 2: lib/hook.js — captureHead + CLI",
+              "line": 68
+            },
+            {
+              "heading": "Task 3: installHook in lib/init.js",
+              "line": 201
+            },
+            {
+              "heading": "Task 4: wire init() + config hook:true",
+              "line": 295
+            },
+            {
+              "heading": "Task 5: docs — command + README",
+              "line": 353
+            },
+            {
+              "heading": "Task 6: integration — init → real commit → hook fires",
+              "line": 378
+            },
+            {
+              "heading": "Self-Review",
+              "line": 422
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-02-lore-sync-journal-fold",
@@ -1038,7 +3972,37 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 56
+            },
+            {
+              "heading": "Task 1: renderDecisionHistory",
+              "line": 69
+            },
+            {
+              "heading": "Task 2: finalizeSync folds journal",
+              "line": 144
+            },
+            {
+              "heading": "Task 3: update /lore:sync command",
+              "line": 303
+            },
+            {
+              "heading": "Task 4: integration — mine → sync folds atom into page",
+              "line": 347
+            },
+            {
+              "heading": "Task 5: README",
+              "line": 406
+            },
+            {
+              "heading": "Self-Review",
+              "line": 431
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-02-lore-hook-design",
@@ -1056,7 +4020,45 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-02-lore-hook"
+          "paired_plan": "superpowers-plans-2026-06-02-lore-hook",
+          "sections": [
+            {
+              "heading": "0. 背景",
+              "line": 11
+            },
+            {
+              "heading": "1. 范围",
+              "line": 14
+            },
+            {
+              "heading": "2. hook runtime（`lib/hook.js`）",
+              "line": 24
+            },
+            {
+              "heading": "3. install（扩 init 的 `installHook(repoRoot) -> string`）",
+              "line": 38
+            },
+            {
+              "heading": "4. 命令改（`commands/lore-init.md`）",
+              "line": 57
+            },
+            {
+              "heading": "5. 测试（确定性 node:test）",
+              "line": 60
+            },
+            {
+              "heading": "6. 验收",
+              "line": 68
+            },
+            {
+              "heading": "7. 不在范围 / 推迟",
+              "line": 77
+            },
+            {
+              "heading": "8. 开放问题",
+              "line": 80
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-02-lore-sync-journal-fold-design",
@@ -1074,7 +4076,65 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-02-lore-sync-journal-fold"
+          "paired_plan": "superpowers-plans-2026-06-02-lore-sync-journal-fold",
+          "sections": [
+            {
+              "heading": "0. 背景：闭合 capture → synthesize",
+              "line": 11
+            },
+            {
+              "heading": "0.5 依赖（关键 — 实施前置）",
+              "line": 17
+            },
+            {
+              "heading": "1. 范围",
+              "line": 25
+            },
+            {
+              "heading": "2. 架构（文件）",
+              "line": 39
+            },
+            {
+              "heading": "3. `renderDecisionHistory(atoms)` 契约（纯函数，锁定）",
+              "line": 52
+            },
+            {
+              "heading": "4. `finalizeSync` 改动",
+              "line": 66
+            },
+            {
+              "heading": "5. token 注入",
+              "line": 83
+            },
+            {
+              "heading": "6. INDEX 计数",
+              "line": 91
+            },
+            {
+              "heading": "7. 命令改（`commands/lore-sync.md`）",
+              "line": 102
+            },
+            {
+              "heading": "8. 错误 / 边界",
+              "line": 115
+            },
+            {
+              "heading": "9. 测试（全确定性 node:test）",
+              "line": 125
+            },
+            {
+              "heading": "10. 验收",
+              "line": 134
+            },
+            {
+              "heading": "11. 不在范围 / 推迟",
+              "line": 145
+            },
+            {
+              "heading": "12. 开放问题",
+              "line": 154
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-01-lore-init",
@@ -1092,7 +4152,81 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 20
+            },
+            {
+              "heading": "Task 1: scaffold",
+              "line": 48
+            },
+            {
+              "heading": "Task 2: copyShell",
+              "line": 112
+            },
+            {
+              "heading": "Task 3: ensureGitignore",
+              "line": 178
+            },
+            {
+              "heading": "Task 4: discoverComponents — fallback layer",
+              "line": 258
+            },
+            {
+              "heading": "Task 5: discoverComponents — Python packages (+ ancestor dedup)",
+              "line": 372
+            },
+            {
+              "heading": "Task 6: discoverComponents — JS workspaces",
+              "line": 456
+            },
+            {
+              "heading": "Task 7: renderConfigYaml",
+              "line": 547
+            },
+            {
+              "heading": "Task 8: init orchestrator",
+              "line": 619
+            },
+            {
+              "heading": "Task 9: CLI entry",
+              "line": 714
+            },
+            {
+              "heading": "Task 10: /lore:init slash command definition",
+              "line": 779
+            },
+            {
+              "heading": "用法",
+              "line": 795
+            },
+            {
+              "heading": "行为",
+              "line": 799
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 813
+            },
+            {
+              "heading": "Task 11: Close the seam — route integration test through init",
+              "line": 837
+            },
+            {
+              "heading": "Task 12: README",
+              "line": 903
+            },
+            {
+              "heading": "`/lore:init`（已实现）",
+              "line": 913
+            },
+            {
+              "heading": "Self-Review",
+              "line": 938
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-01-lore-journal-mine",
@@ -1110,7 +4244,81 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 18
+            },
+            {
+              "heading": "Task 1: Extract lib/config.js (refactor)",
+              "line": 54
+            },
+            {
+              "heading": "Task 2: journal.atomPath",
+              "line": 146
+            },
+            {
+              "heading": "Task 3: journal.appendAtom",
+              "line": 203
+            },
+            {
+              "heading": "Task 4: journal.readAllAtoms + existingIds",
+              "line": 265
+            },
+            {
+              "heading": "Task 5: mine.pathComponent",
+              "line": 360
+            },
+            {
+              "heading": "Task 6: mine.parseGitLog",
+              "line": 428
+            },
+            {
+              "heading": "Task 7: mine.commitAtom",
+              "line": 497
+            },
+            {
+              "heading": "Task 8: mine.mineCommits",
+              "line": 586
+            },
+            {
+              "heading": "Task 9: mine.mine (orchestrate + dedup)",
+              "line": 667
+            },
+            {
+              "heading": "Task 10: mine CLI + integration",
+              "line": 732
+            },
+            {
+              "heading": "Task 11: /lore:mine slash command definition",
+              "line": 820
+            },
+            {
+              "heading": "用法",
+              "line": 838
+            },
+            {
+              "heading": "行为",
+              "line": 842
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 852
+            },
+            {
+              "heading": "Task 12: README",
+              "line": 877
+            },
+            {
+              "heading": "`/lore:mine`（已实现）",
+              "line": 887
+            },
+            {
+              "heading": "Self-Review",
+              "line": 909
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-06-01-lore-sync",
@@ -1128,7 +4336,73 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 22
+            },
+            {
+              "heading": "Task 1: parseConfigCodeRoots",
+              "line": 50
+            },
+            {
+              "heading": "Task 2: planSync",
+              "line": 127
+            },
+            {
+              "heading": "Task 3: stampFrontmatter",
+              "line": 205
+            },
+            {
+              "heading": "Task 4: buildIndex",
+              "line": 278
+            },
+            {
+              "heading": "Component",
+              "line": 318
+            },
+            {
+              "heading": "Task 5: finalizeSync",
+              "line": 338
+            },
+            {
+              "heading": "Task 6: CLI (plan / finalize subcommands)",
+              "line": 473
+            },
+            {
+              "heading": "Task 7: /lore:sync slash command definition",
+              "line": 548
+            },
+            {
+              "heading": "用法",
+              "line": 566
+            },
+            {
+              "heading": "行为（O1 两阶段）",
+              "line": 570
+            },
+            {
+              "heading": "给 agent 的提示",
+              "line": 608
+            },
+            {
+              "heading": "Task 8: Integration — init → agent pages → sync finalize → serve",
+              "line": 634
+            },
+            {
+              "heading": "Task 9: README",
+              "line": 701
+            },
+            {
+              "heading": "`/lore:sync`（已实现）",
+              "line": 711
+            },
+            {
+              "heading": "Self-Review",
+              "line": 734
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-01-lore-init-design",
@@ -1146,7 +4420,61 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-01-lore-init"
+          "paired_plan": "superpowers-plans-2026-06-01-lore-init",
+          "sections": [
+            {
+              "heading": "0. 背景：要闭合的接缝",
+              "line": 11
+            },
+            {
+              "heading": "1. 范围",
+              "line": 23
+            },
+            {
+              "heading": "2. 架构",
+              "line": 44
+            },
+            {
+              "heading": "3. 模块 API 契约（锁定 — 实施计划须照此）",
+              "line": 65
+            },
+            {
+              "heading": "4. 组件自动发现算法（§6）",
+              "line": 97
+            },
+            {
+              "heading": "5. config.yml 形状（§3）",
+              "line": 125
+            },
+            {
+              "heading": "6. 关键行为",
+              "line": 151
+            },
+            {
+              "heading": "7. 集成测试改造（闭合接缝）",
+              "line": 163
+            },
+            {
+              "heading": "8. 测试策略（镜像 serve TDD，全确定性零 LLM）",
+              "line": 173
+            },
+            {
+              "heading": "9. 命令定义（`commands/lore-init.md`）",
+              "line": 188
+            },
+            {
+              "heading": "10. 验收指标",
+              "line": 201
+            },
+            {
+              "heading": "11. 不在范围 / 推迟",
+              "line": 214
+            },
+            {
+              "heading": "12. 开放问题",
+              "line": 224
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-01-lore-journal-mine-design",
@@ -1164,7 +4492,69 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-01-lore-journal-mine"
+          "paired_plan": "superpowers-plans-2026-06-01-lore-journal-mine",
+          "sections": [
+            {
+              "heading": "0. 背景：数据链的生产者侧",
+              "line": 11
+            },
+            {
+              "heading": "1. 范围",
+              "line": 21
+            },
+            {
+              "heading": "2. 架构",
+              "line": 39
+            },
+            {
+              "heading": "3. 模块 API 契约（锁定 — 实施计划须照此）",
+              "line": 66
+            },
+            {
+              "heading": "4. git log 解析（确定性核心）",
+              "line": 100
+            },
+            {
+              "heading": "5. component facet 打标（母 §4 层 1，确定性）",
+              "line": 127
+            },
+            {
+              "heading": "6. commit 原子构造（全 §4 schema）",
+              "line": 135
+            },
+            {
+              "heading": "7. journal 基座（ndjson）",
+              "line": 158
+            },
+            {
+              "heading": "8. mine 编排 + 去重",
+              "line": 167
+            },
+            {
+              "heading": "9. CLI / 错误 / 边界",
+              "line": 184
+            },
+            {
+              "heading": "10. 命令定义（`commands/lore-mine.md`）",
+              "line": 195
+            },
+            {
+              "heading": "11. 测试策略（全确定性 node:test，零 LLM）",
+              "line": 203
+            },
+            {
+              "heading": "12. 验收指标",
+              "line": 223
+            },
+            {
+              "heading": "13. 不在范围 / 推迟",
+              "line": 235
+            },
+            {
+              "heading": "14. 开放问题",
+              "line": 246
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-06-01-lore-sync-design",
@@ -1182,7 +4572,85 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": "superpowers-plans-2026-06-01-lore-sync"
+          "paired_plan": "superpowers-plans-2026-06-01-lore-sync",
+          "sections": [
+            {
+              "heading": "0. 背景：数据链的 keystone",
+              "line": 11
+            },
+            {
+              "heading": "1. 范围（v1 MVP，第一刀）",
+              "line": 23
+            },
+            {
+              "heading": "2. 架构",
+              "line": 44
+            },
+            {
+              "heading": "3. 模块 API 契约（锁定 — 实施计划须照此）",
+              "line": 65
+            },
+            {
+              "heading": "4. 数据流（plan → agent → finalize）",
+              "line": 99
+            },
+            {
+              "heading": "5. 页输出契约（component 页）",
+              "line": 111
+            },
+            {
+              "heading": "Current architecture",
+              "line": 121
+            },
+            {
+              "heading": "Decision history",
+              "line": 125
+            },
+            {
+              "heading": "Cross-links",
+              "line": 129
+            },
+            {
+              "heading": "6. config 读取（零依赖 YAML 子集）",
+              "line": 151
+            },
+            {
+              "heading": "7. INDEX.md（100% Node 机械建）",
+              "line": 165
+            },
+            {
+              "heading": "Component",
+              "line": 175
+            },
+            {
+              "heading": "8. code_sha 语义",
+              "line": 183
+            },
+            {
+              "heading": "9. precheck / 错误 / 幂等",
+              "line": 189
+            },
+            {
+              "heading": "10. 测试策略（确定性 node:test；LLM prose 不自动测）",
+              "line": 198
+            },
+            {
+              "heading": "11. 命令定义（`commands/lore-sync.md`）",
+              "line": 212
+            },
+            {
+              "heading": "12. 验收指标",
+              "line": 231
+            },
+            {
+              "heading": "13. 不在范围 / 推迟",
+              "line": 243
+            },
+            {
+              "heading": "14. 开放问题",
+              "line": 253
+            }
+          ]
         },
         {
           "id": "superpowers-plans-2026-05-31-lore-serve",
@@ -1200,7 +4668,133 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "File Structure",
+              "line": 22
+            },
+            {
+              "heading": "Task 0: Project scaffold",
+              "line": 76
+            },
+            {
+              "heading": "Task 1: Front-matter parser",
+              "line": 120
+            },
+            {
+              "heading": "Task 2: Axis derivation",
+              "line": 217
+            },
+            {
+              "heading": "Task 3: emitManifest core (git + clock injected)",
+              "line": 281
+            },
+            {
+              "heading": "Task 4: manifest CLI wiring (real git)",
+              "line": 438
+            },
+            {
+              "heading": "Task 5: Static file server + path-traversal guard",
+              "line": 545
+            },
+            {
+              "heading": "Task 6: Runtime probe chain",
+              "line": 679
+            },
+            {
+              "heading": "Task 7: PID file management",
+              "line": 763
+            },
+            {
+              "heading": "Task 8: Cross-platform kill",
+              "line": 848
+            },
+            {
+              "heading": "Task 9: Port selection + start/stop orchestration",
+              "line": 908
+            },
+            {
+              "heading": "Task 10: serve CLI entry",
+              "line": 1074
+            },
+            {
+              "heading": "Task 11: Shell pure logic — front-matter strip + markdown render",
+              "line": 1178
+            },
+            {
+              "heading": "Task 12: Shell pure logic — nav model, wikilinks, search, meta",
+              "line": 1310
+            },
+            {
+              "heading": "Task 13: Browser shell DOM + CSS + themes",
+              "line": 1446
+            },
+            {
+              "heading": "Task 14: Test fixtures (committed wiki for integration)",
+              "line": 1636
+            },
+            {
+              "heading": "Component",
+              "line": 1658
+            },
+            {
+              "heading": "Theme",
+              "line": 1661
+            },
+            {
+              "heading": "Current architecture",
+              "line": 1678
+            },
+            {
+              "heading": "Cross-links",
+              "line": 1682
+            },
+            {
+              "heading": "Current architecture",
+              "line": 1700
+            },
+            {
+              "heading": "Cross-links",
+              "line": 1704
+            },
+            {
+              "heading": "Task 15: End-to-end integration test",
+              "line": 1718
+            },
+            {
+              "heading": "Task 16: Slash command definition",
+              "line": 1793
+            },
+            {
+              "heading": "Usage",
+              "line": 1809
+            },
+            {
+              "heading": "Behavior",
+              "line": 1815
+            },
+            {
+              "heading": "Notes for the agent",
+              "line": 1834
+            },
+            {
+              "heading": "Task 17: Final full-suite gate + README note",
+              "line": 1858
+            },
+            {
+              "heading": "`/lore:serve` (implemented)",
+              "line": 1876
+            },
+            {
+              "heading": "Development",
+              "line": 1890
+            },
+            {
+              "heading": "Self-Review (completed during planning)",
+              "line": 1906
+            }
+          ]
         },
         {
           "id": "superpowers-specs-2026-05-31-lore-repo-wiki-design",
@@ -1218,7 +4812,125 @@
             "commits": 0
           },
           "group": "设计与计划",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "0. 背景与问题",
+              "line": 8
+            },
+            {
+              "heading": "1. 范围 (v1)",
+              "line": 25
+            },
+            {
+              "heading": "2. 核心模型：WAL → materialized view",
+              "line": 39
+            },
+            {
+              "heading": "3. 多轴 faceted 组织模型",
+              "line": 66
+            },
+            {
+              "heading": "config.yml（Schema 层 / Karpathy L3 — 唯一存放 repo 特定信息的地方）",
+              "line": 87
+            },
+            {
+              "heading": "文件布局（lives in 目标 repo，git-tracked）",
+              "line": 107
+            },
+            {
+              "heading": "4. 捕获：3 源 + 原子 schema + facet 打标管线",
+              "line": 129
+            },
+            {
+              "heading": "Journal 原子 schema（ndjson，一行一原子）",
+              "line": 131
+            },
+            {
+              "heading": "3 个捕获源",
+              "line": 150
+            },
+            {
+              "heading": "facet 打标管线（最便宜优先，层层兜底）",
+              "line": 182
+            },
+            {
+              "heading": "5. 合成 + lint + 消费",
+              "line": 195
+            },
+            {
+              "heading": "合成（journal + 代码 → wiki 页）— `/lore:sync`",
+              "line": 197
+            },
+            {
+              "heading": "lint — `/lore:lint`（只读，机械为主 + 小 LLM）",
+              "line": 205
+            },
+            {
+              "heading": "消费",
+              "line": 217
+            },
+            {
+              "heading": "v1 命令面（CC 插件）",
+              "line": 228
+            },
+            {
+              "heading": "5.5 本地可视化：`/lore:serve`",
+              "line": 242
+            },
+            {
+              "heading": "架构：哑静态服务器 + 客户端 JS 壳",
+              "line": 246
+            },
+            {
+              "heading": "双渲染器兼容约束（serve 壳 + Obsidian 并存）",
+              "line": 268
+            },
+            {
+              "heading": "壳页面（`.lore/site/index.html` 单文件）",
+              "line": 276
+            },
+            {
+              "heading": "进程生命周期",
+              "line": 291
+            },
+            {
+              "heading": "`.manifest.json` schema + sync 集成",
+              "line": 316
+            },
+            {
+              "heading": "新增引擎文件",
+              "line": 336
+            },
+            {
+              "heading": "6. 通用引擎内核（零 repo 耦合）",
+              "line": 352
+            },
+            {
+              "heading": "7. Bootstrap 计划（threat-intel 当试验田，守规则 #21 小批验证 / #24 落代码非一次性运维）",
+              "line": 366
+            },
+            {
+              "heading": "8. Phases 路线",
+              "line": 377
+            },
+            {
+              "heading": "9. 测试策略",
+              "line": 389
+            },
+            {
+              "heading": "10. 风险 + 缓解",
+              "line": 401
+            },
+            {
+              "heading": "11. 验收指标 (success criteria)",
+              "line": 418
+            },
+            {
+              "heading": "12. 开放问题 / 待定",
+              "line": 435
+            }
+          ]
         },
         {
           "id": "superpowers-notes-2026-06-08-lore-golden-page-sync",
@@ -1236,7 +4948,49 @@
             "commits": 0
           },
           "group": "notes",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "概览",
+              "line": 20
+            },
+            {
+              "heading": "机制详解",
+              "line": 46
+            },
+            {
+              "heading": "① 接口 / 能力面",
+              "line": 49
+            },
+            {
+              "heading": "② finalize 数据流",
+              "line": 61
+            },
+            {
+              "heading": "③ 关键数据契约",
+              "line": 75
+            },
+            {
+              "heading": "④ 指纹状态机",
+              "line": 89
+            },
+            {
+              "heading": "⑤ 边界 / 坑",
+              "line": 108
+            },
+            {
+              "heading": "依赖 / 邻居",
+              "line": 116
+            },
+            {
+              "heading": "Cross-links",
+              "line": 122
+            },
+            {
+              "heading": "这页示范了哪些 C 标准（对照检查表）",
+              "line": 131
+            }
+          ]
         },
         {
           "id": "superpowers-notes-2026-06-02-codegraph-integration-roadmap",
@@ -1254,7 +5008,45 @@
             "commits": 0
           },
           "group": "notes",
-          "paired_plan": ""
+          "paired_plan": "",
+          "sections": [
+            {
+              "heading": "codegraph 是什么（一句话）",
+              "line": 6
+            },
+            {
+              "heading": "codegraph 与 lore：互补，非竞争",
+              "line": 9
+            },
+            {
+              "heading": "验证了 lore 的设计（codegraph 同款，反证 lore 走对）",
+              "line": 14
+            },
+            {
+              "heading": "三个可借想法（未来，按触发条件动）",
+              "line": 21
+            },
+            {
+              "heading": "1. AST 接地的「当前架构」段（最有价值）",
+              "line": 23
+            },
+            {
+              "heading": "2. MCP 暴露（agent 消费）",
+              "line": 29
+            },
+            {
+              "heading": "3. confidence 显示（已在 lore 路线）",
+              "line": 34
+            },
+            {
+              "heading": "不借",
+              "line": 38
+            },
+            {
+              "heading": "一句话结论",
+              "line": 42
+            }
+          ]
         }
       ]
     }

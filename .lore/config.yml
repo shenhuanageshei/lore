@@ -10,7 +10,7 @@ axes:
     deep:                      # 源文件级深度页；按流水线分组（捕获→合成）驱动侧栏排序
       lib:
         捕获: [hook, mine, fold]
-        合成: [sync, manifest, fingerprint]
+        合成: [sync, manifest, fingerprint, syncstate, runner]
   flow:                      # 声明轴 — "数据怎么端到端跑"（示例，按需填）
     values: []
     # - { id: article-pipeline, spans: [lib] }

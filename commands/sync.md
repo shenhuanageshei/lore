@@ -33,6 +33,8 @@ plan 之前先读 `<loreDir>/.state/rewrite-requests.ndjson`（每行 `{ts, page
 3. 全部消化后若文件空，删除或留空文件皆可（readRewriteRequests 都按空处理）。
 4. auto 档下该队列由后台 runner 自动消化（质量门把关）；会话内消化仍然有效（先到先得）。
 
+> 写机制档「⑤ 边界 / 坑」时：源自设计决策的条目，勾稽 spec 出处——格式 `←（决策见 docs 轴 <spec-slug>）`，agent 能从 component 页一跳到决策原文。
+
 2. **合成**（你来，逐 worklist 项）：读该 `codeRoot` 的实际源码，写 `.lore/wiki/<path>`，格式：
    ```markdown
    ---

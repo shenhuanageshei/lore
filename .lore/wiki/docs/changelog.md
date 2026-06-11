@@ -1,8 +1,8 @@
 ---
 title: CHANGELOG
-summary: 8 个版本，最新 0.6.0
+summary: 9 个版本，最新 0.7.0
 source_path: CHANGELOG.md
-last_updated: 2026-06-07
+last_updated: 2026-06-11
 group: 项目状态
 ---
 > 源文档：`CHANGELOG.md`
@@ -11,6 +11,26 @@ group: 项目状态
 
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
+
+## [0.7.0] — 2026-06-11
+
+### 新增
+- **同步控制台 B1** — 档位 `manual`/`notify`（`.state/sync.json`，per-machine，hook 真读分流）；控制 API（status / mode / config / finalize / rewrite-requests / runs，localhost-only + `safeWikiPage` 防越狱）；壳顶栏状态灯（🟢/🟡/⚪/🔵 四态）+ 下拉面板 + `#console` 整页；manifest 轮询（15s 慢 + 操作后 1s 快）自动刷新灯/侧栏 + 当前页「⟳ 内容已更新」提示条；重写排队（ndjson 队列去重，按钮三态反馈）。`serve --node` 给单语仓库启用控制 API。
+- **自动重写 B2** — `auto` 档兑现「wiki 永远新鲜」：hook 只写 pending 时间戳；ticker（60s）统一判静默期（默认 10min，可配）/ 每日 schedule / 防叠跑 → spawn runner；runner 串行调**只读 claude CLI**（`--allowedTools Read,Grep,Glob`，stdout 收文，写盘权在 runner）→ 机械质量门（frontmatter / journal 哨兵 / mermaid 五检 / 防截断）→ 过门写盘 → `auto-runs.ndjson` 历史 → finalize 收尾。重写队列非空也触发（排队即意图）。控制台可编辑 auto 参数（静默期/定时/单次页数）。e2e 实测：真 claude 后台 8 分钟重写 23KB 鸟瞰页，1/1 过门。
+- **docs 轴重构（C-呈现②）** — 侧栏三组分流：「📌 项目状态」（changelog/ROADMAP/pitfalls）置顶常开；「📐 设计与计划」spec↔plan 按 date+slug 配对成行（plan 徽标直达）默认折叠；「📝 notes」折叠。折叠态 localStorage 记忆；搜索穿透折叠组（搜索域含英文 slug）。group/paired_plan 由 docs.js 物化进 frontmatter，manifest 组间排序单一来源。
+- **portal 进化** — ① 写面翻转：全部本地 API 抽成共享 `handleApi(root,…)`，portal 剥 `/<name>` 前缀按 repo 转发（同 localHost 防护，写面限对应 repo 的 `.state`）——控制台在 portal 下完全可操作；② portal 接管全部登记仓库的 auto ticker（每 tick 重读 registry）；③ 壳内仓库切换：🏠 + repo 下拉，per-repo 与 portal 双形态（per-repo 经 `/repos.json` 获知 portal 端口跨端口跳转）；④ **跨 repo 全局搜索**：搜索词懒加载其他仓库 manifest，侧栏底部「🌐 其他仓库」命中直达；⑤ 仓库列表页跟随壳主题（共享 CSS 变量 + localStorage key，自带切换器）。
+- **mermaid 语法校验（lint 第五检）** — 启发式抓实测坑：保留字节点 id、断箭头（`== >`）、未知图类型、引号不配对。顺带修掉 lint 两个老误报（deep 页误判孤儿、token 字面引用误判残留）。
+- **note enrich** — `/lore:note --enrich <sha> --why "…"` 给历史 commit 骨架补 why（append-only，fold 层演化追加）。
+- **server.js 组件页** — 文件级 code_root（`pathComponent` 现成支持），dogfood `code_roots: [lib, server.js]`。
+
+### 修复
+- **决策史 trailer 噪音** — `stripTrailers`（fold.js）：mine 源头净化 + renderDecisionHistory 防御旧原子，`Co-Authored-By` 等不再出现在 why。
+- **Windows 控制台弹窗** — 全部 detached spawn 与 `execFileSync`（git/taskkill/python，共 16 处）加 `windowsHide`。
+- **壳白屏（module 缓存）** — serveStatic 加 `Cache-Control: no-cache`；目录请求 301 补尾斜杠（相对路径 `./shell.mjs` 解析错位的根因）。
+- ROADMAP 大扫除：8 条长期陈旧的「待修复/余项」逐条核实划掉（fold-by-id、HOME 翻译 stale、空段、docs chips 等均早已修复）。
+
+### 安全
+- portal 写面转发沿用 per-repo 全套防护（localHost guard / safeWikiPage / 白名单 loreDir）；零新增暴露面，仍仅绑 `127.0.0.1`。后台 LLM 零写权限（工具白名单 + stdout 收文）。
 
 ## [0.6.0] — 2026-06-07
 

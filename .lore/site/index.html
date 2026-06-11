@@ -443,6 +443,17 @@ function renderConsolePage() {
         </span>
         <span style="color:var(--fg-dim);font-size:12.5px">${modeDesc[m.mode] ?? ''}</span>
       </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12.5px">
+        <span style="color:var(--fg-dim)">auto 参数：</span>
+        <label>静默 <input id="cfg-debounce" type="number" min="0" max="1440" value="${SYNC_STATUS?.config?.debounce_minutes ?? 10}"
+          style="width:54px;background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:2px 6px" ${SYNC_API_OK ? '' : 'disabled'}> 分钟</label>
+        <label>每日 <input id="cfg-schedule" type="text" placeholder="HH:MM 或留空" value="${SYNC_STATUS?.config?.schedule ?? ''}"
+          style="width:90px;background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:2px 6px" ${SYNC_API_OK ? '' : 'disabled'}></label>
+        <label>单次 ≤ <input id="cfg-maxpages" type="number" min="1" max="50" value="${SYNC_STATUS?.config?.max_pages ?? 5}"
+          style="width:46px;background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:2px 6px" ${SYNC_API_OK ? '' : 'disabled'}> 页</label>
+        <button id="cfg-save" ${SYNC_API_OK ? '' : RO_ATTR}>保存</button>
+        <span id="cfg-msg" style="color:var(--fg-dim)"></span>
+      </div>
     </div>
     <div class="console-sec">
       <h3>待重写队列（manifest stale &gt; 0）</h3>
@@ -504,6 +515,22 @@ function renderConsolePage() {
   if (fz) fz.onclick = async () => {
     try { await fetch(BASE + 'api/sync/finalize', { method: 'POST' }); startFastPoll(); }
     catch { await fetchSyncStatus(); renderSyncLight(); renderConsolePage(); }   // server 挂了 → 降级态亮出（与面板同语义）
+  };
+  const cs = document.getElementById('cfg-save');
+  if (cs) cs.onclick = async () => {
+    const msg = document.getElementById('cfg-msg');
+    cs.disabled = true; msg.textContent = '保存中…';
+    try {
+      const r = await fetch(BASE + 'api/sync/config', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          debounce_minutes: Number(document.getElementById('cfg-debounce').value),
+          schedule: document.getElementById('cfg-schedule').value.trim() || null,
+          max_pages: Number(document.getElementById('cfg-maxpages').value),
+        }) });
+      msg.textContent = r.ok ? '✓ 已保存' : '✗ 参数不合法（静默 0-1440 / HH:MM / 1-50 页）';
+    } catch { msg.textContent = '✗ 保存失败'; }
+    cs.disabled = false;
+    await fetchSyncStatus(); renderSyncLight();            // 读回真值（面板摘要同步刷新）
   };
 }
 

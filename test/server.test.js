@@ -203,6 +203,26 @@ test('GET /api/sync/status: B2 扩展形状（config + runner_running）', async
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
+test('POST /api/sync/config: 部分更新落盘+读回；非法 400 不落盘；非 local 403', async () => {
+  const root = syncFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const post = body => fetch(`http://127.0.0.1:${port}/api/sync/config`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const ok = await post({ debounce_minutes: 5, schedule: '02:00' });
+    assert.equal(ok.status, 200);
+    const status = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assert.equal(status.config.debounce_minutes, 5);
+    assert.equal(status.config.schedule, '02:00');
+    assert.equal((await post({ max_pages: 99 })).status, 400);          // 超上限
+    assert.equal((await post({ schedule: 'bad' })).status, 400);
+    const after = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assert.equal(after.config.max_pages, 5);                            // 非法没落盘
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('GET /api/sync/runs: 历史最近 N 条', async () => {
   const root = syncFixture();
   const { appendAutoRun } = await import('../lib/syncstate.js');

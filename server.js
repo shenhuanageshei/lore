@@ -5,7 +5,7 @@ import { dirname, join, normalize, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
-import { readSyncMode, writeSyncMode, appendRewriteRequest, readRewriteRequests,
+import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
   readSyncConfig, readRunnerPid, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
 import { isAlive } from './lib/serve.js';
 
@@ -73,7 +73,12 @@ export function serveStatic(rootDir, rel, res) {
     if (!res.headersSent) res.writeHead(500);
     res.end();
   });
-  res.writeHead(200, { 'content-type': MIME[extname(full)] ?? 'application/octet-stream' });
+  // no-cache（≠no-store）：每次 revalidate。本地 127.0.0.1 毫秒级零体感，
+  // 根治浏览器 module 缓存旧 shell.mjs（缺新 export → import 炸 → 整壳白屏）。
+  res.writeHead(200, {
+    'content-type': MIME[extname(full)] ?? 'application/octet-stream',
+    'cache-control': 'no-cache',
+  });
   stream.pipe(res);
 }
 
@@ -137,6 +142,18 @@ export function createServer(rootDir, { spawnFn = spawn } = {}) {
       return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: pid != null && isAlive(pid) });
     }
 
+    if (req.method === 'POST' && pathname === '/api/sync/config') {
+      try {
+        const body = await readJson(req);
+        const patch = {};
+        if ('debounce_minutes' in body) patch.debounce_minutes = Number(body.debounce_minutes);
+        if ('schedule' in body) patch.schedule = body.schedule === null || body.schedule === '' ? null : String(body.schedule);
+        if ('max_pages' in body) patch.max_pages = Number(body.max_pages);
+        writeSyncConfig(join(root, '.state'), patch);      // 非法值 throw → 400
+        return sendJson(res, 200, { ok: true, config: readSyncConfig(join(root, '.state')) });
+      } catch { return sendJson(res, 400, { error: 'invalid config (debounce 0-1440, schedule HH:MM|null, max_pages 1-50)' }); }
+    }
+
     if (req.method === 'GET' && pathname === '/api/sync/runs') {
       return sendJson(res, 200, { runs: readAutoRuns(join(root, '.state')) });
     }
@@ -157,7 +174,7 @@ export function createServer(rootDir, { spawnFn = spawn } = {}) {
         // 与 hook.maybeRefresh 同款 detached finalize（A 接缝③）。不加防抖：finalize 幂等、最后写赢。
         // 刻意不 gate mode：manual 档关的是「自动」刷新，手动 ⟳ 正是 manual 档的用法——别给这里补 mode 检查。
         const child = spawnFn(process.execPath, [join(HERE, 'lib', 'sync.js'), 'finalize', root],
-          { detached: true, stdio: 'ignore' });
+          { detached: true, stdio: 'ignore', windowsHide: true });
         child.once?.('error', () => {});   // 异步 spawn 失败（EMFILE 等）不能击落常驻 server
         child.unref();
         return sendJson(res, 200, { spawned: true });
@@ -254,7 +271,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       });
       if (!d.run) return;
       clearAutoPending(stateDir);
-      const child = spawn(process.execPath, [RUNNER_JS, rootDir], { detached: true, stdio: 'ignore' });
+      const child = spawn(process.execPath, [RUNNER_JS, rootDir], { detached: true, stdio: 'ignore', windowsHide: true });
       child.once?.('error', () => {});
       child.unref();
     } catch { /* ticker 永不击落 server */ }

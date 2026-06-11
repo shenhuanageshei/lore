@@ -3,8 +3,8 @@ title: server.js —— 本地 Web 门面
 summary: 一个零依赖 http server 同时干三件事：静态伺服壳与 wiki、本机写 API（语言/翻译/同步控制）、多 repo 聚合门户（只读）
 last_updated: 2026-06-11
 code_sha: eef82cd
-atoms: 0
-commits: 0
+atoms: 1
+commits: 1
 ---
 # component: server.js
 
@@ -98,5 +98,5 @@ flowchart LR
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
-暂无 journal 原子（跑 /lore:mine 补全）。
+- **feat(server): status config/runner_running, GET runs, 60s auto ticker (per-repo only)** (469ac6d, 2026-06-10)
 <!-- LORE_JOURNAL:END -->

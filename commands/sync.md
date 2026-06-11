@@ -31,6 +31,7 @@ plan 之前先读 `<loreDir>/.state/rewrite-requests.ndjson`（每行 `{ts, page
 1. 队列里的页**优先**进 worklist——即使指纹判 fresh 也入（`reason: "user-requested"`）：用户点名 = 显式意图，高于机械判定。
 2. 每重写完一页，从队列移除该条目：读全文件 → 过滤掉该 page 的行 → 整体重写文件（队列小、无并发，覆盖写可接受）。
 3. 全部消化后若文件空，删除或留空文件皆可（readRewriteRequests 都按空处理）。
+4. auto 档下该队列由后台 runner 自动消化（质量门把关）；会话内消化仍然有效（先到先得）。
 
 2. **合成**（你来，逐 worklist 项）：读该 `codeRoot` 的实际源码，写 `.lore/wiki/<path>`，格式：
    ```markdown

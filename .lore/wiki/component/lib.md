@@ -2,80 +2,129 @@
 title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-11
-code_sha: b934c49
-atoms: 133
-commits: 132
+code_sha: b4d0003
+atoms: 137
+commits: 136
 ---
 # component: lib
 
-## Current architecture
+## 概览
+
+**一句话**：`lib/` 是 lore 的**全部引擎**——纯 Node 内置、**零依赖**，把每次代码改动沿「**捕获 → 合成 → 消费**」一条单向流水线变成最新 wiki。
+
+**整条流水线**：
 
 ```mermaid
-flowchart TD
-  hook["hook.js · post-commit"] --> J[("journal ndjson")]
-  mine["mine.js · git log 回填"] --> J
-  note["note.js · agent 决策"] --> J
-  J --> fold["fold.js · 按 id 折叠 / 去 orphan"]
-  cfg["config.js · 组件/主题/流/深度页"] --> sync["sync.js · plan / finalize"]
-  fold --> sync
-  sync --> manifest["manifest.js · .manifest.json"]
-  sync --> gj["graph.js · .graph.json"]
-  sync --> fp["fingerprint.js · prose 指纹"]
-  sync --> wiki["wiki 多轴页"]
-  manifest --> serve["serve.js + server.js"]
-  wiki --> serve
-  serve -.->|per-repo| reg["registry.js · servers.json"]
-  repos["repos.js · repos.json"] --> portal["portal.js · 门户 7842"]
-  wiki --> portal
-  gj --> mcp["mcp.js · agent 工具"]
-  manifest --> ask["ask.js · 检索"]
-  manifest --> lint["lint.js · 漂移"]
-  init["init.js · 脚手架"] -.->|装 hook + 登记| repos
+flowchart LR
+  src["源码 + git commit"] --> cap["① 捕获<br/>hook · mine · note"]
+  cap --> jrn[("journal ndjson<br/>append-only")]
+  jrn --> syn["② 合成<br/>plan → 写正文 → finalize"]
+  cfg["config.yml"] --> syn
+  syn --> wiki[("wiki/ + .manifest.json + .graph.json")]
+  wiki --> ppl["③ 消费 · 人读<br/>server · portal"]
+  wiki --> agt["③ 消费 · agent<br/>ask · mcp"]
+  wiki --> lnt["lint · 只读漂移报告"]
 ```
 
-一句话：`lib/` 是 lore 的全部引擎——纯 Node 内置、零依赖，把仓库变更沿「捕获 → 合成 → 消费」单向流水线变成 wiki。
+**一个场景看懂「为什么 commit 之后 wiki 就新了」**：
 
-> 📐 **本页是鸟瞰**，只讲模块间怎么拼。复杂模块各有**深度页**（完整机制 + 故障地图 + 测试锚点，点进去看）：
-> [[sync]] · [[manifest]] · [[fingerprint]] · [[hook]] · [[fold]] · [[mine]]。
+> 你 `git commit` → post-commit `hook` 立刻把这次 commit 落成一条 `journal` 原子（**<50 ms、绝不阻断 commit**）→
+> 同步骤顺手 detached spawn 一次 `sync finalize`（机械、零 LLM）→ 决策史按 sha 重折、`.manifest.json` 盖新章、HOME 状态块刷新、漂移页打上诚实的 `stale` → 浏览器壳下一次刷新就看到新决策史 + stale 灯。
+>
+> 架构正文（`## Current architecture` 那段 prose）**不在这一步**改——它走「代码 prose 指纹动了才重写」的轨道：`plan` 增量列出谁需要重写，agent 在会话里读源码写、或 `auto` 档让 runner 后台跑。
 
-### 捕获：每次变更记成 journal 原子
+**为什么这么设计**：
 
-- [[hook]] — post-commit 钩子，每次 commit 自动记一条原子（<50ms、不阻断 commit），并触发后台机械刷新。
-- [[mine]] — 从 `git log` 全量回填历史，按 sha 幂等，据 config 打 component/theme/flow facet。
-- `note.js` — agent 当场记决策原子（带 why）。
-- `journal.js` — 三源都落成 append-only ndjson（按日分片、去重）。
-- [[fold]] — 读取层按 id 折叠（why 追加 / refs 并集 / ts 最早），丢弃 amend、rebase 留下的 orphan。
+- **零依赖** = 装 lore 不污染目标仓库的 `package.json`，所有 lib 模块只用 Node 内置（`node:http` / `node:fs` / `node:child_process`）。`claude` CLI 是**环境能力**、不是 npm 依赖。
+- **单向流水线** = 每步幂等、删 `.lore/.state/` 任意文件都能从源重建（journal/manifest 是物化产物、**不是真相源**——真相源是 git commit + 源码 + `config.yml`）。
+- **LLM 只占「写正文」一步且只读** = 机械 finalize 不依赖 LLM，故 commit 之后必新；后台 runner 走 `claude -p` 白名单（`Read`/`Grep`/`Glob`），写盘永远是 runner，质量门把关，**LLM 自己无文件写权限**。
 
-### 合成：journal + 源码 → wiki
+想查 BUG 或加端点？展开机制档 👇
 
-[[sync]] 三步走：**plan**（机械列页，增量）→ **写正文**（agent 读源码写「当前架构」）→ **finalize**（机械盖 frontmatter、折决策史、建 INDEX、产 `.manifest.json` + `.graph.json`）。
+## 机制详解
 
-配套模块：
+<details>
+<summary><b>① 模块清单</b> —— 谁在哪一档</summary>
 
-- `config.js` — 解析组件 / 主题 / 数据流 / **深度页**配置，驱动多轴打标。
-- [[manifest]] · `graph.js` — 产出给壳和 agent 用的索引（含诚实 `stale`）与图谱。
-- [[fingerprint]] — prose 指纹，解耦「正文新鲜度」与「机械 finalize」。
-- `home.js` — HOME 首页 + 机械状态块（版本 / sha / 轴 / 语言）。
-- `docs.js` — 把 `docs/` 等物化成 docs 轴（零 LLM）。
-- `i18n.js` + `translate.js` — 双语翻译页（按需生成、防陈旧）。
+| 档 | 模块 | 干什么 | 锚点 |
+|---|---|---|---|
+| 捕获 | [[hook]] | post-commit 钩子；写当次 commit 原子 + 触发后台 finalize；`auto` 档另写 `auto-pending` 时间戳 | `captureHead @ lib/hook.js` · `maybeRefresh @ lib/hook.js` |
+| 捕获 | [[mine]] | `git log` 全量回填历史；按 sha 幂等；据 config 打 component/theme/flow facet | `mineCommits @ lib/mine.js` · `tagThemes @ lib/mine.js` · `tagFlows @ lib/mine.js` |
+| 捕获 | `note.js` | agent 当场记决策原子（带 why）；`--enrich <sha>` 往已有 commit 骨架追 why | `noteAtom @ lib/note.js` |
+| 捕获 | `journal.js` | append-only ndjson；按 ISO 日分片；去重靠 atom `id` | `appendAtom @ lib/journal.js` · `readAllAtoms @ lib/journal.js` · `existingIds @ lib/journal.js` |
+| 合成 | [[sync]] | 三步走：plan（增量）→ 写正文（agent）→ finalize（机械）；finalize 在 hook 里每 commit 跑 | `planSync @ lib/sync.js` · `finalizeSync @ lib/sync.js` · `stampFrontmatter @ lib/sync.js` |
+| 合成 | `config.js` | 解析 component / theme / flow / docs / **deep（源文件级子页）** 五种轴声明；零依赖 YAML 子集 | `parseConfigCodeRoots @ lib/config.js` · `parseConfigThemes @ lib/config.js` · `parseConfigFlows @ lib/config.js` · `parseConfigDeep @ lib/config.js` · `parseConfigLanguage @ lib/config.js` |
+| 合成 | [[fold]] | 同 id 合并（why 追加、refs 并集、ts 最早）；丢 amend/rebase 留下的 unreachable orphan；剥 git trailer 噪声 | `foldAtoms @ lib/fold.js` · `stripTrailers @ lib/fold.js` |
+| 合成 | [[manifest]] | 物化壳和 agent 用的索引（含**诚实**的 `stale`）；front-matter 解析共用 | `emitManifest @ lib/manifest.js` · `parseFrontmatter @ lib/manifest.js` · `makeCountCommitsSince @ lib/manifest.js` |
+| 合成 | `graph.js` | atom/page 节点 + facet/refs_related 边；给 agent 顺图谱推理用 | `buildGraph @ lib/graph.js` · `neighbors @ lib/graph.js` · `resolvePagePath @ lib/graph.js` |
+| 合成 | [[fingerprint]] | prose 指纹（`prose_sha` + `code_sha`）；解耦「正文新鲜度」与「机械 finalize」——故 finalize 可无脑跑 | `proseHash @ lib/fingerprint.js` · `readFingerprints @ lib/fingerprint.js` · `writeFingerprints @ lib/fingerprint.js` |
+| 合成 | `home.js` | HOME 首页 + 状态块（版本/sha/轴/语言）；finalize 用哨兵区原位换 | `buildHomeStatus @ lib/home.js` · `finalizeHomeText @ lib/home.js` · `defaultHomePage @ lib/home.js` |
+| 合成 | `docs.js` | `docs/**/*.md` + `CHANGELOG.md` + `CLAUDE.md` 踩坑 → docs 轴；nuke-rebuild、零 LLM | `buildDocsAxis @ lib/docs.js` |
+| 合成 | `i18n.js` + `translate.js` | 双语翻译页；防陈旧靠源 hash（哨兵区不入源 hash） | `discoverTranslations @ lib/i18n.js` · `translationSourceHash @ lib/i18n.js` |
+| 合成 | `syncstate.js` | `.state/` per-machine 偏好：档位（`manual`/`notify`/`auto`）、重写队列、auto-pending、runner pid、auto-runs 历史 | `readSyncConfig @ lib/syncstate.js` · `readRewriteRequests @ lib/syncstate.js` · `writeAutoPending @ lib/syncstate.js` · `appendAutoRun @ lib/syncstate.js` |
+| 合成 | `runner.js` | `auto` 档后台 LLM 重写器：纯函数 ticker 判定 + 质量门 + claude `-p` 只读后端 + runner 写盘 | `shouldRunAuto @ lib/runner.js` · `qualityGate @ lib/runner.js` · `runAuto @ lib/runner.js` · `claudeBackend @ lib/runner.js` |
+| 消费 | [[server.js]]（仓库根） | 零依赖 http；静态 serve 壳与 wiki + 写 API + Host/路径穿越防护；ticker 跑 `shouldRunAuto` | `createServer @ server.js` · `createPortalServer @ server.js` |
+| 消费 | `serve.js` | start/stop 生命周期；python/node 运行时探测；按 loreDir 哈希取稳定端口 | `startServer @ lib/serve.js` · `runtimeProbe @ lib/serve.js` |
+| 消费 | `registry.js` | `~/.lore/servers.json` 中央登记；`list` / `stop-all` | `readServerRegistry @ lib/registry.js` |
+| 消费 | `portal.js` | 单机门户（固定端口 `7842`）；聚合本机所有 lore 仓库；只读、仅绑 `127.0.0.1` | `startPortal @ lib/portal.js` |
+| 消费 | `repos.js` | `~/.lore/repos.json` 仓库登记；portal 据此发现各仓 | `readRepos @ lib/repos.js` |
+| 消费 | `ask.js` | 关键词检索（关 manifest）；CLI + 给 mcp 用 | `searchPages @ lib/ask.js` |
+| 消费 | `mcp.js` | 零依赖 stdio MCP server；顺 `.graph.json` 推理；导 `lore_ask` / `lore_page` / `lore_neighbors` | `serveMcp @ lib/mcp.js` |
+| 检查 | `lint.js` | 只读漂移报告：stale / orphan / missing / mermaid 语法五检；CLI exit 0（advisory） | `lint @ lib/lint.js` · `mermaidIssues @ lib/lint.js` |
+| 装机 | `init.js` | 一次性脚手架；不参与运行时流水线 | 见 ④ |
 
-### 消费：人读 + agent 读
+</details>
 
-- **人读 · 单仓**：`server.js`（**仓库根**的零依赖 HTTP server —— 静态 serve wiki + i18n 写 API + Host / 目录穿越防护）；`serve.js`（start/stop 生命周期 + python/node 运行时探测）+ `registry.js`（中央登记）+ 每仓稳定端口。
-- **人读 · 门户**（v0.6）：`portal.js` 一个常驻端口 `7842` 聚合本机所有仓库；`repos.js` 发现各仓；按 `/<仓库>/` 路由。只读、仅绑本机。
-- **agent 读**：`ask.js`（关键词检索）+ `mcp.js`（MCP 工具，顺 `.graph.json` 图谱推理）。深度页让图谱可遍历到**模块级**。
+<details>
+<summary><b>② 流水线契约</b> —— 阶段间靠什么对齐</summary>
 
-### 检查
+- **journal 是 append-only ndjson、按 ISO 日分片**：三个源（`hook` / `mine` / `note`）都只 `appendAtom`、不修改既有行；幂等靠 atom `id`（commit sha 或决策 hash）。**严禁在 journal 上直接编辑**——决策史展示的「折叠」在读取层（`foldAtoms`）做、不污染原子。
+- **plan 是增量、finalize 是机械**：`planSync` 按 `prose_sha` 比对 git 变更，只列「代码动过」的 component 深度页（HOME/theme/flow 默认全列）；`finalizeSync` **不读源码不调 LLM**，仅盖 frontmatter / 重折决策史哨兵区 / 重建 INDEX / 写 manifest + graph + docs 轴 + HOME 状态块，故 hook 可在每次 commit 后无脑 detached spawn 它。
+- **manifest 的 `stale` 是诚实的**：`stale` 来自 `git rev-list <prose_sha>..HEAD -- <code_root>` 的 count，**永远不在 finalize 里清零**——只有 prose 真的被重写、`prose_sha` 在 `fingerprints.json` 推进了，下次 finalize 才会归零。`auto` 档跑完 runner 后由 finalize 自然降。
+- **LLM 只读、runner 写盘**：`claudeBackend` 起 `claude -p --allowedTools Read,Grep,Glob` 子进程，整篇页面吐 stdout；runner 收下跑 `qualityGate`（非空 → frontmatter `title+summary` 完整 → `{{LORE_JOURNAL}}` token 或 `LORE_JOURNAL:START` 哨兵在 → 全部 ```mermaid 块过 `mermaidIssues` → `newText.length ≥ oldText.length / 3` 防截断），过门才写 wiki。
+- **stale pid = 无锁**：runner 防叠跑读 `.state/runner.pid`，但进程已死的 pid 视作无锁——杀进程不留死锁，删 pid 文件无副作用。
+- **三个轴 + docs + deep**：当前 sync 支持 `component` / `theme` / `flow` + `docs`（机械、零 LLM）+ `deep`（源文件级 component 子页，如 `lib` 下的 `sync` / `manifest` …）。加新轴要同改 `config.js` 解析、`sync.js` 的 `SYNC_AXES`、`manifest.js` 的 `AXIS_ORDER` 三处。
 
-- `lint.js` — 只读报告漂移（stale / orphan / missing），不自动改。
+</details>
 
----
+<details>
+<summary><b>③ 不变量 / 边界</b> —— 改 lib 之前先记住</summary>
 
-`init.js` 是一次性脚手架：建 `.lore/`、自动发现组件、拷壳、装 hook，并登记到门户。
+- **零依赖不破**：`lib/**/*.js` 只允许 `import 'node:*'` 与同目录 sibling；引第三方 npm 包 = 违反产品承诺，需先在 ROADMAP 立项。
+- **hook 永不挡 commit**：`captureHead` + `maybeRefresh` 都被外层 `try/catch` 吞掉错（`hook.js` CLI 块 `process.exit(0)`），任何新增 hook 行为必须保持 best-effort——**绝不让 commit 因为 lore 失败而失败**。
+- **`.state/` 任一文件可重建**：删 `fingerprints.json` → 下次 sync 视作全 stale 重算；删 `auto-pending.json` / `runner.pid` / `auto-runs.ndjson` → runner 自然忽略；`sync.json` 丢了回默认 `notify` 档；物化产物（`wiki/.manifest.json`、`.graph.json`）从 journal + 源码重建。
+- **portal 只读靠结构**：`createPortalServer` 整段 `404` 掉 `/<repo>/api/*`，不靠运行时 mode 判断——给门户加任何写功能前先想清楚跨 repo 写意味着什么（详见 [[server.js]] 机制档 ④）。
+- **server 的 Host 闸不可绕**：写 API 入口先 `localHost(req)`，拦 DNS 重绑定攻击；测 `403` 要用 `node:http` 注入伪 Host（`fetch` 的 Host 是 forbidden header）。
+- **鸟瞰页 vs 深度页**：`component/<code_root>.md`（本页就是 `lib`）汇总决策史 + 模块导览；`component/<子模块>.md`（如 [[sync]]）按完整两档写、不放 `## Decision history` token（决策史汇总在鸟瞰页）。深度页由 `config.yml` 的 `axes.component.deep.<root>: [子模块…]` 声明，`planSync` 列出 `kind:'deep'` 项。
+
+</details>
+
+<details>
+<summary><b>④ 一次性脚手架</b> —— init 的角色</summary>
+
+`init.js` **不参与运行时流水线**，是 `/lore:init` 的实现：
+
+- 建 `.lore/` 子目录骨架（`mkdir -p`，idempotent）；
+- 自动发现组件：JS workspaces（`workspaces: dir/*` 或 object 形式）→ Python packages + `src/` 布局 → 兜底顶层 code 目录，按 ancestor dedup；
+- 渲染 `config.yml`（component 自动 + theme/flow 种子 + `hook: false`），含 YAML 特殊字符的 root 自动单引号；
+- 拷贝 `site/`（vendored `mermaid.min.js` 在内）覆盖写到 `.lore/site/`；
+- 装 post-commit hook：`installHook` resolve **common git dir**（worktree-safe），尊重 `core.hooksPath` 的默认值，install-if-absent 策略 A；
+- 把 repo 登记进 `~/.lore/repos.json`（best-effort，portal 据此发现）；
+- 保 `.lore/.state/` 走 gitignore 三态。
+
+跑完一次就退场——之后所有 wiki 变化走 hook → sync 流水线。
+
+锚点：`init @ lib/init.js` · `discoverComponents @ lib/init.js` · `installHook @ lib/init.js` · `renderConfigYaml @ lib/init.js` · `ensureGitignore @ lib/init.js`。
+
+</details>
 
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(hook): auto mode stamps pending timestamp (mechanical finalize unchanged)** (1444530, 2026-06-10)
+- **feat(runner): claudeBackend (read-only LLM, stdout) + runAuto pipeline + CLI** (963c6d8, 2026-06-10)
+- **feat(runner): shouldRunAuto ticker predicate + mechanical qualityGate** (27e6698, 2026-06-10)
+- **feat(syncstate): auto mode + config/pending/pid/runs state (B2)** — B1 'auto rejected' assertions flipped (syncstate throw + server 400 → 200) (f2a8209, 2026-06-10)
 - **feat(note): enrich mode — append why to an existing commit skeleton (append-only, fold merges)** — /lore:note --enrich <sha> --why ... resolves short shas via rev-parse, (ddd27b9, 2026-06-10)
 - **feat(lint): mermaid syntax heuristics (5th check) + fix orphan/unfolded false positives** — - mermaidIssues/lintMermaid: catch reserved node ids (graph[...]), broken (eef82cd, 2026-06-10)
 - **feat(manifest): docs-axis group ordering + frontmatter group/paired_plan passthrough (impl)** — Prior commit 077b120 carried the red test only — parallel Edit+Bash misfire, (e3e69a3, 2026-06-10)
@@ -213,4 +262,5 @@ flowchart TD
 
 ## Cross-links
 
-- 深度页：[[sync]] · [[manifest]] · [[fingerprint]] · [[hook]] · [[fold]] · [[mine]]
+- 深度页：[[sync]] · [[manifest]] · [[fingerprint]] · [[hook]] · [[fold]] · [[mine]] · [[server.js]]
+- 同档其他：[[HOME]]（认知入口）· [[INDEX]]（目录）

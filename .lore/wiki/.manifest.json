@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-11T02:29:27.213Z",
-  "current_code_sha": "96675e2",
+  "generated": "2026-06-11T04:18:46.224Z",
+  "current_code_sha": "b4d0003",
   "language": {
     "default": "zh",
     "available": [
@@ -23,11 +23,11 @@
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 59,
+          "stale": 68,
           "code_sha": "7de5966",
           "synthesized_from": {
-            "atoms": 286,
-            "commits": 285
+            "atoms": 295,
+            "commits": 294
           },
           "group": "",
           "paired_plan": ""
@@ -48,10 +48,10 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "96675e2",
+          "code_sha": "b4d0003",
           "synthesized_from": {
-            "atoms": 286,
-            "commits": 285
+            "atoms": 295,
+            "commits": 294
           },
           "group": "",
           "paired_plan": ""
@@ -71,11 +71,11 @@
           "path": "component/lib.md",
           "lang": "zh",
           "translations": [],
-          "stale": 16,
-          "code_sha": "b934c49",
+          "stale": 0,
+          "code_sha": "b4d0003",
           "synthesized_from": {
-            "atoms": 133,
-            "commits": 132
+            "atoms": 137,
+            "commits": 136
           },
           "group": "",
           "paired_plan": ""
@@ -89,11 +89,11 @@
           "path": "component/server.js.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 1,
           "code_sha": "eef82cd",
           "synthesized_from": {
-            "atoms": 0,
-            "commits": 0
+            "atoms": 1,
+            "commits": 1
           },
           "group": "",
           "paired_plan": ""
@@ -107,7 +107,7 @@
           "path": "component/hook.md",
           "lang": "zh",
           "translations": [],
-          "stale": 1,
+          "stale": 2,
           "code_sha": "b934c49",
           "synthesized_from": {
             "atoms": 0,
@@ -249,6 +249,24 @@
           "paired_plan": ""
         },
         {
+          "id": "superpowers-plans-2026-06-10-lore-auto-rewrite",
+          "axis": "docs",
+          "title": "lore 自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）Implementation Plan",
+          "summary": "> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [...",
+          "last_updated": "2026-06-10",
+          "path": "docs/superpowers-plans-2026-06-10-lore-auto-rewrite.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": "设计与计划",
+          "paired_plan": ""
+        },
+        {
           "id": "superpowers-plans-2026-06-10-lore-docs-axis-regroup",
           "axis": "docs",
           "title": "lore docs 轴重构（分组置顶 + feature 配对 + 默认折叠）Implementation Plan",
@@ -265,6 +283,24 @@
           },
           "group": "设计与计划",
           "paired_plan": ""
+        },
+        {
+          "id": "superpowers-specs-2026-06-10-lore-auto-rewrite-design",
+          "axis": "docs",
+          "title": "lore 自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）—— 设计",
+          "summary": "- 日期：2026-06-10 - 状态：设计已批，待写实施计划 - 北极星：人读 + agent 双友好的活文档；本期兑现**「wiki 永远新鲜」的最后一块**——prose 重写不再依赖人开会话 - 前置（已在 main）：A 低摩擦合成（增量 plan/指纹/机械 finalize）、B1 控制面（档位 manual/notify + 控制 API + 壳控制台 + rewrite ...",
+          "last_updated": "2026-06-10",
+          "path": "docs/superpowers-specs-2026-06-10-lore-auto-rewrite-design.md",
+          "lang": "zh",
+          "translations": [],
+          "stale": 0,
+          "code_sha": "",
+          "synthesized_from": {
+            "atoms": 0,
+            "commits": 0
+          },
+          "group": "设计与计划",
+          "paired_plan": "superpowers-plans-2026-06-10-lore-auto-rewrite"
         },
         {
           "id": "superpowers-specs-2026-06-10-lore-docs-axis-regroup-design",

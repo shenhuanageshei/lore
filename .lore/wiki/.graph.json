@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-11T02:29:27.213Z",
+  "generated": "2026-06-11T04:18:46.224Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -79,11 +79,25 @@
       "path": "docs/ROADMAP.md"
     },
     {
+      "id": "page:docs/superpowers-plans-2026-06-10-lore-auto-rewrite",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）Implementation Plan",
+      "path": "docs/superpowers-plans-2026-06-10-lore-auto-rewrite.md"
+    },
+    {
       "id": "page:docs/superpowers-plans-2026-06-10-lore-docs-axis-regroup",
       "type": "page",
       "axis": "docs",
       "title": "lore docs 轴重构（分组置顶 + feature 配对 + 默认折叠）Implementation Plan",
       "path": "docs/superpowers-plans-2026-06-10-lore-docs-axis-regroup.md"
+    },
+    {
+      "id": "page:docs/superpowers-specs-2026-06-10-lore-auto-rewrite-design",
+      "type": "page",
+      "axis": "docs",
+      "title": "lore 自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）—— 设计",
+      "path": "docs/superpowers-specs-2026-06-10-lore-auto-rewrite-design.md"
     },
     {
       "id": "page:docs/superpowers-specs-2026-06-10-lore-docs-axis-regroup-design",
@@ -2457,6 +2471,69 @@
       "kind": "commit",
       "title": "docs(note-cmd): document enrich mode",
       "ts": "2026-06-10T19:29:26-07:00"
+    },
+    {
+      "id": "commit:ee90b08ed7735c64805a83b8347fc34fb1504ed4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): note enrich done",
+      "ts": "2026-06-10T19:30:24-07:00"
+    },
+    {
+      "id": "commit:c14f002546127274a495f9a2191cf665878f7f13",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(spec): auto-rewrite B2 design (LLM runner, unified ticker, read-only backend, quality gate)",
+      "ts": "2026-06-10T20:04:22-07:00"
+    },
+    {
+      "id": "commit:def4b122fbf5f6cae9bed5f903d7b70edfde1fae",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(plan): auto-rewrite B2 implementation plan (7 tasks, TDD, fake-backend tested)",
+      "ts": "2026-06-10T20:11:01-07:00"
+    },
+    {
+      "id": "commit:f2a820952f42763d484bbf98290831e4bc7a032f",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(syncstate): auto mode + config/pending/pid/runs state (B2)",
+      "ts": "2026-06-10T20:25:51-07:00"
+    },
+    {
+      "id": "commit:27e669883715e9bfefff39107292c4baf8eafccb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(runner): shouldRunAuto ticker predicate + mechanical qualityGate",
+      "ts": "2026-06-10T20:31:17-07:00"
+    },
+    {
+      "id": "commit:963c6d825a23bf5ad93c0cd66d0a5de6fe1ca428",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(runner): claudeBackend (read-only LLM, stdout) + runAuto pipeline + CLI",
+      "ts": "2026-06-10T20:45:12-07:00"
+    },
+    {
+      "id": "commit:1444530989d933977d97fbf5042756c2589f92eb",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(hook): auto mode stamps pending timestamp (mechanical finalize unchanged)",
+      "ts": "2026-06-10T20:56:39-07:00"
+    },
+    {
+      "id": "commit:469ac6d4dccf1fe0ad20e28ffe08dab06563c139",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(server): status config/runner_running, GET runs, 60s auto ticker (per-repo only)",
+      "ts": "2026-06-10T21:00:04-07:00"
+    },
+    {
+      "id": "commit:b4d0003376d76e7705de95b492e7a0c9cd9ccd07",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(shell): unlock auto mode, busy light, auto-run history table",
+      "ts": "2026-06-10T21:05:57-07:00"
     }
   ],
   "edges": [
@@ -3123,6 +3200,31 @@
     {
       "from": "commit:ddd27b9f5ccad03aa0c0b1181a9a86f8cebf6c43",
       "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:f2a820952f42763d484bbf98290831e4bc7a032f",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:27e669883715e9bfefff39107292c4baf8eafccb",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:963c6d825a23bf5ad93c0cd66d0a5de6fe1ca428",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:1444530989d933977d97fbf5042756c2589f92eb",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:469ac6d4dccf1fe0ad20e28ffe08dab06563c139",
+      "to": "page:component/server.js",
       "type": "facet"
     }
   ]

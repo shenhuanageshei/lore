@@ -61,9 +61,9 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 改为 **per-facet confidence**；`renderDecisionHistory` / serve 壳给 INFERRED facet 显「(推断)」；`/lore:lint` 把 AMBIGUOUS 推人确认。
 - **2026-06-10 评估：YAGNI 暂缓**——dogfood 的 flow/theme 轴均为空（`values: []`），per-facet 标注在空轴上无意义。flow/theme 真实启用后再做。
 
-### note enrich 骨架（母 §4② 后半）· fold-by-id 半边已实现
-- `/lore:note` 现只产新 decision 原子。加 **enrich 已有 commit 骨架**：同 `commit:<hash>` append 新行补 `why`（append-only 神圣，不改旧行）。
-- ~~配套 journal fold-by-id~~ ✅ 已实现（`lib/fold.js` mergeById：同 id 合并、why 演化追加、refs 并集，sync 消费）——enrich 落地时折叠层零改动直接可用。注：ask 读 manifest、lint 读 frontmatter，均不消费原子，无需接入。
+### ~~note enrich 骨架（母 §4② 后半）~~ ✅ 已实现（2026-06-10）
+- `/lore:note --enrich <sha> --why "..."`：短 sha rev-parse 展开对齐骨架 id，追加同 `commit:<sha>` 的 enriched 原子（append-only 不改旧行）；fold 层 mergeById 合并——骨架 title 保留、新 why 演化追加（轨迹可审计）。
+- ~~配套 journal fold-by-id~~ ✅ 已实现（`lib/fold.js` mergeById，sync 消费）。注：ask 读 manifest、lint 读 frontmatter，均不消费原子，无需接入。
 
 ## 呈现（wiki 渲染，⭐ 用户明确要）
 
@@ -88,7 +88,8 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 
 ### 同步控制台 B1（档位 + 控制 API + 壳控制台）✅ 已实现
 - 已实现：档位 `manual`/`notify`（`.state/sync.json`，per-machine，hook 真读分流——manual 档 commit 零后台动作）；控制 API 四端点（status / mode / finalize-spawn / rewrite-requests，localhost-only + safeWikiPage 防越狱，portal 仍只读 404）；壳顶栏状态灯（🟢/🟡/⚪ 三态）+ 下拉面板 + `#console` 整页（全 CSS 主题变量，三主题跟随）；manifest 轮询（15s 慢 + 操作后 1s 快，`no-store` 防 python 缓存）自动刷新灯/侧栏 + 当前页「⟳ 内容已更新」提示条；重写排队（ndjson 队列去重，`/lore:sync` 优先消化）。serve `--node` 给单语 repo 启用控制 API。7 项端到端验收全过（含「切 manual → commit → manifest 纹丝不动」反空壳）。设计见 `docs/superpowers/specs/2026-06-09-lore-sync-console-design.md`。
-- **B2（另立 spec）**：LLM 运行器（可插拔后端：默认 spawn claude CLI 无头 / 裸 Anthropic API / codex 扩展位）+ `auto` 档 + `schedule` 定时 + 质量门（机械校验+失败丢弃）+ 自动重写任务历史。
+### 自动重写 B2（LLM 运行器 + auto 档 + schedule + 质量门）✅ 已实现
+- 已实现：auto 档（`.state/sync.json` 扩展 debounce/schedule/max_pages）；hook 只写 pending 时间戳，server ticker（60s，仅 per-repo）统一判静默期/schedule/防叠跑 → spawn runner；runner 串行调 **只读 claude CLI**（--allowedTools Read,Grep,Glob，stdout 收文）→ 机械质量门（frontmatter/journal token/mermaid 第五检/防截断）→ 过门写盘 → `.state/auto-runs.ndjson` 历史 → finalize 收尾；壳 auto 解锁 + 灯 busy 态 + console 任务历史表。设计见 `docs/superpowers/specs/2026-06-10-lore-auto-rewrite-design.md`。余项（裸 API/codex 后端、配置编辑 UI）另立。
 
 ### 内容质量（两档好页 + 源文件级深度页）✅ 已实现（C-内容）
 - 已实现：定义「好 wiki 页」**两档标准**（**概览档**零黑话 + **机制档** 9 节 `<details>` 折叠 + **锚点锚符号**），写进 `commands/sync.md` + golden page 标杆（`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.{html,md}`）；**两层粒度**——config `axes.component.deep.<root>:[子模块…]` 声明源文件级深度页，`planSync` 列深度页工单（增量按源文件）、`finalizeSync` 按源文件精确算 stale；深度页是普通 component 页 → manifest/graph 自动支持（**graph 可遍历到模块级**）。dogfood：lib 一页 → 鸟瞰页 + 6 深度页（graph 1→7 节点）。设计见 `docs/superpowers/specs/2026-06-08-lore-content-quality-design.md`。余项（壳深度切换 UX、产出校验、文件级决策史分流）另立。

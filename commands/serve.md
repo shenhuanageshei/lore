@@ -35,5 +35,6 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/serve.js" stop --lore "$(pwd)/.lore"
 
 - 前置条件：`.lore/wiki/.manifest.json` 必须存在。若命令提示 "run /lore:sync first"，告诉用户先运行 `/lore:sync` 再启动服务。
 - 服务器仅绑定 `127.0.0.1`（本地浏览，绝不暴露到局域网）。
+- auto 档的后台重写依赖 Node server 在跑（ticker 宿主）——serve 没开则 auto 不触发，下次开 serve 时补跑过期 pending。
 - 把打印出的 URL 告诉用户；进程在后台运行，不阻塞会话。提醒用户可用 `/lore:serve --stop` 停止。
 - 不要修改目标仓库的任何源码；serve 只读取 `.lore/`。

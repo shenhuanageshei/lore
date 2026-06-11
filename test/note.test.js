@@ -65,6 +65,50 @@ function tokenPage(title, summary) {
     `## Current architecture\n\narch\n\n## Decision history\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`;
 }
 
+// --- enrich 骨架（母 §4② 后半）：同 commit:<hash> append 补 why，append-only，fold 层合并 ---
+import { enrichAtom } from '../lib/note.js';
+import { foldAtoms } from '../lib/fold.js';
+
+test('enrichAtom: 同 id 的 enriched commit 原子（补 why 不带 title）', () => {
+  const a = enrichAtom({ sha: 'abc123full', ts: '2026-06-10T01:00:00Z', why: '当时没写清楚：其实是为了 O(logN)' });
+  assert.equal(a.id, 'commit:abc123full');        // 与骨架同 id → fold 合并
+  assert.equal(a.kind, 'commit');
+  assert.equal(a.commit, 'abc123full');
+  assert.equal(a.enriched, true);                  // mergeGroup 只追加 enriched 原子的 why
+  assert.equal(a.title, '');                       // 不抢骨架 title（firstNonEmpty 基底优先）
+  assert.equal(a.why, '当时没写清楚：其实是为了 O(logN)');
+  assert.equal(a.source, 'agent');
+});
+
+test('integration: mine 骨架 → enrich 短 sha → fold 后 why 演化追加（append-only 两条原子）', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'feat: add a'], { cwd: root });
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n');
+    // mine 骨架
+    execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() });
+    const shortSha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    const fullSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
+    // enrich（短 sha → CLI 内部 rev-parse 展开成全 sha 对齐骨架 id）
+    const out = execFileSync('node', ['lib/note.js', root, '--enrich', shortSha, '--why', '补记：为了演示 enrich'], { cwd: process.cwd() }).toString();
+    assert.match(out, /enriched commit:/);
+    // journal 里同 id 两条（append-only）
+    const atoms = readAllAtoms(join(lore, 'journal')).filter(a => a.id === `commit:${fullSha}`);
+    assert.equal(atoms.length, 2);
+    assert.equal(atoms[1].enriched, true);
+    // fold 合并：why 演化追加、骨架 title 保留
+    const folded = foldAtoms(atoms);
+    assert.equal(folded.length, 1);
+    assert.match(folded[0].why, /补记：为了演示 enrich/);
+    assert.equal(folded[0].title, 'feat: add a');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('integration: note → sync folds the decision atom into the component page', () => {
   const root = gitRepo();
   try {

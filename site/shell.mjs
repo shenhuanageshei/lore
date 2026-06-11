@@ -158,7 +158,9 @@ export function buildConsoleModel(manifest, status) {
   stalePages.sort((a, b) => b.stale - a.stale || a.key.localeCompare(b.key));
   const mode = status?.mode ?? 'notify';
   return {
-    light: mode === 'manual' ? 'off' : (stalePages.length ? 'stale' : 'fresh'),
+    light: mode === 'manual' ? 'off'
+      : status?.runner_running ? 'busy'
+      : (stalePages.length ? 'stale' : 'fresh'),
     staleTotal: stalePages.length,
     stalePages,
     mode,

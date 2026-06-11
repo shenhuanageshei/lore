@@ -238,6 +238,13 @@ test('buildConsoleModel: status null（python server / portal 无 API）→ 默�
   assert.equal(m.staleTotal, 0);
 });
 
+test('buildConsoleModel: runner_running → busy 灯（优先于 stale/fresh，不盖 manual off）', () => {
+  const m = buildConsoleModel(mkManifest([{ id: 'a', title: 'A', stale: 3 }]), { mode: 'auto', last_finalize: null, runner_running: true });
+  assert.equal(m.light, 'busy');
+  const off = buildConsoleModel(mkManifest([]), { mode: 'manual', last_finalize: null, runner_running: true });
+  assert.equal(off.light, 'off');   // manual 优先（runner 不该在 manual 下跑，防御性显示）
+});
+
 test('pollDecide: generated 未变 → 全 false；变了 → 重建；当前页变了 → 提示条', () => {
   assert.deepEqual(pollDecide('t1', 't1', false), { changed: false, rebuildSidebar: false, showUpdateBar: false });
   assert.deepEqual(pollDecide('t1', null, false), { changed: false, rebuildSidebar: false, showUpdateBar: false });

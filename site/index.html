@@ -52,6 +52,8 @@
   #sync-light .ind { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
   #sync-light.stale .ind { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
   #sync-light.off .ind { background: var(--fg-dim); }
+  #sync-light.busy .ind { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: lb-pulse 1.2s infinite; }
+  @keyframes lb-pulse { 50% { opacity: .35; } }
   #sync-panel { position: absolute; top: 46px; right: 12px; z-index: 50; width: 280px;
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
     padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,.35); font-size: 12.5px; color: var(--fg); }
@@ -199,9 +201,10 @@
       <span class="seg">
         <button data-mode="manual">手动</button>
         <button data-mode="notify">提醒</button>
-        <button data-mode="auto" disabled title="B2 解锁">全自动 🔒</button>
+        <button data-mode="auto">全自动</button>
       </span>
     </div>
+    <div class="row" id="sync-auto-info" hidden><span class="dim">auto</span><span id="sync-auto-info-text"></span></div>
     <div class="row"><span class="dim">待重写</span><span id="sync-stale-summary">—</span></div>
     <div class="row"><span class="dim">上次机械刷新</span><span id="sync-last">—</span></div>
     <div class="actions">
@@ -419,7 +422,7 @@ const RO_ATTR = 'disabled title="只读模式（portal 或 python server）—�
 
 function renderConsolePage() {
   const m = buildConsoleModel(MANIFEST, SYNC_STATUS);
-  const modeDesc = { manual: '一切手动——commit 不触发任何后台动作', notify: 'commit 后自动机械刷新（决策史/manifest/stale），prose 重写排队提醒' };
+  const modeDesc = { manual: '一切手动——commit 不触发任何后台动作', notify: 'commit 后自动机械刷新（决策史/manifest/stale），prose 重写排队提醒', auto: 'commit 静默期后自动重写 stale 页（后台只读 LLM，质量门把关）' };
   const rows = m.stalePages.map(p => `
     <tr><td><a href="#${p.key}">${p.key}</a></td>
       <td><span class="tag w">⚠ ${p.stale} commits</span></td>
@@ -436,7 +439,7 @@ function renderConsolePage() {
         <span class="seg" id="console-seg">
           <button data-mode="manual" ${SYNC_API_OK ? '' : RO_ATTR}>手动</button>
           <button data-mode="notify" ${SYNC_API_OK ? '' : RO_ATTR}>提醒</button>
-          <button data-mode="auto" disabled title="B2 解锁">全自动 🔒</button>
+          <button data-mode="auto" ${SYNC_API_OK ? '' : RO_ATTR}>全自动</button>
         </span>
         <span style="color:var(--fg-dim);font-size:12.5px">${modeDesc[m.mode] ?? ''}</span>
       </div>
@@ -453,13 +456,23 @@ function renderConsolePage() {
       <h3>状态</h3>
       <table>
         <tr><td style="color:var(--fg-dim)">上次机械刷新</td><td>${m.lastFinalize ? new Date(m.lastFinalize).toLocaleString() : '—'}</td></tr>
-        <tr><td style="color:var(--fg-dim)">已排队请求</td><td>${QUEUED_PAGES.size} 条 —— 下次会话 /lore:sync 优先消化</td></tr>
-        <tr><td style="color:var(--fg-dim);opacity:.55">自动重写任务历史</td><td style="opacity:.55">🔒 B2 全自动档解锁后显示</td></tr>
+        <tr><td style="color:var(--fg-dim)">已排队请求</td><td>${QUEUED_PAGES.size} 条 —— ${m.mode === 'auto' ? '后台 runner 自动消化' : '下次会话 /lore:sync 优先消化'}</td></tr>
       </table>
+    </div>
+    <div class="console-sec">
+      <h3>自动重写任务历史</h3>
+      ${SYNC_RUNS.length ? `<table><tr><th>时间</th><th>页数</th><th>结果</th><th>详情</th></tr>${
+        SYNC_RUNS.map(r => {
+          const ok = r.pages.filter(p => p.ok).length;
+          const fails = r.pages.filter(p => !p.ok);
+          return `<tr><td>${new Date(r.ts).toLocaleString()}</td><td>${r.pages.length}</td>
+            <td>${ok ? `<span class="tag q">✓ ${ok}</span>` : ''}${fails.length ? ` <span class="tag w">✗ ${fails.length}</span>` : ''}</td>
+            <td style="color:var(--fg-dim);font-size:12px">${fails.slice(0, 2).map(f => `${f.page.split('/').pop()}: ${f.reason}`).join('；') || `${Math.round(r.total_ms / 1000)}s`}</td></tr>`;
+        }).join('')}</table>` : '<p style="color:var(--fg-dim)">暂无运行记录（auto 档触发后在此显示）</p>'}
     </div>`;
   document.querySelectorAll('#console-seg button').forEach(b => {
     b.classList.toggle('on', b.dataset.mode === m.mode);
-    if (b.dataset.mode !== 'auto') b.onclick = async () => {
+    b.onclick = async () => {
       try {
         await fetch(BASE + 'api/sync/mode', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: b.dataset.mode }) });
       } catch {}
@@ -524,6 +537,7 @@ function wireTheme() {
 let SYNC_STATUS = null;        // GET /api/sync/status 结果；API 不可用（python/portal）→ null
 let SYNC_API_OK = false;
 let QUEUED_PAGES = new Set();  // 已排队 page path（渲染「已排队 ✓」）
+let SYNC_RUNS = [];            // auto 任务历史（console 表格消费）
 
 async function fetchSyncStatus() {
   try {
@@ -533,7 +547,8 @@ async function fetchSyncStatus() {
     SYNC_API_OK = true;
     const q = await (await fetch(BASE + 'api/sync/rewrite-requests')).json();
     QUEUED_PAGES = new Set((q.requests ?? []).map(x => x.page));
-  } catch { SYNC_STATUS = null; SYNC_API_OK = false; }
+    try { SYNC_RUNS = (await (await fetch(BASE + 'api/sync/runs')).json()).runs ?? []; } catch { SYNC_RUNS = []; }
+  } catch { SYNC_STATUS = null; SYNC_API_OK = false; SYNC_RUNS = []; }
 }
 
 // --- manifest 轮询：15s 慢轮询常驻；操作后 1s×10 快轮询（秒级反馈）。纯 GET，三 serve 形态全兼容。
@@ -590,7 +605,15 @@ function renderSyncLight() {
   light.className = m.light === 'fresh' ? '' : m.light;          // '' | 'stale' | 'off'
   document.getElementById('sync-light-text').textContent =
     m.light === 'off' ? `手动 · ${m.staleTotal} 待写`
+    : m.light === 'busy' ? '自动重写中…'
     : m.staleTotal ? `${m.staleTotal} 待重写` : '全新鲜';
+  const autoInfo = document.getElementById('sync-auto-info');
+  autoInfo.hidden = m.mode !== 'auto';
+  if (m.mode === 'auto') {
+    const c = SYNC_STATUS?.config ?? {};
+    document.getElementById('sync-auto-info-text').textContent =
+      `静默 ${c.debounce_minutes ?? 10}min${c.schedule ? ' · 每日 ' + c.schedule : ''} · 单次 ≤${c.max_pages ?? 5} 页`;
+  }
   document.querySelectorAll('#sync-panel .seg button').forEach(b =>
     b.classList.toggle('on', b.dataset.mode === m.mode));
   document.getElementById('sync-stale-summary').textContent = m.staleTotal
@@ -617,7 +640,6 @@ function wireSyncConsole() {
     if (!panel.hidden && !panel.contains(e.target) && !light.contains(e.target)) panel.hidden = true;
   });
   document.querySelectorAll('#sync-panel .seg button[data-mode]').forEach(b => {
-    if (b.dataset.mode === 'auto') return;                       // B2
     b.onclick = async () => {
       try {
         await fetch(BASE + 'api/sync/mode', { method: 'POST', headers: { 'content-type': 'application/json' },

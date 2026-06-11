@@ -133,6 +133,22 @@ test('tickAuto: auto+pending 过期 → spawn runner + 清 pending；notify → 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('tickAuto: 重写队列非空（无 commit pending）也触发——排队即意图', async () => {
+  const { tickAuto } = await import('../lib/runner.js');
+  const { appendRewriteRequest: q } = await import('../lib/syncstate.js');
+  const { root, lore } = autoRepo();
+  try {
+    const state = join(lore, '.state');
+    mkdirSync(state, { recursive: true });
+    wf(join(state, 'sync.json'), JSON.stringify({ mode: 'auto', debounce_minutes: 0 }));
+    q(state, { page: 'component/lib.md', now: '2026-06-10T00:00:00Z' });   // 只排队，不 commit
+    const calls = [];
+    const r = tickAuto(lore, { spawnFn: (cmd, args) => { calls.push(args); return { unref() {}, once() {} }; } });
+    assert.equal(r.run, true);
+    assert.equal(calls.length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('runAuto: maxPages 截断', async () => {
   const { root, lore } = autoRepo();
   try {

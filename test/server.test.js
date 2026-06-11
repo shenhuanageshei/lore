@@ -28,6 +28,34 @@ test('serves a file with correct mime', async () => {
   }
 });
 
+test('目录请求无尾斜杠 → 301 加斜杠（相对 import 解析基准）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  mkdirSync(join(root, 'site'), { recursive: true });
+  writeFileSync(join(root, 'site', 'index.html'), '<html></html>');
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/site`, { redirect: 'manual' });
+    assert.equal(r.status, 301);
+    assert.equal(r.headers.get('location'), '/site/');
+    const r2 = await fetch(`http://127.0.0.1:${port}/site/`);          // 带斜杠正常吐 index
+    assert.equal(r2.status, 200);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('portal: /<name>/site 无尾斜杠 → 301 带 repo 前缀', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  mkdirSync(join(root, 'site'), { recursive: true });
+  writeFileSync(join(root, 'site', 'index.html'), '<html></html>');
+  const server = createPortalServer({ demo: root });
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/demo/site`, { redirect: 'manual' });
+    assert.equal(r.status, 301);
+    assert.equal(r.headers.get('location'), '/demo/site/');            // 前缀不能丢
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('404 for missing file', async () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
   const server = createServer(root);

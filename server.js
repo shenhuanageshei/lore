@@ -51,7 +51,8 @@ const MIME = {
 
 // Serve <root>/<rel> as a static file: traversal guard, dir→index.html, stream + MIME.
 // Extracted so the per-repo server AND the portal share identical static semantics.
-export function serveStatic(rootDir, rel, res) {
+// reqPath = 原始请求 pathname（portal 下带 /<repo> 前缀）——目录无尾斜杠时 301 用它拼。
+export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   let full = normalize(join(root, rel));
   // traversal guard: resolved path must stay within root.
@@ -63,6 +64,12 @@ export function serveStatic(rootDir, rel, res) {
   try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
   // directory request → serve its index.html, mirroring python http.server.
   if (st.isDirectory()) {
+    // 无尾斜杠先 301 补上（python http.server 同款）：文档 URL 不带斜杠时，
+    // 浏览器把 ./shell.mjs 解析到上一级 → 404 → 整壳白屏。
+    if (!reqPath.endsWith('/')) {
+      res.writeHead(301, { location: reqPath + '/' });
+      return res.end();
+    }
     full = join(full, 'index.html');
     try { st = statSync(full); } catch { res.writeHead(404); return res.end('not found'); }
   }
@@ -196,7 +203,7 @@ export function createServer(rootDir, { spawnFn = spawn } = {}) {
     }
 
     const rel = pathname.replace(/^\/+/, '');
-    return serveStatic(root, rel, res);
+    return serveStatic(root, rel, res, pathname);
   });
 }
 
@@ -242,7 +249,7 @@ export function createPortalServer(repoMap) {
     if (rel === 'api' || rel.startsWith('api/')) {   // MVP 只读：不路由写接口
       res.writeHead(404); return res.end('not found');
     }
-    return serveStatic(repoMap[name], rel, res);
+    return serveStatic(repoMap[name], rel, res, pathname);
   });
 }
 

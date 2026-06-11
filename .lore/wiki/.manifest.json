@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-11T02:10:10.321Z",
-  "current_code_sha": "eef82cd",
+  "generated": "2026-06-11T02:29:27.213Z",
+  "current_code_sha": "96675e2",
   "language": {
     "default": "zh",
     "available": [
@@ -23,11 +23,11 @@
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 56,
+          "stale": 59,
           "code_sha": "7de5966",
           "synthesized_from": {
-            "atoms": 283,
-            "commits": 282
+            "atoms": 286,
+            "commits": 285
           },
           "group": "",
           "paired_plan": ""
@@ -48,10 +48,10 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "eef82cd",
+          "code_sha": "96675e2",
           "synthesized_from": {
-            "atoms": 283,
-            "commits": 282
+            "atoms": 286,
+            "commits": 285
           },
           "group": "",
           "paired_plan": ""
@@ -71,11 +71,11 @@
           "path": "component/lib.md",
           "lang": "zh",
           "translations": [],
-          "stale": 15,
+          "stale": 16,
           "code_sha": "b934c49",
           "synthesized_from": {
-            "atoms": 132,
-            "commits": 131
+            "atoms": 133,
+            "commits": 132
           },
           "group": "",
           "paired_plan": ""

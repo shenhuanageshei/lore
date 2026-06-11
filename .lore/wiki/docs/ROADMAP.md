@@ -56,10 +56,10 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
   - ~~docs 页 chips~~ ✅ 已修（`buildMeta` docs 分支）。
   - **小项**：折叠页 id 碰撞前缀（doc 名撞 `changelog`/`pitfalls`）、源链本地壳可点（现仅 github 仓库浏览可点）、pitfalls 标签集对齐 threat-intel 实测格式。
 
-### per-facet confidence 显示（母 §4 line 190）
+### per-facet confidence 显示（母 §4 line 190）⏸ 依赖 flow/theme 启用
 - 现 commit 原子整体 `confidence:'EXTRACTED'`。母 spec：component=EXTRACTED、flow/theme=INFERRED（机械推断）。
 - 改为 **per-facet confidence**；`renderDecisionHistory` / serve 壳给 INFERRED facet 显「(推断)」；`/lore:lint` 把 AMBIGUOUS 推人确认。
-- 小改动，完成 facet 质量故事。
+- **2026-06-10 评估：YAGNI 暂缓**——dogfood 的 flow/theme 轴均为空（`values: []`），per-facet 标注在空轴上无意义。flow/theme 真实启用后再做。
 
 ### note enrich 骨架（母 §4② 后半）· fold-by-id 半边已实现
 - `/lore:note` 现只产新 decision 原子。加 **enrich 已有 commit 骨架**：同 `commit:<hash>` append 新行补 `why`（append-only 神圣，不改旧行）。
@@ -67,8 +67,8 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 
 ## 呈现（wiki 渲染，⭐ 用户明确要）
 
-### ~~mermaid 架构图 + 数据流图~~ ✅ 已实现（v0.2 + C-呈现①增强）
-- vendored 客户端渲染 + securityLevel strict（v0.2）；点击 lightbox 放大 + 主题感知重渲染（C-呈现①）。余项：mermaid 语法校验 lint + `<br/>` 统一（另立）。
+### ~~mermaid 架构图 + 数据流图~~ ✅ 已实现（v0.2 + C-呈现①增强 + 语法校验）
+- vendored 客户端渲染 + securityLevel strict（v0.2）；点击 lightbox 放大 + 主题感知重渲染（C-呈现①）；**语法启发式校验进 `/lore:lint` 第五检**（保留字节点 id / 断箭头 / 未知图类型 / 引号不配对——dogfood 实测坑全覆盖，8 真图零误报，2026-06-10）。~~`<br/>` 统一~~ 核实为伪需求：`<br/>` 全在 mermaid 节点标签内，是 mermaid 标准且唯一的标签换行语法，无可统一之物。
 
 ### ~~双语切换（中/EN）~~ ✅ 已实现（v0.5 持久化双语层）
 - 语言配置 + 翻译 sidecar + `/lore:translate` + 切换器 + state API（v0.5）。决策史保持源语言（诚实约束已落实）。
@@ -94,7 +94,7 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 已实现：定义「好 wiki 页」**两档标准**（**概览档**零黑话 + **机制档** 9 节 `<details>` 折叠 + **锚点锚符号**），写进 `commands/sync.md` + golden page 标杆（`docs/superpowers/notes/2026-06-08-lore-golden-page-sync.{html,md}`）；**两层粒度**——config `axes.component.deep.<root>:[子模块…]` 声明源文件级深度页，`planSync` 列深度页工单（增量按源文件）、`finalizeSync` 按源文件精确算 stale；深度页是普通 component 页 → manifest/graph 自动支持（**graph 可遍历到模块级**）。dogfood：lib 一页 → 鸟瞰页 + 6 深度页（graph 1→7 节点）。设计见 `docs/superpowers/specs/2026-06-08-lore-content-quality-design.md`。余项（壳深度切换 UX、产出校验、文件级决策史分流）另立。
 
 ### 壳呈现（mermaid 放大 + component 排序分组）✅ 已实现（C-呈现 ①）
-- 已实现：壳大 mermaid 图点击 → lightbox（弹层内拖拽 + 滚轮缩放，缩放圈在弹层内不扰正文；**按当前主题重渲染**，亮/暗主题大图节点色与正文逐字一致）；`config.deep` 升级分组 map（捕获/合成），`manifest` component 页按流水线序排（lib 鸟瞰置顶）+ 带 `group` 字段，壳侧栏插分组小标题。设计见 `docs/superpowers/specs/2026-06-09-lore-shell-presentation-design.md`。余项（mermaid 语法校验+br 统一、server.js 根文件组件+决策史分流）各自另立。
+- 已实现：壳大 mermaid 图点击 → lightbox（弹层内拖拽 + 滚轮缩放，缩放圈在弹层内不扰正文；**按当前主题重渲染**，亮/暗主题大图节点色与正文逐字一致）；`config.deep` 升级分组 map（捕获/合成），`manifest` component 页按流水线序排（lib 鸟瞰置顶）+ 带 `group` 字段，壳侧栏插分组小标题。设计见 `docs/superpowers/specs/2026-06-09-lore-shell-presentation-design.md`。余项收尾（2026-06-10）：mermaid 语法校验 ✅（lint 第五检）、br 统一 ✅（核实伪需求）、server.js 根文件组件页 ✅（文件级 code_root 现成支持，dogfood `code_roots: [lib, server.js]` + 两档标准页；历史 journal 原子 facet 不含 server.js，决策史从今往后积累）。仅余：文件级决策史分流（远期，需文件级 facet）。
 
 ### docs 轴重构（分组置顶 + feature 配对 + 默认折叠）✅ 已实现（C-呈现 ②）
 - 已实现：docs 轴侧栏三组分流——「📌 项目状态」（changelog/ROADMAP/pitfalls）置顶常开、「📐 设计与计划」spec↔plan 按 date+slug 配对成行（plan 徽标直达，dogfood 25 对）默认折叠、「📝 notes」折叠；折叠态 localStorage 记忆；搜索穿透折叠组（data-search 含英文 slug）。group/paired_plan 由 `docs.js` 物化进 frontmatter，manifest 组间排序（单一来源），壳 `buildDocsRows` 纯函数可测。无 superpowers 结构 repo 零影响。设计见 `docs/superpowers/specs/2026-06-10-lore-docs-axis-regroup-design.md`。

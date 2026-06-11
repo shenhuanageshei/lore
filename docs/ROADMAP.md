@@ -52,9 +52,9 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 - 改为 **per-facet confidence**；`renderDecisionHistory` / serve 壳给 INFERRED facet 显「(推断)」；`/lore:lint` 把 AMBIGUOUS 推人确认。
 - **2026-06-10 评估：YAGNI 暂缓**——dogfood 的 flow/theme 轴均为空（`values: []`），per-facet 标注在空轴上无意义。flow/theme 真实启用后再做。
 
-### note enrich 骨架（母 §4② 后半）· fold-by-id 半边已实现
-- `/lore:note` 现只产新 decision 原子。加 **enrich 已有 commit 骨架**：同 `commit:<hash>` append 新行补 `why`（append-only 神圣，不改旧行）。
-- ~~配套 journal fold-by-id~~ ✅ 已实现（`lib/fold.js` mergeById：同 id 合并、why 演化追加、refs 并集，sync 消费）——enrich 落地时折叠层零改动直接可用。注：ask 读 manifest、lint 读 frontmatter，均不消费原子，无需接入。
+### ~~note enrich 骨架（母 §4② 后半）~~ ✅ 已实现（2026-06-10）
+- `/lore:note --enrich <sha> --why "..."`：短 sha rev-parse 展开对齐骨架 id，追加同 `commit:<sha>` 的 enriched 原子（append-only 不改旧行）；fold 层 mergeById 合并——骨架 title 保留、新 why 演化追加（轨迹可审计）。
+- ~~配套 journal fold-by-id~~ ✅ 已实现（`lib/fold.js` mergeById，sync 消费）。注：ask 读 manifest、lint 读 frontmatter，均不消费原子，无需接入。
 
 ## 呈现（wiki 渲染，⭐ 用户明确要）
 

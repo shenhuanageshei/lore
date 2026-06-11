@@ -3,8 +3,8 @@ title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-11
 code_sha: b934c49
-atoms: 132
-commits: 131
+atoms: 133
+commits: 132
 ---
 # component: lib
 
@@ -76,6 +76,7 @@ flowchart TD
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(note): enrich mode — append why to an existing commit skeleton (append-only, fold merges)** — /lore:note --enrich <sha> --why ... resolves short shas via rev-parse, (ddd27b9, 2026-06-10)
 - **feat(lint): mermaid syntax heuristics (5th check) + fix orphan/unfolded false positives** — - mermaidIssues/lintMermaid: catch reserved node ids (graph[...]), broken (eef82cd, 2026-06-10)
 - **feat(manifest): docs-axis group ordering + frontmatter group/paired_plan passthrough (impl)** — Prior commit 077b120 carried the red test only — parallel Edit+Bash misfire, (e3e69a3, 2026-06-10)
 - **feat(docs): materialize group + paired_plan into docs-page frontmatter** (f9b6762, 2026-06-10)

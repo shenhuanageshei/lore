@@ -3,8 +3,8 @@ title: lib —— lore 引擎核心
 summary: 零依赖 Node 模块，串起 捕获 → journal → 合成 → 消费 + lint 的全流程；复杂模块各有深度页
 last_updated: 2026-06-11
 code_sha: b4d0003
-atoms: 137
-commits: 136
+atoms: 141
+commits: 140
 ---
 # component: lib
 
@@ -121,6 +121,10 @@ flowchart LR
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **fix(runner): non-empty rewrite queue counts as pending — queueing alone triggers auto after debounce** (a217597, 2026-06-11)
+- **feat(portal): route /api per repo + take over auto ticker — console fully operational behind portal** — v0.6 'portal read-only' flipped by user need: all local APIs extracted into (14ec7cc, 2026-06-11)
+- **fix: windowsHide on every execFileSync — git.exe spawned its own console inside hidden detached processes** — The detached node windows were already hidden, but git/taskkill/python (e1b89eb, 2026-06-11)
+- **fix: no-cache static headers (module-cache white screen), windowsHide all detached spawns, config edit UI** — - serveStatic sends Cache-Control: no-cache — stale shell.mjs in the browser (c01c63b, 2026-06-11)
 - **feat(hook): auto mode stamps pending timestamp (mechanical finalize unchanged)** (1444530, 2026-06-10)
 - **feat(runner): claudeBackend (read-only LLM, stdout) + runAuto pipeline + CLI** (963c6d8, 2026-06-10)
 - **feat(runner): shouldRunAuto ticker predicate + mechanical qualityGate** (27e6698, 2026-06-10)

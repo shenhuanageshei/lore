@@ -3,8 +3,8 @@ title: server.js —— 本地 Web 门面
 summary: 一个零依赖 http server 同时干三件事：静态伺服壳与 wiki、本机写 API（语言/翻译/同步控制）、多 repo 聚合门户（只读）
 last_updated: 2026-06-11
 code_sha: fb13a5b
-atoms: 1
-commits: 1
+atoms: 7
+commits: 7
 ---
 # component: server.js
 
@@ -103,5 +103,11 @@ flowchart LR
 ## Decision history
 
 <!-- LORE_JOURNAL:START -->
+- **feat(portal): route /api per repo + take over auto ticker — console fully operational behind portal** — v0.6 'portal read-only' flipped by user need: all local APIs extracted into (14ec7cc, 2026-06-11)
+- **fix(portal): repo-list page follows shell theme (shared CSS vars + same localStorage key, with its own switcher)** (89f7615, 2026-06-11)
+- **feat(shell): repo switcher on per-repo serve too — jumps via portal** — Per-repo server now serves /repos.json (central registry + portal port + (cc3326e, 2026-06-11)
+- **feat(portal): in-shell repo switcher + home button** — GET /repos.json (read-only list, zero-write invariant intact); shell detects (9d34c3f, 2026-06-11)
+- **fix(server): 301 trailing-slash redirect on directory requests (white-screen root cause)** — User hit http://127.0.0.1:7001/site (no trailing slash): serveStatic served (1003574, 2026-06-11)
+- **fix: no-cache static headers (module-cache white screen), windowsHide all detached spawns, config edit UI** — - serveStatic sends Cache-Control: no-cache — stale shell.mjs in the browser (c01c63b, 2026-06-11)
 - **feat(server): status config/runner_running, GET runs, 60s auto ticker (per-repo only)** (469ac6d, 2026-06-10)
 <!-- LORE_JOURNAL:END -->

@@ -27,7 +27,7 @@ lore 把这些**决策与架构知识沉淀成 git 内的活文档**：
 |---|---|
 | **Journal-first** | `.lore/journal/` 的 append-only 决策原子是**唯一耐久知识层**。wiki 是它的物化视图（可 nuke 重建）。 |
 | **三源捕获** | `hook`（每 commit 机械骨架，零 LLM，<50ms，永不阻断 commit）+ `mine`（回填历史）+ `note`（agent 补 why）。 |
-| **确定性 / LLM 分层** | 确定性活（捕获、folding、manifest、lint、检索）纯 Node 可测；只有「当前架构」prose 交给 agent。→ 廉价的活可自动/秒级，贵的 LLM 活手动触发。 |
+| **确定性 / LLM 分层** | 确定性活（捕获、folding、manifest、lint、检索）纯 Node 可测；只有「当前架构」prose 交给 agent。→ 廉价的活 commit 后秒级自刷；贵的 LLM 活三档可选：手动 / 排队提醒 / **auto 档后台自动**（只读 claude CLI + 机械质量门把关）。 |
 | **零依赖** | 纯 Node 内置模块，含自写的 config YAML 子集解析器。无 `node_modules`。 |
 | **零侵入** | 只写 `.lore/` + 一个 `.git/hooks/post-commit`（git 机制，非业务源码，唯一例外）。卸载 = 删 `.lore/` + 摘 hook，源码丝毫不动。 |
 
@@ -50,8 +50,9 @@ node lib/sync.js finalize /path/to/your-repo/.lore
 node lib/serve.js start --lore /path/to/your-repo/.lore   # 打印 127.0.0.1 URL
 node lib/serve.js stop  --lore /path/to/your-repo/.lore
 
-# 4b.（可选）单机共享门户：一个端口（7842）聚合本机所有已登记 lore 仓库
+# 4b.（可选，推荐常驻）单机共享门户：一个端口（7842）聚合本机所有已登记 lore 仓库
 node lib/portal.js start   # 打印 http://127.0.0.1:7842/ ；另有 stop / list
+                           # 壳内可切仓库 / 跨仓搜索 / 操作同步控制台；portal 还接管各仓库 auto 档的后台调度
 
 # 5. agent 答问（从 wiki 检索）
 node lib/ask.js /path/to/your-repo/.lore "M3 的准确率为什么这么调"
@@ -71,10 +72,12 @@ node lib/lint.js /path/to/your-repo/.lore
 | `/lore:mine` | 捕获③（回填） | `git log` 全历史 → commit 原子（按 sha 去重，幂等） | 否 |
 | `/lore:note` | 捕获②（人工 why） | agent 决策当下记 `kind:decision` 原子（why + facets） | agent |
 | `/lore:sync` | 合成 | component/theme/flow 三轴页（agent 写架构 prose；Node 折 journal + INDEX + manifest） | 混合 |
-| `/lore:serve` | 浏览 | 起本地哑服务器 + 浏览器壳（侧栏/渲染/搜索/多主题），只读 | 否 |
-| `/lore:portal` | 浏览（聚合） | 单机一个常驻门户（7842）聚合本机所有 lore 仓库，顶层选 repo，只读 | 否 |
+| `/lore:serve` | 浏览 + 控制 | 本地 server + 浏览器壳（侧栏分组/搜索/多主题/mermaid lightbox）+ **同步控制台**（档位切换/立即刷新/重写排队/auto 参数） | 否 |
+| `/lore:portal` | 浏览（聚合） | 单机常驻门户（7842）聚合本机所有 lore 仓库：切仓下拉、跨仓搜索、控制台可操作（API 按 repo 转发）、接管各仓 auto 调度 | 否 |
+| `/lore:translate` | 双语 | 按需生成翻译 sidecar（语言切换器 + stale 检测） | agent |
 | `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
-| `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing），不自动改 | 否 |
+| `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing / unfolded / **mermaid 语法五检**），不自动改 | 否 |
+| **auto 档**（壳里切） | 合成（自动） | commit 静默期后 runner 调只读 claude CLI 重写 stale 页，机械质量门过门才落盘，任务历史可查 | claude CLI |
 
 ## 架构
 
@@ -98,7 +101,7 @@ node lib/lint.js /path/to/your-repo/.lore
 
 **三轴打标**：component = 变更路径前缀匹配 `code_roots`；theme = `title+why` 含 config `match:` 关键词（子串，大小写无关）；flow = 原子的 component ∈ config flow 的 `spans`。
 
-**引擎文件**（`lib/`，全零依赖）：`config` `journal` `mine` `hook` `note` `sync` `manifest` `serve` `lint` `ask` `init` + `server.js`（serve 兜底）。
+**引擎文件**（`lib/`，全零依赖）：`config` `journal` `mine` `hook` `note` `sync` `fold` `fingerprint` `manifest` `graph` `docs` `home` `i18n` `translate` `syncstate` `runner` `serve` `portal` `repos` `registry` `lint` `ask` `mcp` `init` + 根 `server.js`（静态壳 + 控制 API + auto ticker + 门户）。
 
 ## 不变量（测试显式守）
 
@@ -110,7 +113,7 @@ node lib/lint.js /path/to/your-repo/.lore
 ## 开发
 
 ```bash
-node --test        # 全部测试（229，零外部依赖）
+node --test        # 全部测试（380+，零外部依赖）
 ```
 
 - 流程：每功能走 brainstorming → spec（`docs/superpowers/specs/`）→ plan（`docs/superpowers/plans/`）→ TDD → 双审 → 合并。

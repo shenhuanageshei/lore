@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-11T06:53:15.780Z",
-  "current_code_sha": "fb13a5b",
+  "generated": "2026-06-11T10:25:31.927Z",
+  "current_code_sha": "3413d62",
   "language": {
     "default": "zh",
     "available": [
@@ -23,11 +23,11 @@
           "path": "HOME.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 10,
           "code_sha": "fb13a5b",
           "synthesized_from": {
-            "atoms": 297,
-            "commits": 296
+            "atoms": 307,
+            "commits": 306
           },
           "group": "",
           "paired_plan": ""
@@ -48,10 +48,10 @@
           "lang": "zh",
           "translations": [],
           "stale": 0,
-          "code_sha": "fb13a5b",
+          "code_sha": "3413d62",
           "synthesized_from": {
-            "atoms": 297,
-            "commits": 296
+            "atoms": 307,
+            "commits": 306
           },
           "group": "",
           "paired_plan": ""
@@ -71,11 +71,11 @@
           "path": "component/lib.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 4,
           "code_sha": "b4d0003",
           "synthesized_from": {
-            "atoms": 137,
-            "commits": 136
+            "atoms": 141,
+            "commits": 140
           },
           "group": "",
           "paired_plan": ""
@@ -89,11 +89,11 @@
           "path": "component/server.js.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 6,
           "code_sha": "fb13a5b",
           "synthesized_from": {
-            "atoms": 1,
-            "commits": 1
+            "atoms": 7,
+            "commits": 7
           },
           "group": "",
           "paired_plan": ""
@@ -107,7 +107,7 @@
           "path": "component/hook.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 2,
           "code_sha": "fb13a5b",
           "synthesized_from": {
             "atoms": 0,
@@ -125,7 +125,7 @@
           "path": "component/mine.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 1,
           "code_sha": "fb13a5b",
           "synthesized_from": {
             "atoms": 0,
@@ -161,7 +161,7 @@
           "path": "component/sync.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 1,
           "code_sha": "fb13a5b",
           "synthesized_from": {
             "atoms": 0,
@@ -179,7 +179,7 @@
           "path": "component/manifest.md",
           "lang": "zh",
           "translations": [],
-          "stale": 0,
+          "stale": 1,
           "code_sha": "fb13a5b",
           "synthesized_from": {
             "atoms": 0,

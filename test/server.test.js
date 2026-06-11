@@ -134,7 +134,9 @@ test('POST /api/sync/mode：合法落盘；auto/非法 → 400；非 local Host 
     const ok = await post({ mode: 'manual' });
     assert.equal(ok.status, 200);
     assert.equal(readSyncMode(join(root, '.state')), 'manual');     // 配置真实生效（硬约束②）
-    assert.equal((await post({ mode: 'auto' })).status, 400);       // B2 才解锁
+    assert.equal((await post({ mode: 'auto' })).status, 200);       // B2 解锁
+    assert.equal(readSyncMode(join(root, '.state')), 'auto');
+    assert.equal((await post({ mode: 'manual' })).status, 200);     // 复位，供下面「非法不改盘」断言
     assert.equal((await post({ mode: 'hyper' })).status, 400);
     const status403 = await new Promise((resolve, reject) => {
       const r = http.request(

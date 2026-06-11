@@ -36,11 +36,67 @@ test('readSyncMode: 坏 JSON / 未知 mode → notify（best-effort）', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('writeSyncMode: 非法值 throw（B1 枚举 manual|notify，auto 留 B2）', () => {
+test('writeSyncMode: 非法值 throw；auto 自 B2 起合法', () => {
   const dir = tmp();
   try {
-    assert.throws(() => writeSyncMode(dir, 'auto'), /invalid sync mode/);
+    writeSyncMode(dir, 'auto');                                  // B2 解锁
+    assert.equal(readSyncMode(dir), 'auto');
     assert.throws(() => writeSyncMode(dir, ''), /invalid sync mode/);
+    assert.throws(() => writeSyncMode(dir, 'warp'), /invalid sync mode/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+import { readSyncConfig, writeAutoPending, readAutoPending, clearAutoPending,
+  writeRunnerPid, readRunnerPid, clearRunnerPid, appendAutoRun, readAutoRuns } from '../lib/syncstate.js';
+
+test('readSyncConfig: 默认值兜底 + B1 形状向后兼容 + 扩展字段', () => {
+  const dir = tmp();
+  try {
+    assert.deepEqual(readSyncConfig(dir), { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5 });
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'manual' }));            // B1 形状
+    assert.equal(readSyncConfig(dir).mode, 'manual');
+    assert.equal(readSyncConfig(dir).debounce_minutes, 10);
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2, future_field: 1 }));
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2 });
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', schedule: 'not-a-time' }));
+    assert.equal(readSyncConfig(dir).schedule, null);            // 非法 schedule 回默认
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('auto-pending: 写读清 round-trip；缺文件 null', () => {
+  const dir = tmp();
+  try {
+    assert.equal(readAutoPending(dir), null);
+    writeAutoPending(dir, '2026-06-10T01:00:00Z');
+    assert.equal(readAutoPending(dir), '2026-06-10T01:00:00Z');
+    clearAutoPending(dir);
+    assert.equal(readAutoPending(dir), null);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('runner pid: 写读清；坏 JSON → null', () => {
+  const dir = tmp();
+  try {
+    assert.equal(readRunnerPid(dir), null);
+    writeRunnerPid(dir, 12345);
+    assert.equal(readRunnerPid(dir), 12345);
+    clearRunnerPid(dir);
+    assert.equal(readRunnerPid(dir), null);
+    writeFileSync(join(dir, 'runner.pid'), '{oops');
+    assert.equal(readRunnerPid(dir), null);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('auto-runs: append + 读最近 N 条（新在前）；缺文件 []', () => {
+  const dir = tmp();
+  try {
+    assert.deepEqual(readAutoRuns(dir), []);
+    appendAutoRun(dir, { ts: 't1', pages: [{ page: 'component/a.md', ok: true, ms: 100 }], total_ms: 100 });
+    appendAutoRun(dir, { ts: 't2', pages: [], total_ms: 5 });
+    const runs = readAutoRuns(dir, 1);
+    assert.equal(runs.length, 1);
+    assert.equal(runs[0].ts, 't2');                              // 最新在前
+    assert.equal(readAutoRuns(dir).length, 2);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

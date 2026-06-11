@@ -67,6 +67,35 @@ test('removeResident: 删标记节留其余；mergeMcpConfig: 创建/保既有/�
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+import { init } from '../lib/init.js';
+import { execFileSync } from 'node:child_process';
+
+test('init 集成: 默认注入 CLAUDE.md 标记节 + .mcp.json；config resident:false 跳过', () => {
+  const root = tmp();
+  const root2 = tmp();
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x=1;');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /LORE_RESIDENT:START/);
+    const mcp = JSON.parse(readFileSync(join(root, '.mcp.json'), 'utf8'));
+    assert.match(mcp.mcpServers.lore.args[0], /mcp\.js$/);
+    // resident:false 的 repo：预置 config 关掉
+    execFileSync('git', ['init', '-q'], { cwd: root2 });
+    mkdirSync(join(root2, '.lore'), { recursive: true });
+    writeFileSync(join(root2, '.lore', 'config.yml'), 'resident: false\naxes:\n  component:\n    code_roots: [lib]\n');
+    mkdirSync(join(root2, 'lib'), { recursive: true });
+    writeFileSync(join(root2, 'lib', 'a.js'), 'export const x=1;');
+    init({ repoRoot: root2, srcSiteDir: join(process.cwd(), 'site') });
+    assert.equal(existsSync(join(root2, 'CLAUDE.md')), false);
+    assert.equal(existsSync(join(root2, '.mcp.json')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(root2, { recursive: true, force: true });
+  }
+});
+
 test('residentStats: 从 manifest 算 {pages, deepPages, updated}；无 manifest → 零值', () => {
   const root = tmp();
   try {

@@ -40,7 +40,7 @@ flowchart LR
 | 导出 | 签名 | 干什么 | 锚点 |
 |---|---|---|---|
 | `shouldRunAuto` | `({config, pendingTs, lastRunDate, now, runnerAlive}) → {run, reason}` | ticker 判定纯函数（静默期/schedule/防叠跑） | `shouldRunAuto @ lib/runner.js` |
-| `qualityGate` | `(newText, oldText) → {ok, reason?}` | 写盘前四道机械质检 | `qualityGate @ lib/runner.js` |
+| `qualityGate` | `(newText, oldText) → {ok, reason?}` | 写盘前五道机械质检 | `qualityGate @ lib/runner.js` |
 | `claudeBackend` | `() → {rewritePage({page, repoRoot, timeoutMs}) → Promise<string>}` | claude CLI 后端（唯一实现；接口留 codex/裸 API 位） | `claudeBackend @ lib/runner.js` |
 | `runAuto` | `(loreDir, {backend, maxPages, timeoutMs, spawnFn, now}) → {pages, total_ms}` | 主流程（全注入可测） | `runAuto @ lib/runner.js` |
 | `tickAuto` | `(loreDir, {spawnFn}) → {run, reason}` | ticker 单 repo 判定+触发（永不抛） | `tickAuto @ lib/runner.js` |

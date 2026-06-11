@@ -225,13 +225,29 @@ function renderRepoList(names) {
   const items = names.length
     ? names.map(n => `<li><a href="/${encodeURIComponent(n)}/site/">${escHtml(n)}</a></li>`).join('')
     : '<li class="empty">（暂无登记仓库：在某个 repo 跑 <code>/lore:init</code>）</li>';
+  // 主题变量与壳同源同 key（localStorage 'lore-theme'）：壳里切的主题，列表页自动跟随。
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>lore portal</title>
-<style>body{font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#1a1b26;color:#c0caf5;max-width:680px;margin:48px auto;padding:0 20px}
-h1{color:#fff;font-size:22px}a{color:#7aa2f7;text-decoration:none}a:hover{text-decoration:underline}
-ul{list-style:none;padding:0}li{margin:10px 0;font-size:16px}.empty{color:#565f89;font-size:13px}
-code{background:#1e202e;padding:2px 6px;border-radius:4px}</style>
-</head><body><h1>lore portal</h1><p>本机已登记的 lore 仓库：</p><ul>${items}</ul></body></html>`;
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('lore-theme') || 'dark');</script>
+<style>
+:root{--bg:#1a1b26;--fg:#c0caf5;--fg-dim:#565f89;--fg-bright:#fff;--accent:#7aa2f7;--panel:#1f2130;--border:#2a2e42;--code-bg:#1e202e}
+:root[data-theme="light"]{--bg:#ffffff;--fg:#24283b;--fg-dim:#787c99;--fg-bright:#1a1b26;--accent:#3760bf;--panel:#eef0f4;--border:#dcdfe6;--code-bg:#eef0f4}
+:root[data-theme="sepia"]{--bg:#f4ecd8;--fg:#5b4636;--fg-dim:#9c8b73;--fg-bright:#3b2f25;--accent:#9a6a3a;--panel:#e7dcc0;--border:#d9c9a3;--code-bg:#e7dcc0}
+body{font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--fg);max-width:680px;margin:48px auto;padding:0 20px}
+h1{color:var(--fg-bright);font-size:22px;display:flex;align-items:center;justify-content:space-between}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+ul{list-style:none;padding:0}li{margin:10px 0;font-size:16px}.empty{color:var(--fg-dim);font-size:13px}
+code{background:var(--code-bg);padding:2px 6px;border-radius:4px}
+#theme{background:var(--panel);border:1px solid var(--border);color:var(--fg);padding:5px 9px;border-radius:7px;font-size:13px;cursor:pointer}
+</style>
+</head><body><h1>lore portal <select id="theme" title="主题">
+<option value="dark">🌙 暗</option><option value="light">☀ 亮</option><option value="sepia">🌿 护眼</option>
+</select></h1><p>本机已登记的 lore 仓库：</p><ul>${items}</ul>
+<script>
+const sel=document.getElementById('theme');
+sel.value=localStorage.getItem('lore-theme')||'dark';
+sel.onchange=()=>{document.documentElement.setAttribute('data-theme',sel.value);localStorage.setItem('lore-theme',sel.value);};
+</script></body></html>`;
 }
 
 // 单机共享门户：一个端口聚合本机所有 lore repo。repoMap: { name -> loreDir }。

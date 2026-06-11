@@ -5,7 +5,9 @@ import { dirname, join, normalize, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
-import { readSyncMode, writeSyncMode, appendRewriteRequest, readRewriteRequests } from './lib/syncstate.js';
+import { readSyncMode, writeSyncMode, appendRewriteRequest, readRewriteRequests,
+  readSyncConfig, readRunnerPid, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
+import { isAlive } from './lib/serve.js';
 
 const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -126,11 +128,17 @@ export function createServer(rootDir, { spawnFn = spawn } = {}) {
 
     // --- B1 同步控制 API（spec 2026-06-09-lore-sync-console）---
     if (req.method === 'GET' && pathname === '/api/sync/status') {
-      const mode = readSyncMode(join(root, '.state'));
+      const stateDir = join(root, '.state');
+      const config = readSyncConfig(stateDir);
       let lastFinalize = null;
       try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
       catch { /* 无 manifest（未 sync）→ null */ }
-      return sendJson(res, 200, { mode, last_finalize: lastFinalize });
+      const pid = readRunnerPid(stateDir);
+      return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: pid != null && isAlive(pid) });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/sync/runs') {
+      return sendJson(res, 200, { runs: readAutoRuns(join(root, '.state')) });
     }
 
     if (req.method === 'POST' && pathname === '/api/sync/mode') {
@@ -226,4 +234,29 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!rootDir || !portStr) { console.error('usage: node server.js <rootDir> <port>'); process.exit(1); }
   createServer(rootDir).listen(Number(portStr), '127.0.0.1',
     () => console.log(`lore static server on 127.0.0.1:${portStr} root=${rootDir}`));
+  // B2 ticker：统一调度静默期与 schedule（仅 per-repo server；portal 只读不带 ticker）。
+  // 动态 import runner——ticker 是进程级关注点，不把判定链拖进 createServer 工厂（测试零影响）。
+  const RUNNER_JS = join(HERE, 'lib', 'runner.js');
+  setInterval(async () => {
+    try {
+      const stateDir = join(rootDir, '.state');
+      const config = readSyncConfig(stateDir);
+      if (config.mode !== 'auto') return;
+      const { shouldRunAuto } = await import('./lib/runner.js');
+      const pid = readRunnerPid(stateDir);
+      const runs = readAutoRuns(stateDir, 1);
+      const d = shouldRunAuto({
+        config,
+        pendingTs: readAutoPending(stateDir),
+        lastRunDate: runs[0]?.ts?.slice(0, 10) ?? null,
+        now: new Date(),
+        runnerAlive: pid != null && isAlive(pid),
+      });
+      if (!d.run) return;
+      clearAutoPending(stateDir);
+      const child = spawn(process.execPath, [RUNNER_JS, rootDir], { detached: true, stdio: 'ignore' });
+      child.once?.('error', () => {});
+      child.unref();
+    } catch { /* ticker 永不击落 server */ }
+  }, 60_000).unref();
 }

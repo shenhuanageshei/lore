@@ -192,6 +192,30 @@ test('GET/POST /api/sync/rewrite-requests：排队 + 读回 + 去重 + 非法 pa
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
+test('GET /api/sync/status: B2 扩展形状（config + runner_running）', async () => {
+  const root = syncFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assert.deepEqual(body.config, { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5 });
+    assert.equal(body.runner_running, false);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GET /api/sync/runs: 历史最近 N 条', async () => {
+  const root = syncFixture();
+  const { appendAutoRun } = await import('../lib/syncstate.js');
+  appendAutoRun(join(root, '.state'), { ts: 't1', pages: [], total_ms: 5 });
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/runs`)).json();
+    assert.equal(body.runs.length, 1);
+    assert.equal(body.runs[0].ts, 't1');
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('portal: /<name>/api/sync/status 仍 404（只读不变）', async () => {
   const root = syncFixture();
   const server = createPortalServer({ demo: root });

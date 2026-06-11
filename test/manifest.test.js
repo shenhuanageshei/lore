@@ -415,3 +415,16 @@ test('emitManifest: docs 轴组间固定序 + 组内时间降序 + paired_plan �
     assert.equal(docs.pages.find(p => p.id === 'changelog').group, '项目状态');   // frontmatter 优先
   } finally { rmSync(wiki, { recursive: true, force: true }); }
 });
+
+test('pageEntry: sections 节索引进 manifest（##/### + ①-⑧）', () => {
+  const wiki = mkdtempSync(join(tmpdir(), 'lore-sec-'));
+  try {
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    writeFileSync(join(wiki, 'component', 'x.md'),
+      '---\ntitle: X\ncode_sha: c\n---\n# x\n\n## 概览\n\np\n\n## 机制详解\n\n<details>\n<summary><b>① 接口</b></summary>\nb\n</details>\n');
+    const m = emitManifest({ wikiDir: wiki, currentSha: 'c', countCommitsSince: () => 0, now: 't' });
+    const page = m.axes.find(a => a.id === 'component').pages[0];
+    assert.deepEqual(page.sections.map(s => s.heading), ['概览', '机制详解', '① 接口']);
+    assert.equal(typeof page.sections[0].line, 'number');
+  } finally { rmSync(wiki, { recursive: true, force: true }); }
+});

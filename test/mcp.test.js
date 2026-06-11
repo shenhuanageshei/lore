@@ -80,3 +80,40 @@ test('mcp: lore_page returns content; unknown tool → isError', async () => {
     assert.equal(byId.get(2).result.isError, true);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// 两档页 fixture：概览（人读）+ 机制详解（agent 要的）——view=agent / section 切片的考场。
+function setupTwoTierRepo() {
+  const root = setupRepo();
+  const compDir = join(root, '.lore', 'wiki', 'component');
+  writeFileSync(join(compDir, 'lib.md'),
+    '---\ntitle: Lib\nsummary: core thing\n---\n# component: lib\n\n## 概览\n\n**一句话**：比喻给人看的。\n\n## 机制详解\n\n<details>\n<summary><b>① 接口</b> —— 导出</summary>\n\n- f(a) → b\n\n</details>\n\n## Decision history\n\n{{LORE_JOURNAL}}\n');
+  execFileSync('node', ['lib/sync.js', 'finalize', join(root, '.lore')], { cwd: process.cwd() });
+  return root;
+}
+
+test('mcp: view=agent 剥概览档；section 取单节；描述含触发词；ask 命中带切片', async () => {
+  const root = setupTwoTierRepo();
+  try {
+    const replies = await rpc(root, [
+      { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'lore_page', arguments: { id: 'page:component/lib', view: 'agent' } } },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'lore_page', arguments: { id: 'page:component/lib', section: '① 接口' } } },
+      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'lore_ask', arguments: { query: '接口' } } },
+      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'lore_page', arguments: { id: 'page:component/lib', section: '不存在' } } },
+    ]);
+    const byId = new Map(replies.map(r => [r.id, r]));
+    const askDesc = byId.get(1).result.tools.find(t => t.name === 'lore_ask').description;
+    assert.match(askDesc, /优先/);                                        // 触发词重写
+    const agent = JSON.parse(byId.get(2).result.content[0].text);
+    assert.doesNotMatch(agent.content, /比喻给人看的/);                    // 概览剥了
+    assert.match(agent.content, /机制详解/);                              // 机制档在
+    const sec = JSON.parse(byId.get(3).result.content[0].text);
+    assert.match(sec.content, /f\(a\) → b/);
+    assert.doesNotMatch(sec.content, /概览/);                             // 只有该节
+    const ask = JSON.parse(byId.get(4).result.content[0].text);
+    const hit = ask.find(h => h.id === 'page:component/lib');
+    assert.equal(hit.section, '① 接口');
+    assert.match(hit.slice, /f\(a\) → b/);                               // 切片直接带回
+    assert.equal(byId.get(5).result.isError, true);                       // 未知节报错
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -71,7 +71,7 @@ test('portal: 未登记 repo → 404；穿越 → 403', async () => {
   }
 });
 
-test('portal: 写接口不路由（MVP 只读）→ 404', async () => {
+test('portal: 写接口按 repo 转发（v0.6 只读翻转——portal 控制台可操作）', async () => {
   const loreA = makeLoreDir('A');
   const server = createPortalServer({ lore: loreA });
   const port = await listen(server);
@@ -81,7 +81,8 @@ test('portal: 写接口不路由（MVP 只读）→ 404', async () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ language: 'zh' }),
     });
-    assert.equal(r.status, 404);
+    assert.equal(r.status, 200);                          // 转发到 loreA 的 handleApi
+    assert.match(readFileSync(join(loreA, '.state', 'preferences.json'), 'utf8'), /"zh"/);   // 真落对应 repo
   } finally {
     server.close();
     rmSync(loreA, { recursive: true, force: true });

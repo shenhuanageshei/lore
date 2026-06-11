@@ -110,6 +110,29 @@ test('runAuto: backend 抛错 → 该页失败记 reason，不崩', async () => 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('tickAuto: auto+pending 过期 → spawn runner + 清 pending；notify → 不动', async () => {
+  const { tickAuto } = await import('../lib/runner.js');
+  const { writeSyncMode, writeAutoPending, readAutoPending } = await import('../lib/syncstate.js');
+  const { root, lore } = autoRepo();
+  try {
+    const state = join(lore, '.state');
+    mkdirSync(state, { recursive: true });
+    wf(join(state, 'sync.json'), JSON.stringify({ mode: 'auto', debounce_minutes: 0 }));
+    writeAutoPending(state, '2026-06-10T00:00:00Z');           // 早已过静默期
+    const calls = [];
+    const r = tickAuto(lore, { spawnFn: (cmd, args) => { calls.push(args); return { unref() {}, once() {} }; } });
+    assert.equal(r.run, true);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0][0], /runner\.js$/);
+    assert.equal(calls[0][1], lore);
+    assert.equal(readAutoPending(state), null);                // pending 清了
+    // notify 档对照
+    writeSyncMode(state, 'notify');
+    writeAutoPending(state, '2026-06-10T00:00:00Z');
+    assert.equal(tickAuto(lore, { spawnFn: () => { throw new Error('should not spawn'); } }).run, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('runAuto: maxPages 截断', async () => {
   const { root, lore } = autoRepo();
   try {

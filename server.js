@@ -22,6 +22,7 @@ async function readJson(req) {
 function sendJson(res, status, value) {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify(value) + '\n');
+  return true;   // handleApi 各分支 `return sendJson(...)` 即「已处理」——调用方据此停止后续路由
 }
 
 // Only accept the local-loopback Host header on write APIs — blocks DNS-rebinding
@@ -93,17 +94,14 @@ export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
 const PORTAL_PORT = 7842;   // 与 lib/portal.js 固定端口一致
 const slashLower = p => normalize(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
-export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json') } = {}) {
-  const root = normalize(rootDir).replace(/[/\\]+$/, '');
-  return http.createServer(async (req, res) => {
-    let pathname;
-    try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
-    catch { res.writeHead(400); return res.end('bad request'); }
-
-    // Local write APIs (only reachable on 127.0.0.1). Scoped to <root>/.state and
-    // a read of <root>/wiki; never write arbitrary paths.
+// 全部本地 API 的共享处理器：per-repo server 直挂根路径；portal 剥 /<name> 前缀后按 repo 转发。
+// 返回 true = 已响应；false = 非 API 路径（调用方继续静态/404）。
+// Local write APIs (only reachable on 127.0.0.1). Scoped to <root>/.state and
+// a read of <root>/wiki; never write arbitrary paths.
+export async function handleApi(root, req, res, pathname, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json') } = {}) {
     if (req.method === 'POST' && pathname.startsWith('/api/') && !localHost(req)) {
-      return sendJson(res, 403, { error: 'forbidden host' });
+      sendJson(res, 403, { error: 'forbidden host' });
+      return true;
     }
     if (req.method === 'POST' && pathname === '/api/preferences') {
       try {
@@ -214,6 +212,18 @@ export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedi
       }
     }
 
+  return false;   // 非 API 路径
+}
+
+export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json') } = {}) {
+  const root = normalize(rootDir).replace(/[/\\]+$/, '');
+  return http.createServer(async (req, res) => {
+    let pathname;
+    try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+    catch { res.writeHead(400); return res.end('bad request'); }
+
+    if (await handleApi(root, req, res, pathname, { spawnFn, reposPath })) return;
+
     const rel = pathname.replace(/^\/+/, '');
     return serveStatic(root, rel, res, pathname);
   });
@@ -253,7 +263,7 @@ sel.onchange=()=>{document.documentElement.setAttribute('data-theme',sel.value);
 // 单机共享门户：一个端口聚合本机所有 lore repo。repoMap: { name -> loreDir }。
 // MVP 只读：/<name>/api/… 一律 404（无 write 面 → 无 DNS-rebind 写风险）。配合 .listen 仅绑 127.0.0.1。
 export function createPortalServer(repoMap) {
-  return http.createServer((req, res) => {
+  return http.createServer(async (req, res) => {
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
@@ -278,7 +288,10 @@ export function createPortalServer(repoMap) {
       return res.end();
     }
     const rel = m[2].replace(/^\/+/, '');
-    if (rel === 'api' || rel.startsWith('api/')) {   // MVP 只读：不路由写接口
+    if (rel === 'api' || rel.startsWith('api/')) {
+      // v0.6「portal 只读」翻转（用户需求：portal 下控制台可操作）：API 按 repo 转发，
+      // localHost guard 在 handleApi 内同样生效，写面仍限对应 repo 的 .state。
+      if (await handleApi(repoMap[name], req, res, '/' + rel, {})) return;
       res.writeHead(404); return res.end('not found');
     }
     return serveStatic(repoMap[name], rel, res, pathname);
@@ -290,29 +303,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!rootDir || !portStr) { console.error('usage: node server.js <rootDir> <port>'); process.exit(1); }
   createServer(rootDir).listen(Number(portStr), '127.0.0.1',
     () => console.log(`lore static server on 127.0.0.1:${portStr} root=${rootDir}`));
-  // B2 ticker：统一调度静默期与 schedule（仅 per-repo server；portal 只读不带 ticker）。
-  // 动态 import runner——ticker 是进程级关注点，不把判定链拖进 createServer 工厂（测试零影响）。
-  const RUNNER_JS = join(HERE, 'lib', 'runner.js');
+  // B2 ticker：统一调度静默期与 schedule。判定+触发在 runner.tickAuto（与 portal 共用，永不抛）。
+  // 动态 import——ticker 是进程级关注点，不把判定链拖进 createServer 工厂（测试零影响）。
   setInterval(async () => {
-    try {
-      const stateDir = join(rootDir, '.state');
-      const config = readSyncConfig(stateDir);
-      if (config.mode !== 'auto') return;
-      const { shouldRunAuto } = await import('./lib/runner.js');
-      const pid = readRunnerPid(stateDir);
-      const runs = readAutoRuns(stateDir, 1);
-      const d = shouldRunAuto({
-        config,
-        pendingTs: readAutoPending(stateDir),
-        lastRunDate: runs[0]?.ts?.slice(0, 10) ?? null,
-        now: new Date(),
-        runnerAlive: pid != null && isAlive(pid),
-      });
-      if (!d.run) return;
-      clearAutoPending(stateDir);
-      const child = spawn(process.execPath, [RUNNER_JS, rootDir], { detached: true, stdio: 'ignore', windowsHide: true });
-      child.once?.('error', () => {});
-      child.unref();
-    } catch { /* ticker 永不击落 server */ }
+    try { (await import('./lib/runner.js')).tickAuto(rootDir); }
+    catch { /* ticker 永不击落 server */ }
   }, 60_000).unref();
 }

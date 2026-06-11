@@ -302,14 +302,37 @@ test('portal: GET /repos.json → 仓库名列表（壳切换下拉数据源）'
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
-test('portal: /<name>/api/sync/status 仍 404（只读不变）', async () => {
-  const root = syncFixture();
-  const server = createPortalServer({ demo: root });
+test('portal: /<name>/api/* 转发到对应 repo（控制台在 portal 下可操作）', async () => {
+  const rootA = syncFixture();
+  const rootB = syncFixture();
+  const server = createPortalServer({ alpha: rootA, beta: rootB });
   const port = await listen(server);
   try {
-    const r = await fetch(`http://127.0.0.1:${port}/demo/api/sync/status`);
-    assert.equal(r.status, 404);
-  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+    // GET status 经转发可达
+    const st = await fetch(`http://127.0.0.1:${port}/alpha/api/sync/status`);
+    assert.equal(st.status, 200);
+    assert.equal((await st.json()).mode, 'notify');
+    // POST mode 写到「对应 repo」的 .state（隔离：beta 不受影响）
+    const r = await fetch(`http://127.0.0.1:${port}/alpha/api/sync/mode`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'manual' }),
+    });
+    assert.equal(r.status, 200);
+    assert.equal(readSyncMode(join(rootA, '.state')), 'manual');
+    assert.equal(readSyncMode(join(rootB, '.state')), 'notify');
+    // localHost guard 在 portal 转发路径同样生效
+    const status403 = await new Promise((resolve, reject) => {
+      const rq = http.request(
+        { host: '127.0.0.1', port, path: '/alpha/api/sync/mode', method: 'POST',
+          headers: { 'content-type': 'application/json', host: 'evil.example' } },
+        res => { res.resume(); resolve(res.statusCode); });
+      rq.on('error', reject);
+      rq.end(JSON.stringify({ mode: 'notify' }));
+    });
+    assert.equal(status403, 403);
+    assert.equal(readSyncMode(join(rootA, '.state')), 'manual');   // 403 没改盘
+    // 未登记 repo 的 api 仍 404
+    assert.equal((await fetch(`http://127.0.0.1:${port}/ghost/api/sync/status`)).status, 404);
+  } finally { server.close(); rmSync(rootA, { recursive: true, force: true }); rmSync(rootB, { recursive: true, force: true }); }
 });
 
 test('GET /api/sync/status: 无 manifest → last_finalize null', async () => {

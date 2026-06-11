@@ -67,7 +67,7 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 ## 中期（消费纪律 + 质量）
 
 ### 单机共享 wiki server（多 repo 聚合门户）✅ MVP 已实现（v0.6）· 余项待迭代
-> MVP 已实现（见上「已完成 v0.6.0」）：单进程聚合 + 中央 registry + `/<name>/` 路由 + repo 选择器 + 只读白名单。**余项（后续迭代）**：跨 repo 全局搜索、write API 多路由、壳内「切 repo」下拉、per-repo serve 自动迁移/端口回收、namespace 高级冲突策略。
+> MVP 已实现（见上「已完成 v0.6.0」）：单进程聚合 + 中央 registry + `/<name>/` 路由 + repo 选择器 + 只读白名单。**余项（后续迭代）**：跨 repo 全局搜索、per-repo serve 自动迁移/端口回收、namespace 高级冲突策略。~~write API 多路由~~ ✅（2026-06-11 handleApi 按 repo 转发+portal 接管 ticker）；~~壳内「切 repo」下拉~~ ✅（2026-06-11 双形态 🏠+下拉）。
 - ~~现状痛点 / 待定 / 踏脚石~~ ✅ 均已被 v0.6 MVP + `serve --list/--stop-all` + `stablePort` 落地（旧计划文本删除，2026-06-10 清理）。
 
 ### resident-mode（母 §5 消费）

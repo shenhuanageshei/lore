@@ -44,7 +44,7 @@ appendAutoRun(stateDir, run) / readAutoRuns(stateDir, limit=20)
 ### B · 触发链路
 
 - **hook**（`lib/hook.js` `maybeRefresh`）：auto 分支 = notify 行为（spawn 机械 finalize）**+ `writeAutoPending(stateDir, now)`**。不 spawn LLM、不等待。
-- **server ticker**（`server.js` CLI 块，不进 `createServer` 工厂——测试零影响；**portal 进程不带 ticker**——聚合只读，不该替任何 repo 跑 runner）：每 60s 调 `tickAuto(loreDir)`；
+- **server ticker**（`server.js` CLI 块，不进 `createServer` 工厂——测试零影响）：每 60s 调 `tickAuto(loreDir)`。~~portal 进程不带 ticker~~ **2026-06-11 翻转**：portal API 转发落地后（用户需求：portal 下控制台可操作），portal 是更自然的常驻调度宿主——portal `__run` 对全部登记 repo 循环 `tickAuto`；
 - **判定纯函数**（`lib/runner.js` 导出，可测）：
 
 ```

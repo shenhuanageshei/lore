@@ -82,7 +82,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -211,5 +211,72 @@ test('CLI: reports unfolded literal token and exits 0', () => {
     const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
     assert.match(out, /unfolded/);
     assert.match(out, /component\/lib\.md/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// --- 实扫暴露的两个误报修复 ---
+
+test('lintUnfolded: 哨兵区内/inline code span 里的字面 token 引用不算残留', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    // 决策史哨兵区内提到 token（commit message 字面引用）→ 不报
+    wikiPage(lore, 'component', 'a', 'title: A\ncode_sha: x',
+      '# A\n\n<!-- LORE_JOURNAL:START -->\n- **fix: fold {{LORE_JOURNAL}} exactly once** (abc, 2026-06-04)\n<!-- LORE_JOURNAL:END -->\n');
+    // 正文反引号 code span 引用 → 不报
+    wikiPage(lore, 'component', 'b', 'title: B\ncode_sha: x',
+      '# B\n\n机制：`{{LORE_JOURNAL}}` token 在首次 finalize 跳变。\n');
+    // 裸 token（真残留）→ 报
+    wikiPage(lore, 'component', 'c', 'title: C\ncode_sha: x', '# C\n\n{{LORE_JOURNAL}}\n');
+    assert.deepEqual(lintUnfolded(join(lore, 'wiki')), ['component/c.md']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintOrphans/lintMissing: deep 页不是孤儿、deep 缺页要报', () => {
+  // deep 声明的子模块页是合法 component 页
+  assert.deepEqual(lintOrphans(['lib', 'sync', 'rogue'], ['lib'], { lib: { order: ['sync'], groups: [] } }), ['rogue']);
+  assert.deepEqual(lintMissing(['lib'], ['lib'], { lib: { order: ['sync'], groups: [] } }), ['sync']);
+  // 不传 deep → 行为同旧（向后兼容）
+  assert.deepEqual(lintOrphans(['lib', 'sync'], ['lib']), ['sync']);
+});
+
+// --- mermaid 语法启发式校验（第五检）---
+import { mermaidIssues, lintMermaid } from '../lib/lint.js';
+
+test('mermaidIssues: 合法图 → []', () => {
+  assert.deepEqual(mermaidIssues('flowchart LR\n  a["A 标签"] --> b{"判断?"}\n  b -->|yes| c'), []);
+  assert.deepEqual(mermaidIssues('stateDiagram-v2\n  [*] --> seed\n  seed --> 保持: hash 不变'), []);
+  assert.deepEqual(mermaidIssues('graph TD\n  a --> b'), []);                  // graph 作图类型合法
+  assert.deepEqual(mermaidIssues('flowchart LR\n  a -- yes --> b'), []);       // 带文本老语法箭头合法
+});
+
+test('mermaidIssues: 保留字节点 id（实测踩过 graph[...]）', () => {
+  const issues = mermaidIssues('flowchart LR\n  finalize --> graph[".graph.json"]');
+  assert.equal(issues.length, 1);
+  assert.match(issues[0], /reserved id.*graph/);
+  assert.match(mermaidIssues('flowchart TD\n  end["收尾"] --> x')[0], /reserved id.*end/);
+});
+
+test('mermaidIssues: 断箭头（实测踩过 == >）', () => {
+  assert.match(mermaidIssues('flowchart LR\n  a ==立刻返回== > b')[0], /broken arrow/);
+  assert.match(mermaidIssues('flowchart LR\n  a -- > b')[0], /broken arrow/);
+});
+
+test('mermaidIssues: 未知图类型 / 引号不配对', () => {
+  assert.match(mermaidIssues('flowchat LR\n  a --> b')[0], /unknown diagram type/);
+  assert.match(mermaidIssues('flowchart LR\n  a["未闭合 --> b')[0], /unbalanced quote/);
+});
+
+test('lintMermaid: 扫页报坏图（页名+第几个图+问题）；好页不报', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    wikiPage(lore, 'component', 'good', 'title: G', '# G\n\n```mermaid\nflowchart LR\n  a --> b\n```\n');
+    wikiPage(lore, 'component', 'bad', 'title: B', '# B\n\n```mermaid\nflowchart LR\n  x --> graph["g"]\n```\n');
+    const out = lintMermaid(join(lore, 'wiki'));
+    assert.equal(out.length, 1);
+    assert.equal(out[0].page, 'component/bad.md');
+    assert.equal(out[0].diagram, 1);
+    assert.match(out[0].issue, /reserved id/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

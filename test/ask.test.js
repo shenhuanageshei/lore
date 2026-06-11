@@ -84,3 +84,17 @@ test('integration: init → write page → sync → ask finds it', () => {
     assert.match(out, /component\/lib\.md/);   // ask finds the page by its summary keywords
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('searchPages: 节级命中（heading 含词）→ 带 section 字段，分数并入；id 进搜索域', () => {
+  const manifest = { axes: [{ id: 'component', pages: [
+    { id: 'fp', title: '指纹层', summary: '', path: 'component/fp.md',
+      sections: [{ heading: '⑤ 边界 / 坑', line: 30 }, { heading: '概览', line: 5 }] },
+  ] }] };
+  const hits = searchPages(manifest, '边界');
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].section, '⑤ 边界 / 坑');     // 命中节
+  assert.ok(hits[0].score >= 1);
+  const pageHit = searchPages(manifest, '指纹');
+  assert.equal(pageHit[0].section, undefined);       // 页级命中无 section
+  assert.equal(searchPages(manifest, 'fp')[0].id, 'fp');   // 英文 slug 可搜
+});

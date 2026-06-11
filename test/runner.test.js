@@ -44,3 +44,77 @@ test('qualityGate: mermaid 坏图拒（复用 lint 第五检）', () => {
   const bad = GOOD_PAGE + '\n```mermaid\nflowchart LR\n  x --> graph["g"]\n```\n';
   assert.match(qualityGate(bad, OLD_PAGE).reason, /mermaid/);
 });
+
+// --- runAuto 主流程（fake backend 注入，不真调 claude）---
+import { runAuto } from '../lib/runner.js';
+import { mkdtempSync, mkdirSync, writeFileSync as wf, readFileSync as rf, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { appendRewriteRequest, readRewriteRequests, readAutoRuns, readRunnerPid } from '../lib/syncstate.js';
+
+function autoRepo() {
+  const root = mkdtempSync(join(tmpdir(), 'lore-runner-'));
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  mkdirSync(join(root, 'lib'), { recursive: true });
+  wf(join(root, 'lib', 'a.js'), 'export const x = 1;');
+  const lore = join(root, '.lore');
+  mkdirSync(join(lore, 'wiki', 'component'), { recursive: true });
+  wf(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [lib]\n');
+  wf(join(lore, 'wiki', 'component', 'lib.md'),
+    '---\ntitle: Lib\nsummary: s\n---\n# Lib\n\n旧正文。\n\n<!-- LORE_JOURNAL:START -->\n- x\n<!-- LORE_JOURNAL:END -->\n');
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return { root, lore };
+}
+
+const FAKE_OK = `---\ntitle: Lib\nsummary: better\n---\n# Lib\n\n新正文，质量门要求长度不短于旧文三分之一，这里足够长完全没问题。\n\n<!-- LORE_JOURNAL:START -->\n- x\n<!-- LORE_JOURNAL:END -->\n`;
+const noopSpawn = () => ({ unref() {}, once() {} });
+
+test('runAuto: 好页写盘+队列移除+历史记录+pid 清理', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    appendRewriteRequest(join(lore, '.state'), { page: 'component/lib.md' });
+    let calls = 0;
+    const backend = { rewritePage: async () => { calls++; return FAKE_OK; } };
+    const res = await runAuto(lore, { backend, maxPages: 5, spawnFn: noopSpawn, now: () => new Date('2026-06-10T12:00:00') });
+    assert.equal(calls, 1);                                              // 只有 lib 一页
+    assert.equal(res.pages[0].ok, true);
+    assert.match(rf(join(lore, 'wiki', 'component', 'lib.md'), 'utf8'), /新正文/);   // 写盘了
+    assert.deepEqual(readRewriteRequests(join(lore, '.state')), []);     // 队列消化
+    assert.equal(readAutoRuns(join(lore, '.state')).length, 1);          // 历史
+    assert.equal(readRunnerPid(join(lore, '.state')), null);             // pid 清了
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runAuto: 质量门不过 → 页面原样 + reason 入历史', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    const backend = { rewritePage: async () => 'garbage no frontmatter' };
+    const res = await runAuto(lore, { backend, maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
+    assert.equal(res.pages[0].ok, false);
+    assert.match(res.pages[0].reason, /frontmatter/);
+    assert.match(rf(join(lore, 'wiki', 'component', 'lib.md'), 'utf8'), /旧正文/);   // 没动
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runAuto: backend 抛错 → 该页失败记 reason，不崩', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    const backend = { rewritePage: async () => { throw new Error('claude-cli-missing'); } };
+    const res = await runAuto(lore, { backend, maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
+    assert.equal(res.pages[0].ok, false);
+    assert.match(res.pages[0].reason, /claude-cli-missing/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runAuto: maxPages 截断', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    const backend = { rewritePage: async () => FAKE_OK };
+    const res = await runAuto(lore, { backend, maxPages: 0, spawnFn: noopSpawn, now: () => new Date() });
+    assert.equal(res.pages.length, 0);                       // 0 页上限 → 啥都不跑（截断生效）
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

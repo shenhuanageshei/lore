@@ -235,6 +235,10 @@ export function createPortalServer(repoMap) {
       return res.end(renderRepoList(Object.keys(repoMap)));
     }
 
+    if (pathname === '/repos.json') {                // 只读列表：壳的 repo 切换下拉数据源（不破门户零写面铁律）
+      return sendJson(res, 200, { repos: Object.keys(repoMap) });
+    }
+
     const m = pathname.match(/^\/([^/]+)(\/.*)?$/);
     const name = m && m[1];
     // hasOwnProperty（非 `in`）：避免 'constructor'/'__proto__' 这类继承键误判为已登记 repo。

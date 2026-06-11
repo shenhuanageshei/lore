@@ -264,6 +264,17 @@ test('GET /api/sync/runs: 历史最近 N 条', async () => {
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
+test('portal: GET /repos.json → 仓库名列表（壳切换下拉数据源）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  const server = createPortalServer({ alpha: root, beta: root });
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/repos.json`);
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { repos: ['alpha', 'beta'] });
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('portal: /<name>/api/sync/status 仍 404（只读不变）', async () => {
   const root = syncFixture();
   const server = createPortalServer({ demo: root });

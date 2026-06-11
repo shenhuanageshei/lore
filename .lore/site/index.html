@@ -42,9 +42,12 @@
   #search input { width: 100%; background: var(--panel); border: 1px solid var(--border);
     color: var(--fg); padding: 7px 12px; border-radius: 7px; font-size: 13px; }
   #search input:focus { outline: none; border-color: var(--accent); }
-  #theme, #language { background: var(--panel); border: 1px solid var(--border); color: var(--fg);
+  #theme, #language, #repo-switch { background: var(--panel); border: 1px solid var(--border); color: var(--fg);
     padding: 6px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; }
-  #theme:focus, #language:focus { outline: none; border-color: var(--accent); }
+  #theme:focus, #language:focus, #repo-switch:focus { outline: none; border-color: var(--accent); }
+  #portal-home { color: var(--fg); text-decoration: none; padding: 5px 9px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--panel); font-size: 13px; }
+  #portal-home:hover { border-color: var(--accent); }
   #sync-light { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px;
     border: 1px solid var(--border); background: var(--panel); color: var(--fg);
     cursor: pointer; font-size: 12px; user-select: none; white-space: nowrap; }
@@ -277,6 +280,7 @@ async function boot() {
   await fetchSyncStatus();
   wireSyncConsole();
   renderSyncLight();
+  wireRepoSwitch();   // portal 形态才生效（fire-and-forget，不阻塞 route）
   LAST_GENERATED = MANIFEST.generated ?? null;
   schedulePoll(15000);
   window.addEventListener('hashchange', route);
@@ -537,6 +541,26 @@ function renderConsolePage() {
 function firstPageKey() {
   for (const ax of MANIFEST.axes) if (ax.pages[0]) return `${ax.id}/${ax.pages[0].id}`;
   return '';
+}
+
+// portal 形态（BASE !== '/'）：顶栏插 🏠 返回仓库列表 + repo 切换下拉。
+// per-repo / 旧 portal 下 /repos.json 404 → catch 静默跳过，零影响。
+async function wireRepoSwitch() {
+  if (BASE === '/') return;
+  try {
+    const { repos } = await (await fetch('/repos.json')).json();
+    if (!Array.isArray(repos) || repos.length === 0) return;
+    const cur = BASE.replaceAll('/', '');
+    const home = document.createElement('a');
+    home.id = 'portal-home'; home.href = '/'; home.textContent = '🏠'; home.title = '返回仓库列表';
+    const sel = document.createElement('select');
+    sel.id = 'repo-switch'; sel.title = '切换仓库';
+    sel.innerHTML = repos.map(r => `<option value="${r}"${r === cur ? ' selected' : ''}>${r}</option>`).join('');
+    sel.onchange = () => { location.href = '/' + encodeURIComponent(sel.value) + '/site/'; };
+    const brand = document.getElementById('brand');
+    brand.after(sel);
+    brand.after(home);
+  } catch { /* repos.json 不可达（per-repo serve）→ 无切换 UI */ }
 }
 
 function wireSearch() {

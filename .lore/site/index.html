@@ -448,7 +448,13 @@ function renderConsolePage() {
       <h3>待重写队列（manifest stale &gt; 0）</h3>
       ${m.staleTotal ? `<table><tr><th>页面</th><th>落后</th><th>正文最后重写</th><th></th></tr>${rows}</table>` : '<p style="color:var(--fg-dim)">全部新鲜 ✓</p>'}
       <div style="margin-top:10px">
-        <button id="console-queue-all" ${SYNC_API_OK && m.staleTotal ? '' : (SYNC_API_OK ? 'disabled' : RO_ATTR)}>✍ 全部排队</button>
+        ${(() => {
+          const unq = m.stalePages.filter(p => p.path && !QUEUED_PAGES.has(p.path)).length;
+          if (!SYNC_API_OK) return `<button id="console-queue-all" ${RO_ATTR}>✍ 全部排队</button>`;
+          if (!m.staleTotal) return '<button id="console-queue-all" disabled>✍ 全部排队</button>';
+          if (!unq) return `<button id="console-queue-all" disabled>✓ 已排队 ${m.staleTotal} 页</button>`;
+          return `<button id="console-queue-all">✍ 全部排队 (${unq})</button>`;
+        })()}
         <button id="console-finalize" ${SYNC_API_OK ? '' : RO_ATTR}>⟳ 立即机械刷新</button>
       </div>
     </div>
@@ -480,6 +486,7 @@ function renderConsolePage() {
     };
   });
   document.querySelectorAll('#content button[data-queue]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = '排队中…';                // 即时反馈；重渲染后变「已排队 ✓」tag
     try {
       await fetch(BASE + 'api/sync/rewrite-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: b.dataset.queue }) });
     } catch {}
@@ -487,6 +494,7 @@ function renderConsolePage() {
   });
   const qa = document.getElementById('console-queue-all');
   if (qa) qa.onclick = async () => {
+    qa.disabled = true; qa.textContent = '排队中…';
     for (const p of m.stalePages) if (p.path && !QUEUED_PAGES.has(p.path)) {
       try { await fetch(BASE + 'api/sync/rewrite-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: p.path }) }); } catch {}
     }
@@ -626,6 +634,14 @@ function renderSyncLight() {
     btn.disabled = !SYNC_API_OK;
     btn.title = SYNC_API_OK ? '' : '只读模式（portal 或 python server）——本地 /lore:serve --node 可操作';
   }
+  // 排队按钮三态：有未排队页 → 显剩余数；全部已排队 → ✓ 锁定；无 stale → 原样禁用
+  const qa = document.getElementById('sync-queue-all');
+  if (SYNC_API_OK) {
+    const unqueued = m.stalePages.filter(p => p.path && !QUEUED_PAGES.has(p.path)).length;
+    if (m.staleTotal === 0) { qa.disabled = true; qa.textContent = '✍ 重写排队'; }
+    else if (unqueued === 0) { qa.disabled = true; qa.textContent = `✓ 已排队 ${m.staleTotal} 页`; }
+    else { qa.textContent = `✍ 重写排队 (${unqueued})`; }
+  }
   document.querySelectorAll('#sync-panel .seg button:not([data-mode="auto"])').forEach(b => {
     b.disabled = !SYNC_API_OK;
     b.title = SYNC_API_OK ? '' : '只读模式';
@@ -654,7 +670,9 @@ function wireSyncConsole() {
       startFastPoll();                                           // 快轮询秒级反馈
     } catch { await fetchSyncStatus(); renderSyncLight(); }      // server 挂了 → 降级态自然亮出
   };
-  document.getElementById('sync-queue-all').onclick = async () => {
+  document.getElementById('sync-queue-all').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.textContent = '排队中…';            // 点击即时反馈，完成后 renderSyncLight 置「✓ 已排队 N 页」
     const m = buildConsoleModel(MANIFEST, SYNC_STATUS);
     for (const p of m.stalePages) {
       if (p.path && !QUEUED_PAGES.has(p.path)) {

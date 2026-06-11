@@ -180,3 +180,28 @@ test('maybeRefresh: mode=notify（显式写入）→ spawn 照旧', () => {
     assert.equal(calls.length, 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+import { readAutoPending } from '../lib/syncstate.js';
+
+test('maybeRefresh: mode=auto → 写 pending 时间戳 + 照旧 spawn finalize；notify 不写 pending', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'wiki', '.manifest.json'), '{"axes":[]}');
+    writeSyncMode(join(lore, '.state'), 'auto');
+    const calls = [];
+    const r = maybeRefresh({ loreDir: lore, spawnFn: (cmd, args) => { calls.push(args); return { unref() {} }; } });
+    assert.equal(r.spawned, true);                                  // 机械 finalize 照旧
+    assert.equal(calls.length, 1);
+    assert.notEqual(readAutoPending(join(lore, '.state')), null);   // pending 写了
+    // notify 对照：不写 pending
+    const root2 = mkdtempSync(join(tmpdir(), 'lore-mr-'));
+    const lore2 = join(root2, '.lore');
+    mkdirSync(join(lore2, 'wiki'), { recursive: true });
+    writeFileSync(join(lore2, 'wiki', '.manifest.json'), '{"axes":[]}');
+    maybeRefresh({ loreDir: lore2, spawnFn: () => ({ unref() {} }) });
+    assert.equal(readAutoPending(join(lore2, '.state')), null);
+    rmSync(root2, { recursive: true, force: true });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

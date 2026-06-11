@@ -2,6 +2,7 @@
 import http from 'node:http';
 import { appendFileSync, createReadStream, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, sep, extname } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
@@ -89,7 +90,10 @@ export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
   stream.pipe(res);
 }
 
-export function createServer(rootDir, { spawnFn = spawn } = {}) {
+const PORTAL_PORT = 7842;   // 与 lib/portal.js 固定端口一致
+const slashLower = p => normalize(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+
+export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json') } = {}) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer(async (req, res) => {
     let pathname;
@@ -163,6 +167,14 @@ export function createServer(rootDir, { spawnFn = spawn } = {}) {
 
     if (req.method === 'GET' && pathname === '/api/sync/runs') {
       return sendJson(res, 200, { runs: readAutoRuns(join(root, '.state')) });
+    }
+
+    // per-repo 形态的仓库切换数据源：读中央注册表 + 报告 portal 端口（壳跳 portal 切仓库）。
+    if (req.method === 'GET' && pathname === '/repos.json') {
+      let entries = [];
+      try { entries = JSON.parse(readFileSync(reposPath, 'utf8')) ?? []; } catch { entries = []; }
+      const current = entries.find(e => slashLower(e.loreDir) === slashLower(root))?.name ?? null;
+      return sendJson(res, 200, { repos: entries.map(e => e.name), portal: PORTAL_PORT, current });
     }
 
     if (req.method === 'POST' && pathname === '/api/sync/mode') {

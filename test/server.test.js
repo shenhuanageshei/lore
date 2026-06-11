@@ -264,6 +264,33 @@ test('GET /api/sync/runs: 历史最近 N 条', async () => {
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
+test('per-repo: GET /repos.json → 中央注册表 + portal 端口 + 当前 repo（壳跳转 portal 用）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  const reposPath = join(root, 'repos.json');
+  writeFileSync(reposPath, JSON.stringify([
+    { name: 'alpha', loreDir: root },               // 匹配当前 server root → current
+    { name: 'beta', loreDir: 'D:/elsewhere/.lore' },
+  ]));
+  const server = createServer(root, { reposPath });
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/repos.json`)).json();
+    assert.deepEqual(body.repos, ['alpha', 'beta']);
+    assert.equal(body.portal, 7842);
+    assert.equal(body.current, 'alpha');
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('per-repo: 注册表缺失 → repos 空（壳不显示切换器）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  const server = createServer(root, { reposPath: join(root, 'nope.json') });
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/repos.json`)).json();
+    assert.deepEqual(body, { repos: [], portal: 7842, current: null });
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('portal: GET /repos.json → 仓库名列表（壳切换下拉数据源）', async () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
   const server = createPortalServer({ alpha: root, beta: root });

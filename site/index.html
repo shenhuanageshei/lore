@@ -543,24 +543,27 @@ function firstPageKey() {
   return '';
 }
 
-// portal 形态（BASE !== '/'）：顶栏插 🏠 返回仓库列表 + repo 切换下拉。
-// per-repo / 旧 portal 下 /repos.json 404 → catch 静默跳过，零影响。
+// 仓库切换（两种形态统一）：portal 下相对跳 /<name>/site/；per-repo 下响应带 portal 端口
+// → 跳 portal 绝对 URL（portal 没起则跳转失败，自然提示用户 /lore:portal start）。
+// 旧 server / python 静态下 /repos.json 404 → catch 静默跳过，零影响。
 async function wireRepoSwitch() {
-  if (BASE === '/') return;
   try {
-    const { repos } = await (await fetch('/repos.json')).json();
+    const info = await (await fetch('/repos.json')).json();
+    const repos = info.repos;
     if (!Array.isArray(repos) || repos.length === 0) return;
-    const cur = BASE.replaceAll('/', '');
+    const onPortal = BASE !== '/';
+    const cur = onPortal ? BASE.replaceAll('/', '') : (info.current ?? '');
+    const portalRoot = onPortal ? '/' : `http://127.0.0.1:${info.portal}/`;
     const home = document.createElement('a');
-    home.id = 'portal-home'; home.href = '/'; home.textContent = '🏠'; home.title = '返回仓库列表';
+    home.id = 'portal-home'; home.href = portalRoot; home.textContent = '🏠'; home.title = '仓库列表（portal）';
     const sel = document.createElement('select');
     sel.id = 'repo-switch'; sel.title = '切换仓库';
     sel.innerHTML = repos.map(r => `<option value="${r}"${r === cur ? ' selected' : ''}>${r}</option>`).join('');
-    sel.onchange = () => { location.href = '/' + encodeURIComponent(sel.value) + '/site/'; };
+    sel.onchange = () => { location.href = portalRoot + encodeURIComponent(sel.value) + '/site/'; };
     const brand = document.getElementById('brand');
     brand.after(sel);
     brand.after(home);
-  } catch { /* repos.json 不可达（per-repo serve）→ 无切换 UI */ }
+  } catch { /* repos.json 不可达（旧 server / python）→ 无切换 UI */ }
 }
 
 function wireSearch() {

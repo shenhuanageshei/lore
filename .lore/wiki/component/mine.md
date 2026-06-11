@@ -2,7 +2,7 @@
 title: mine —— git 历史考古队
 summary: 把整部 git log 全量挖成 journal 原子，按文件路径→组件、关键词→主题、组件→数据流打 facet；按 sha 幂等回填，确定性、可反复跑
 last_updated: 2026-06-11
-code_sha: 35acc10
+code_sha: fb13a5b
 atoms: 0
 commits: 0
 ---
@@ -113,7 +113,7 @@ mine **只写 journal**，不碰 wiki、不碰源码。
   "kind": "commit",
   "commit": "9e14cc4",
   "title": "feat(mine): improve accuracy",
-  "why": "<commit body 多行原文>",
+  "why": "<commit body，已剥 git trailer 噪音>",
   "what_changed": "",
   "facets": { "component": ["lib"], "flow": ["pipeline"], "theme": ["quality"] },
   "refs": { "files": ["lib/mine.js", "README.md"], "pitfall": null, "related": [] },
@@ -128,7 +128,8 @@ mine **只写 journal**，不碰 wiki、不碰源码。
 - **`id` 是幂等键**：`commit:<sha>`，下游去重、`fold` 折叠都按它。
 - **`facets` 三轴恒为数组**（可空 `[]`，永不缺键），且都 `sort()` 过 → 确定性。`refs.files` 保留**全部**变更文件（含不属于任何组件的，如 `README.md`），只有 `facets.component` 做了过滤；`refs.pitfall=null`、`refs.related=[]` 是占位，留给 `note` / 富化阶段填。
 - **`source`** 区分来源：mine 写 `miner:commits`，hook 复用 `commitAtom` 时传 `hook`。
-- **`enriched:false` / `confidence:"EXTRACTED"`**：标明这是**机械抽取**的原子（非 agent 人工富化），下游可据此分级。`why = commit body` 原文、`what_changed` 留空（机械挖挖不出语义 diff）。
+- **`enriched:false` / `confidence:"EXTRACTED"`**：标明这是**机械抽取**的原子（非 agent 人工富化），下游可据此分级。`why = stripTrailers(commit body)`——**源头剥掉 `*-by:` 家族 trailer**（`Co-Authored-By:` / `Signed-off-by:` 等签名行是协作元数据不是 rationale，`stripTrailers @ lib/fold.js`）；纯 trailer 的 body 剥完为空串。`what_changed` 留空（机械挖挖不出语义 diff）。
+- **历史原子的 trailer 不回改**（journal append-only 神圣）——渲染层 `renderDecisionHistory @ lib/sync.js` 同样过 `stripTrailers` 防御旧数据。
 
 </details>
 
@@ -205,7 +206,7 @@ mine **只写 journal**，不碰 wiki、不碰源码。
 
 ## 依赖 / 邻居
 
-- **依赖**：`journal`（`appendAtom` / `existingIds` 落盘与去重）· `config`（`parseConfigCodeRoots` / `parseConfigThemes` / `parseConfigFlows` 解析三轴声明）。
+- **依赖**：`journal`（`appendAtom` / `existingIds` 落盘与去重）· `config`（`parseConfigCodeRoots` / `parseConfigThemes` / `parseConfigFlows` 解析三轴声明）· `fold`（`stripTrailers` 把 commit body 里的 `*-by:` trailer 在源头剥掉）。
 - **被复用**：`hook.js` 进口 `parseGitLog` / `commitAtom` / `GIT_FORMAT` —— post-commit 时复用同一套打标逻辑，只把 git log 收窄到 `-1 HEAD`、`source` 改 `hook`，单 commit 记一条原子。mine 与 hook 是「**全量回填**」与「**增量追加**」的一对：mine 补过去，hook 跟现在，两者产出的原子结构同构、按同一 id 幂等共存于一条 journal。
 - **下游**：mine 写进 journal 的原子，由 `fold` 折叠去重（按 id），再被 `sync` 的 finalize 按 `facets` 折进各页 `## Decision history`。
 

@@ -2,7 +2,7 @@
 title: sync —— 合成总装线
 summary: plan 列工单 → agent 写正文 → finalize 机械盖章；prose 指纹让 stale 诚实、增量只重写动过的页
 last_updated: 2026-06-11
-code_sha: 57efae2
+code_sha: fb13a5b
 atoms: 0
 commits: 0
 ---
@@ -54,7 +54,7 @@ flowchart LR
 `finalizeSync`（`finalizeSync @ lib/sync.js`）顺序：
 
 1. 读 journal → `foldAtoms` 去重 / 丢 amend·rebase orphan
-2. 读旧指纹，逐页：`foldJournal` 折决策史 → 对**折叠后文本**算 `proseHash` → `resolveProseSha` 定 `prose_sha` → `stampFrontmatter` 盖 `code_sha = prose_sha`
+2. 读旧指纹，逐页：`foldJournal` 折决策史（条目渲染时 `renderDecisionHistory` 对 why 过 `stripTrailers @ lib/fold.js`——已落盘旧原子里的 Co-Authored-By 等 trailer 不上墙）→ 对**折叠后文本**算 `proseHash` → `resolveProseSha` 定 `prose_sha` → `stampFrontmatter` 盖 `code_sha = prose_sha`
 3. HOME 同走指纹逻辑；INDEX 纯机械、不进指纹
 4. 写回指纹 + **GC 孤儿**（`nextFingerprints` 只装本轮处理过的页 → 已删页天然丢弃）
 5. 构造 `staleScopes`：component→`[code_root]`、flow→`spans` 各 root、deep→`[<root>/<mod>.js]`
@@ -107,7 +107,7 @@ stateDiagram-v2
 ## 依赖 / 邻居
 
 - **依赖**：`fold` · `fingerprint` · `manifest` · `graph` · `journal` · `config` · `docs` · `home` · `i18n`
-- **被调**：`/lore:sync` 命令 · `hook.js` 的 `maybeRefresh`（提交即 finalize）
+- **被调**：`/lore:sync` 命令 · `hook.js` 的 `maybeRefresh`（提交即 finalize）· `runner.js` 的 `runAuto`（auto 档：`planSync` 列工单给 LLM 重写、收尾再 spawn finalize 盖章）· `server.js` 的 `POST /api/sync/finalize`（控制台「立即刷新」）
 - **相关页**：[[manifest]]（stale 计算）· [[fingerprint]]（指纹层）· [[hook]]（提交刷新）
 
 ## Cross-links

@@ -2,7 +2,7 @@
 title: server.js —— 本地 Web 门面
 summary: 一个零依赖 http server 同时干三件事：静态伺服壳与 wiki、本机写 API（语言/翻译/同步控制）、多 repo 聚合门户（只读）
 last_updated: 2026-06-11
-code_sha: eef82cd
+code_sha: fb13a5b
 atoms: 1
 commits: 1
 ---
@@ -19,9 +19,12 @@ flowchart LR
   wiki[".lore/wiki + site/<br/>（sync 的产物）"] --> srv["server.js<br/>createServer"]
   srv -->|"GET 静态"| shell["浏览器壳<br/>（人读）"]
   shell -->|"POST /api/*<br/>仅本机"| state[".state/<br/>偏好·翻译队列·档位·重写队列"]
+  srv -. "ticker 60s<br/>auto 档静默期/定时" .-> rn["spawn lib/runner.js<br/>后台 LLM 重写"]
   registry["~/.lore/repos<br/>多 repo 登记"] --> portal["createPortalServer<br/>只读聚合"]
   portal -->|"/repo名/…"| shell
 ```
+
+**B2 之后的第四个角色**：per-repo 进程还是 **auto 档的调度宿主**——CLI 块挂一个 60 秒 ticker，用 `shouldRunAuto @ lib/runner.js` 判「静默期到了 / schedule 到点 / runner 没在跑」，满足就 detached spawn `lib/runner.js`（后台 LLM 重写）。serve 没开 = auto 不触发（可接受降级，下次开 serve 补跑过期 pending）。**portal 进程不带 ticker**——聚合只读，不替任何 repo 跑 runner。
 
 **为什么一个文件三种角色**：静态伺服（壳+wiki）、写 API（本机控制）、聚合门户（多 repo）共享同一套路径安全逻辑（`serveStatic` 防穿越）。拆三个文件会复制安全代码；合在一起，**门户复用 per-repo 的静态语义但砍掉全部写面**——只读由结构保证，不靠运行时判断。
 
@@ -56,11 +59,12 @@ flowchart LR
 1. **POST /api/\* 总闸**：`!localHost(req)` → 403（任何写 API 之前）
 2. `POST /api/preferences` → 写 `.state/preferences.json`（语言偏好）
 3. `POST /api/translation-requests` → append `.state/translation-requests.ndjson`（翻译排队）
-4. `GET /api/sync/status` → 档位 + manifest.generated（B1 控制台灯）
-5. `POST /api/sync/mode` → 枚举校验写 `.state/sync.json`（auto 拒绝留 B2）
+4. `GET /api/sync/status` → `{mode, last_finalize, config, runner_running}`（config=debounce/schedule/max_pages 全配置；runner_running 查 `.state/runner.pid` 活性——壳灯 🔵 busy 态的数据源）
+5. `POST /api/sync/mode` → 枚举校验写 `.state/sync.json`（manual/notify/**auto** 三档全合法，B2 起）
 6. `POST /api/sync/finalize` → detached spawn `lib/sync.js finalize`（不 gate 档位——手动刷新正是 manual 档的用法）
 7. `GET/POST /api/sync/rewrite-requests` → 重写排队（`safeWikiPage` 防越狱）
-8. 其余 → `serveStatic`（壳 / wiki / mermaid.min.js）
+8. `GET /api/sync/runs` → `.state/auto-runs.ndjson` 最近 20 条（console 任务历史表）
+9. 其余 → `serveStatic`（壳 / wiki / mermaid.min.js）
 
 门户（`createPortalServer`）：`/` 出 repo 列表页；`/<name>/api/…` **一律 404**（只读铁律）；`/<name>/<rel>` → 该 repo 的 `serveStatic`。
 
@@ -82,6 +86,7 @@ flowchart LR
 - **finalize 端点刻意不 gate 档位**——manual 关的是「自动」，手动 ⟳ 正是 manual 档的用法。别给它补 mode 检查（端点注释有同款警告）。
 - **python 退化形态**：单语 repo 默认 python 静态 server（`lib/serve.js` probe）→ 本文件不在场、全部 API 404 → 壳降级只读。`/lore:serve --node` 强制启用本文件。
 - **portal 安全靠结构**：`hasOwnProperty` 查 repoMap（防 `__proto__` 假命中）+ api 前缀整段 404。给门户加写功能前先想清楚跨 repo 写意味着什么。
+- **ticker 永不击落 server**：整个 tick 回调包 try/catch；`shouldRunAuto` 动态 import（判定链不进 `createServer` 工厂，测试建 server 零定时器）；`.unref()` 让进程能正常退出。runner 防叠跑靠 `.state/runner.pid` 活性检查（LLM 重写不幂等，必须防叠）。
 
 </details>
 

@@ -83,7 +83,8 @@ export function buildPageIndex(manifest) {
 }
 
 export function preprocessWikilinks(html, pageIndex) {
-  return html.replace(/\[\[([a-zA-Z0-9_\-]+)\]\]/g, (_, id) => {
+  // id 允许 `.`：文件级页（如 server.js）的 wikilink；`.` 不在首尾防误吞省略号
+  return html.replace(/\[\[([a-zA-Z0-9_\-][a-zA-Z0-9_.\-]*[a-zA-Z0-9_\-]|[a-zA-Z0-9_\-])\]\]/g, (_, id) => {
     const target = pageIndex[id] ?? `component/${id}`;
     return `<a class="wikilink" href="#${target}">${id}</a>`;
   });

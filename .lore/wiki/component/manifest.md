@@ -2,7 +2,7 @@
 title: manifest —— wiki 总目录与「新鲜度」体检
 summary: 扫 wiki 各轴页成 .manifest.json；每页拿 frontmatter 的 code_sha 跟 HEAD 比，算出「落后几个 commit」的 stale
 last_updated: 2026-06-11
-code_sha: 35acc10
+code_sha: fb13a5b
 atoms: 0
 commits: 0
 ---
@@ -134,8 +134,12 @@ flowchart LR
 | `stale` | **当场算**，见 ④ | 落后正文几个 commit；0 = 新鲜 |
 | `code_sha` | frontmatter `code_sha`，缺省 `''` | finalize 盖的「这页对应的代码 sha」 |
 | `synthesized_from` | `{atoms, commits}` | provenance：合成自几条 atom / 几个 commit |
+| `group` | **frontmatter 优先**（docs 物化写入），pageGroups map 兜底（component finalize 构造），缺省 `''` | 侧栏分组小标题（component：捕获/合成；docs：项目状态/设计与计划/notes） |
+| `paired_plan` | frontmatter `paired_plan`，缺省 `''` | docs 轴 spec↔plan 配对：spec 页指向其 plan 页 id（壳渲染 plan 徽标，被配对 plan 不占侧栏行） |
 
 > 轴顺序契约（`AXIS_ORDER`）：`HOME → INDEX → component → flow → theme → docs`，未知轴字母序垫在最后——保证跨平台**确定性**（同输入字节级一致）。
+>
+> **轴内排序**两个特例：component 轴按 `componentOrder`（鸟瞰 code_root 置顶 + deep 流水线序，不在序里的字母序垫后）；docs 轴**组间固定序**（项目状态 0 → 设计与计划 1 → notes 2 → 其他值 3 垫底）+ 组内 `last_updated` 降序——**排序单一来源在 manifest，壳不重排**。
 
 </details>
 

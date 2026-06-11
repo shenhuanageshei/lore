@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-11T04:18:46.224Z",
+  "generated": "2026-06-11T06:53:15.780Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -2534,6 +2534,20 @@
       "kind": "commit",
       "title": "feat(shell): unlock auto mode, busy light, auto-run history table",
       "ts": "2026-06-10T21:05:57-07:00"
+    },
+    {
+      "id": "commit:3c0b8de7423537c85f8e7e561a408f605b19f9c0",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs: auto-rewrite B2 done; dogfood e2e verified (real claude rewrote lib.md, 1/1 ok, gate passed, stale zeroed)",
+      "ts": "2026-06-10T21:25:19-07:00"
+    },
+    {
+      "id": "commit:fb13a5ba95a9301e3187d21605bd96c84c71c2af",
+      "type": "atom",
+      "kind": "commit",
+      "title": "fix(shell): queue buttons get real feedback — remaining count, loading state, locked done state",
+      "ts": "2026-06-10T23:20:52-07:00"
     }
   ],
   "edges": [

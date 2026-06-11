@@ -71,6 +71,12 @@ test('preprocessWikilinks falls back for unknown id', () => {
   assert.match(out, /href="#component\/ghost"/);   // best-effort fallback
 });
 
+test('preprocessWikilinks: 带点的文件级页 id（如 server.js）也成链', () => {
+  const out = preprocessWikilinks('见 [[server.js]] 门面', {});
+  assert.match(out, /<a class="wikilink" href="#component\/server\.js">server\.js<\/a>/);
+  assert.equal(preprocessWikilinks('[[a]]', {}).includes('href="#component/a"'), true);   // 单字符 id 仍可
+});
+
 test('buildNavModel passes axes through with pages', () => {
   const nav = buildNavModel(MANIFEST);
   assert.equal(nav.length, 2);

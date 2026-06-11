@@ -2,7 +2,7 @@
 title: hook —— 提交即记录·提交即刷新
 summary: 每次 commit 后台记一条 journal 原子 + 触发机械 finalize；best-effort、detached、永不挡 commit
 last_updated: 2026-06-11
-code_sha: b934c49
+code_sha: fb13a5b
 atoms: 0
 commits: 0
 ---
@@ -22,10 +22,14 @@ flowchart LR
   hook --> cap["captureHead<br/>读 git log -1"]
   hook --> ref["maybeRefresh<br/>提交即刷新"]
   cap --> journal[("journal<br/>追加 1 条原子")]
+  ref -. 档位 manual? .-> stop["跳过<br/>一切手动"]
+  ref -. 档位 auto? .-> pend["写 auto-pending<br/>时间戳"]
   ref -. manifest 存在? .-> spawn["detached spawn<br/>sync.js finalize"]
   spawn -. 后台·零LLM .-> wiki[("wiki 机械部分<br/>准实时刷新")]
   commit ==立刻返回==> you((你))
 ```
+
+**档位开关**（B1/B2）：hook 开跑前先读 `.state/sync.json` 的档位——**manual** 档连机械刷新都不碰（一切手动）；**notify**（默认）走上图全流程；**auto** 档额外写一个 `auto-pending.json` 时间戳，给 server 的 ticker 当「静默期」计时起点（LLM 重写不在 hook 里跑——hook 永远是毫秒级）。
 
 **一个场景串到底**：
 
@@ -67,7 +71,7 @@ flowchart LR
 | 导出 | 签名 | 干什么 | 锚点 |
 |---|---|---|---|
 | `captureHead` | `({repoRoot, journalDir, codeRoots, themes=[], flows=[]}) → {added: 0\|1}` | 把 HEAD commit 记成 1 条 journal 原子（幂等） | `captureHead @ lib/hook.js` |
-| `maybeRefresh` | `({loreDir, spawnFn=spawn}) → {spawned: bool}` | manifest 存在则 detached spawn `finalize` | `maybeRefresh @ lib/hook.js` |
+| `maybeRefresh` | `({loreDir, spawnFn=spawn}) → {spawned: bool, reason?: 'manual'}` | 按档位分流：manual 跳过；auto 先写 pending；manifest 存在则 detached spawn `finalize` | `maybeRefresh @ lib/hook.js` |
 
 `spawnFn` 是**注入点**：默认就是 `node:child_process` 的 `spawn`，测试时换成桩函数断言「用什么参数 spawn 了」（见 ⑦）。
 
@@ -86,11 +90,14 @@ flowchart LR
 
 **`maybeRefresh`**（`maybeRefresh @ lib/hook.js`）：
 
-1. `existsSync(<loreDir>/wiki/.manifest.json)` 为假 → **`{spawned:false}` 直接返回**（manifest 闸门）。
-2. 解析同目录的 `sync.js` 路径（`fileURLToPath(import.meta.url)` → `dirname` → `join`）。
-3. `spawnFn(process.execPath, [syncJs,'finalize',loreDir], {detached:true, stdio:'ignore'})`。
-4. `child.unref()` —— 让 git 父进程能在不等该子进程的情况下退出。
-5. 返回 `{spawned:true}`；**整段包在 `try/catch`，任何异常 → `{spawned:false}`**。
+1. `readSyncMode(<loreDir>/.state)` 读档位（`readSyncMode @ lib/syncstate.js`，缺文件/坏 JSON → `'notify'`）：
+   - `'manual'` → **`{spawned:false, reason:'manual'}` 直接返回**（用户关掉了一切自动）。
+   - `'auto'` → `writeAutoPending(stateDir, now)` 落一个时间戳（server ticker 据此判静默期），然后继续往下。
+2. `existsSync(<loreDir>/wiki/.manifest.json)` 为假 → **`{spawned:false}` 直接返回**（manifest 闸门）。
+3. 解析同目录的 `sync.js` 路径（`fileURLToPath(import.meta.url)` → `dirname` → `join`）。
+4. `spawnFn(process.execPath, [syncJs,'finalize',loreDir], {detached:true, stdio:'ignore'})`。
+5. `child.unref()` —— 让 git 父进程能在不等该子进程的情况下退出。
+6. 返回 `{spawned:true}`；**整段包在 `try/catch`，任何异常 → `{spawned:false}`**。
 
 **CLI 段**（`lib/hook.js` 末尾）：读 config → `captureHead` → `maybeRefresh`，**外层再裹一层 `try/catch` + `process.exit(0)`**（双保险，见 ⑤⑧）。
 
@@ -127,6 +134,8 @@ flowchart LR
 - **detached + unref 缺一不可**：`detached:true` 让子进程脱离 git 进程组、`unref()` 让 Node 事件循环不等它——两者齐活，git commit 才能在 finalize 还在后台跑时就返回。少 `unref` → 父进程可能挂着等子进程；少 `detached` → 子进程可能随父进程组一起被信号带走。
 - **双层 try/catch + exit 0**：`maybeRefresh` 内层 try/catch 吞 spawn 失败；CLI 段外层 try/catch 再兜整体 + `process.exit(0)`。**任何异常都不冒泡成非零退出码**——git 看到 hook 失败也只是打条 warning，但这里连 warning 都不给，commit 永远干净。
 - **manifest-gated**：没 manifest 不 spawn（见 ③）。别误以为「装了 hook 就会刷 wiki」——得先 sync 过一次。
+- **manual 档优先于 manifest 闸门**：档位判定在最前——manual 时即使有 manifest 也直接返回（用户意图 > 能力判定）。auto 档的 pending 写入是 best-effort 文件写，同样被 try/catch 兜住。
+- **LLM 永远不在 hook 里**：auto 档只写时间戳；真正的重写由 server ticker → `lib/runner.js` 在静默期后触发。hook 的毫秒级承诺不因 auto 档破坏。
 - **`--no-merges`**：merge commit 被 git log 过滤掉、`parseGitLog` 返回空 → `captureHead` 走「空→`{added:0}`」分支，不为 merge 记原子（测试 `captureHead on a merge HEAD …` 兜的就是这条幂等性）。
 - **Windows EPERM 隔离**：detached spawn 在 Windows 上偶发权限/句柄异常，全被内层 try/catch 吞进 `{spawned:false}`——刷新可能这次没起来，但**绝不污染 commit**。下次 commit 再触发即可，丢的只是一次准实时刷新。
 - **极速连续 commit**：两次 commit 可能各 spawn 一个 finalize 叠跑——finalize 自身幂等全量重建、最后写赢、无锁（这是 [[sync]] 侧的决策，hook 不加锁）。
@@ -160,9 +169,12 @@ flowchart LR
 | `captureHead tags theme from config themes` | `themes:[{id,match}]` → 原子 `facets.theme` |
 | `captureHead tags flow from config flows` | `flows:[{id,spans}]` → 原子 `facets.flow` |
 | `integration: init installs hook → a real commit auto-writes …` | 端到端：init 装 hook → 真 commit 自动落原子 |
-| `maybeRefresh: 有 manifest → spawn finalize（detached）` | 注入 `spawnFn` 断言 `args=[syncJs,'finalize',lore]` |
+| `maybeRefresh: 有 manifest → spawn finalize（detached）` | 注入 `spawnFn` 断言 `args=[syncJs,'finalize',lore]`；该 fixture 无 sync.json = 默认 notify 档行为 |
 | `maybeRefresh: 无 manifest → 不 spawn` | manifest 闸门：无 manifest → `spawned:false` |
 | `maybeRefresh: spawn 抛错也不抛出（best-effort）` | `spawnFn` 抛错 → 吞掉、`spawned:false` |
+| `maybeRefresh: mode=manual → 不 spawn` | manual 档：`{spawned:false, reason:'manual'}`，spawnFn 未被调 |
+| `maybeRefresh: mode=notify（显式写入）→ spawn 照旧` | 显式 notify 与缺省一致 |
+| `maybeRefresh: mode=auto → 写 pending + 照旧 spawn` | auto 档：pending 时间戳落盘 + 机械 finalize 不变；notify 对照不写 pending |
 
 </details>
 
@@ -171,6 +183,7 @@ flowchart LR
 
 - **永不挡 commit**：`captureHead` / `maybeRefresh` / CLI 段三处都 best-effort，异常一律吞、退出码恒 `0`。这是 hook 存在的前提，高于一切。
 - **幂等**：同一 commit 多次触发 hook，journal 至多一条原子（id 去重）。
+- **档位语义**：manual = 零后台动作；notify = 机械刷新；auto = 机械刷新 + pending 时间戳。hook 自身永不调 LLM。
 - **manifest-gated 刷新**：无 `.manifest.json` 绝不 spawn finalize。
 - **来源诚实**：hook 写的原子 `source` 恒为 `'hook'`。
 - **零阻塞刷新**：finalize 必须 detached + unref，git 进程不为它停留。
@@ -179,7 +192,7 @@ flowchart LR
 
 ## 依赖 / 邻居
 
-- **依赖**：`mine`（`parseGitLog` / `commitAtom` / `GIT_FORMAT` 解析 commit、造原子）· `journal`（`existingIds` / `appendAtom` 幂等追加）· `config`（`parseConfigCodeRoots` / `parseConfigThemes` / `parseConfigFlows` 取 facet 规则）。
+- **依赖**：`mine`（`parseGitLog` / `commitAtom` / `GIT_FORMAT` 解析 commit、造原子）· `journal`（`existingIds` / `appendAtom` 幂等追加）· `config`（`parseConfigCodeRoots` / `parseConfigThemes` / `parseConfigFlows` 取 facet 规则）· `syncstate`（`readSyncMode` 档位 / `writeAutoPending` auto 时间戳）。
 - **spawn（运行时调起，非 import）**：`sync.js finalize`（detached 后台机械刷新）。
 - **被调**：git `post-commit` 钩子（由 `/lore:init` 安装）。
 - **相关页**：[[mine]]（同源造原子，回填 vs 提交即记）· [[sync]]（finalize 是被 spawn 的那一头）。

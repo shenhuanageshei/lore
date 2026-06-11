@@ -1,7 +1,7 @@
 ---
 title: fold —— journal 的去重对账员
 summary: 读取层纯函数：同 id 多条原子折成一条（why 追加 / refs 并集 / ts 最早），按 git 可达性丢掉 amend·rebase 留下的 orphan commit；不碰 ndjson
-last_updated: 2026-06-10
+last_updated: 2026-06-11
 code_sha: 35acc10
 atoms: 0
 commits: 0

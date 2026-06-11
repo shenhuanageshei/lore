@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-10T11:50:12.788Z",
+  "generated": "2026-06-11T02:10:10.321Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -14,6 +14,13 @@
       "axis": "component",
       "title": "lib —— lore 引擎核心",
       "path": "component/lib.md"
+    },
+    {
+      "id": "page:component/server.js",
+      "type": "page",
+      "axis": "component",
+      "title": "server.js —— 本地 Web 门面",
+      "path": "component/server.js.md"
     },
     {
       "id": "page:component/hook",
@@ -2415,6 +2422,20 @@
       "kind": "commit",
       "title": "feat(shell): docs sidebar groups (pinned status, collapsible, plan badge, search punch-through)",
       "ts": "2026-06-10T04:49:31-07:00"
+    },
+    {
+      "id": "commit:b747e879894c06a6f26e490f382ef0342ef546a4",
+      "type": "atom",
+      "kind": "commit",
+      "title": "docs(roadmap): docs-axis regroup done (C-呈现②); searchable english slugs in docs rows",
+      "ts": "2026-06-10T04:59:25-07:00"
+    },
+    {
+      "id": "commit:eef82cd0a83af30429fbc643c7e75444710d5253",
+      "type": "atom",
+      "kind": "commit",
+      "title": "feat(lint): mermaid syntax heuristics (5th check) + fix orphan/unfolded false positives",
+      "ts": "2026-06-10T19:06:13-07:00"
     }
   ],
   "edges": [
@@ -3070,6 +3091,11 @@
     },
     {
       "from": "commit:e3e69a342922dc72171994fe4c26abef732d10f8",
+      "to": "page:component/lib",
+      "type": "facet"
+    },
+    {
+      "from": "commit:eef82cd0a83af30429fbc643c7e75444710d5253",
       "to": "page:component/lib",
       "type": "facet"
     }

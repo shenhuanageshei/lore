@@ -1,7 +1,7 @@
 ---
 title: mine —— git 历史考古队
 summary: 把整部 git log 全量挖成 journal 原子，按文件路径→组件、关键词→主题、组件→数据流打 facet；按 sha 幂等回填，确定性、可反复跑
-last_updated: 2026-06-10
+last_updated: 2026-06-11
 code_sha: 35acc10
 atoms: 0
 commits: 0

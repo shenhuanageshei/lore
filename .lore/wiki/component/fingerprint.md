@@ -1,7 +1,7 @@
 ---
 title: fingerprint —— 每页 prose 指纹
 summary: 存每页 {prose_hash, prose_sha}，把「正文新鲜度」与「机械盖章」解耦；正文没动 → hash 不变 → prose_sha 保持 → stale 诚实
-last_updated: 2026-06-10
+last_updated: 2026-06-11
 code_sha: 35acc10
 atoms: 0
 commits: 0

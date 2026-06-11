@@ -1,10 +1,10 @@
 ---
 title: Index
 summary: table of contents
-last_updated: 2026-06-10
-code_sha: 2a9a1b1
-atoms: 281
-commits: 280
+last_updated: 2026-06-11
+code_sha: eef82cd
+atoms: 283
+commits: 282
 ---
 # lore wiki — index
 
@@ -15,6 +15,7 @@ commits: 280
 - [[lib]]
 - [[manifest]]
 - [[mine]]
+- [[server.js]]
 - [[sync]]
 
 ## Docs

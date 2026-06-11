@@ -6,7 +6,7 @@ language:                    # wiki 语言（人读首页 + 双语 sidecar）
 axes:
   component:                 # 内置轴 + 自动发现
     discover: auto
-    code_roots: [lib]
+    code_roots: [lib, server.js]   # server.js 是根级单文件组件（pathComponent 支持文件级 code_root）
     deep:                      # 源文件级深度页；按流水线分组（捕获→合成）驱动侧栏排序
       lib:
         捕获: [hook, mine, fold]

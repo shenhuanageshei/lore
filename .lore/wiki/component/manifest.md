@@ -1,7 +1,7 @@
 ---
 title: manifest —— wiki 总目录与「新鲜度」体检
 summary: 扫 wiki 各轴页成 .manifest.json；每页拿 frontmatter 的 code_sha 跟 HEAD 比，算出「落后几个 commit」的 stale
-last_updated: 2026-06-10
+last_updated: 2026-06-11
 code_sha: 35acc10
 atoms: 0
 commits: 0

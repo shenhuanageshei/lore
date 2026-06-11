@@ -1,7 +1,7 @@
 ---
 title: sync —— 合成总装线
 summary: plan 列工单 → agent 写正文 → finalize 机械盖章；prose 指纹让 stale 诚实、增量只重写动过的页
-last_updated: 2026-06-10
+last_updated: 2026-06-11
 code_sha: 57efae2
 atoms: 0
 commits: 0

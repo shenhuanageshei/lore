@@ -2,7 +2,7 @@
 title: runner —— 自动重写运行器
 summary: ticker 判触发 → 只读 claude CLI 吐新页 → 机械质量门过门才写盘 → 历史落盘 → finalize 收尾；LLM 零写权限
 last_updated: 2026-06-11
-code_sha: 9e3f187
+code_sha: fb00a57
 atoms: 0
 commits: 0
 ---
@@ -27,7 +27,7 @@ flowchart LR
 **一个场景看懂「只读 LLM」**：
 
 > 后台的 claude 只拿到 `Read,Grep,Glob` 三个工具——它能读源码、能搜，但**一个字也写不了盘**。
-> 新页面全文从 stdout 吐出来，由 runner（确定性代码）接住、跑完四道质检（frontmatter 完整？
+> 新页面全文从 stdout 吐出来，由 runner（确定性代码）接住、跑完五道质检（非空？frontmatter 完整？
 > 决策史哨兵没丢？mermaid 图语法过？没腰斩？）才落盘。LLM 哪怕被注入了坏念头，攻击面也是零。
 
 想看触发条件和质量门细节？展开机制档 👇

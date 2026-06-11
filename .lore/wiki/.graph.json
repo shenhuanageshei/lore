@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-11T12:13:03.563Z",
+  "generated": "2026-06-11T12:20:06.093Z",
   "nodes": [
     {
       "id": "page:HOME/HOME",
@@ -2716,6 +2716,13 @@
       "kind": "commit",
       "title": "feat(init,sync): wire resident-mode (inject on init, refresh on finalize, resident:false opt-out)",
       "ts": "2026-06-11T05:09:17-07:00"
+    },
+    {
+      "id": "commit:fb00a5774ff8b4407bd76a01a8ecd6923d3ef68b",
+      "type": "atom",
+      "kind": "commit",
+      "title": "dogfood: deep pages for syncstate/runner (with decision cross-refs), eat own resident-mode",
+      "ts": "2026-06-11T05:13:42-07:00"
     }
   ],
   "edges": [

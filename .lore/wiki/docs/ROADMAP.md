@@ -42,7 +42,7 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 
 ## 北极星 agent 端 —— ✅ 基本已实现
 
-- **agent 友好 graph + MCP 暴露** ✅ —— `graph.js` 把 wiki 合成机器可遍历结构（节点：页/原子/组件；边：facet/refs_related），`mcp.js` 暴露 `lore_ask`/`lore_page`/`lore_neighbors` 三工具让 agent 顺图谱检索/推理。**内容质量 C 的源文件级深度页让图谱可遍历到模块级**（dogfood：lib 从 1→7 个 component 节点）。**余项**：`lore_stale` 工具 + resident-mode 消费纪律（grep/读大文件前先查 wiki）。
+- **agent 友好 graph + MCP 暴露** ✅ —— `graph.js` 把 wiki 合成机器可遍历结构（节点：页/原子/组件；边：facet/refs_related），`mcp.js` 暴露 `lore_ask`/`lore_page`/`lore_neighbors` 三工具让 agent 顺图谱检索/推理。**内容质量 C 的源文件级深度页让图谱可遍历到模块级**（dogfood：lib 从 1→7 个 component 节点）。~~resident-mode 消费纪律~~ ✅ 已实现（2026-06-11，agent 常驻消费）：init 默认注入 CLAUDE.md 标记节（动态 N页/M深度页/日期，finalize 刷新，resident:false 关）+ .mcp.json 注册 + 工具描述触发词化；节级检索（manifest sections 索引 → ask 节命中 → lore_page section/view=agent）。**冷启动复测**（新问题集）：wiki+MCP 链路 49.5k tokens vs 基线 65.6k（降 25%），与 source-only 打平（46.7k）但「决策/呈现类」问题 source 组答不全（侧栏行为/设计取舍只有 wiki 有）——非对称优势区实证。设计见 docs/superpowers/specs/2026-06-11-lore-agent-residency-design.md。**余项**：`lore_stale` 工具；ask 返回的 section 标题含行内格式（反引号）时 sliceSection 精确匹配 miss（宽松化 heading 比对，小修复）。
 
 ## 近期（高价值、自洽）
 

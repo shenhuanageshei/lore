@@ -52,6 +52,18 @@ test('qualityGate: mermaid 坏图拒（复用 lint 第五检）', () => {
   assert.match(qualityGate(bad, OLD_PAGE).reason, /mermaid/);
 });
 
+test('qualityGate: 防截断在 token 态比较——物化态旧页(巨大哨兵区) vs token 态新页 不误杀', () => {
+  // 旧页：物化决策史 30K；新页：同等 prose + 单行 token。物化区剥离后两边对等 → 过门
+  const bigSentinel = '<!-- LORE_JOURNAL:START -->\n' + '- 决策原子条目。\n'.repeat(1500) + '<!-- LORE_JOURNAL:END -->';
+  const prose = '正文内容相当充实，' .repeat(30);
+  const oldMaterialized = `---\ntitle: X\nsummary: s\n---\n# X\n\n${prose}\n\n## Decision history\n\n${bigSentinel}\n`;
+  const newTokenForm = `---\ntitle: X\nsummary: s\n---\n# X\n\n${prose}\n\n## Decision history\n\n{{LORE_JOURNAL}}\n`;
+  assert.deepEqual(qualityGate(newTokenForm, oldMaterialized), { ok: true });
+  // 真截断（prose 砍剩零头）仍要拒
+  const reallyTruncated = `---\ntitle: X\nsummary: s\n---\n# X\n\n短。\n\n{{LORE_JOURNAL}}\n`;
+  assert.match(qualityGate(reallyTruncated, oldMaterialized).reason, /truncated/);
+});
+
 test('qualityGate: HOME 页查 HOME_STATUS 哨兵；普通页仍查 JOURNAL；互不串味', () => {
   const home = '---\ntitle: H\nsummary: s\n---\n# HOME\n\n{{LORE_HOME_STATUS}}\n\n' + '正文足够长免截断。'.repeat(10);
   assert.equal(qualityGate(home, '', { path: 'HOME.md' }).ok, true);

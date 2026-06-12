@@ -198,8 +198,11 @@ test('init re-run keeps user-edited config.yml, still refreshes shell', () => {
     writeFileSync(cfg, '# user edited\naxes: {}\n');                    // simulate user edit
     writeFileSync(join(src, 'index.html'), '<!doctype html>UPGRADED');  // engine upgraded shell
     const r2 = init({ repoRoot: root, srcSiteDir: src });
-    assert.equal(r2.configWritten, false);
-    assert.equal(readFileSync(cfg, 'utf8'), '# user edited\naxes: {}\n'); // preserved
+    assert.equal(r2.configWritten, false);                               // 不整文件覆盖
+    const cfgText = readFileSync(cfg, 'utf8');
+    assert.ok(cfgText.startsWith('# user edited\naxes: {}\n'));          // 用户行逐字保留为前缀
+    assert.match(cfgText, /^language:/m);                                // 迁移补缺块 append 其后
+    assert.doesNotMatch(cfgText, /^  docs:/m);                           // axes 是 inline form → 锚不识别，二级不强插
     assert.equal(readFileSync(join(root, '.lore', 'site', 'index.html'), 'utf8'), '<!doctype html>UPGRADED'); // refreshed
   } finally {
     rmSync(root, { recursive: true, force: true });

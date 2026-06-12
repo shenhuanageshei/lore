@@ -5,8 +5,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS, alignGitignore, alignGitattributes, GITIGNORE_LINES } from '../lib/migrate.js';
+import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS, alignGitignore, alignGitattributes, GITIGNORE_LINES, alignAssets } from '../lib/migrate.js';
 import { renderConfigYaml } from '../lib/init.js';
+import { finalizeSync } from '../lib/sync.js';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-mig-')); }
 
@@ -52,7 +53,10 @@ test('alignHookStub: absent → installed；老内容含 MARKER → refreshed；
   const root = tmp();
   try {
     execFileSync('git', ['init', '-q'], { cwd: root });
-    const r1 = alignHookStub(root, 'D:/engine/lib/hook.js', 'journal:\n  hook: true\n');
+    // 默认（finalize 语义）absent → 不装；install:true（init 语义）→ 装
+    assert.equal(alignHookStub(root, 'D:/engine/lib/hook.js', '').status, 'absent');
+    assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), false);
+    const r1 = alignHookStub(root, 'D:/engine/lib/hook.js', 'journal:\n  hook: true\n', { install: true });
     assert.equal(r1.status, 'installed');
     const hookPath = join(root, '.git', 'hooks', 'post-commit');
     assert.match(readFileSync(hookPath, 'utf8'), /D:\/engine\/lib\/hook\.js/);
@@ -208,11 +212,72 @@ test('alignGitattributes: 缺文件创建 / 已有追加 / 幂等 / 删行 appli
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('alignAssets 集成: 全新 git repo 一把对齐全部资产；再跑零动作', () => {
+  const root = tmp();
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    const eng = tmp();
+    try {
+      writeFileSync(join(eng, 'index.html'), '<html/>');
+      writeFileSync(join(eng, 'shell.mjs'), 'export const v = 1;');
+      writeFileSync(join(eng, 'mermaid.min.js'), '// m');
+      const lore = join(root, '.lore');
+      mkdirSync(lore, { recursive: true });
+      writeFileSync(join(lore, 'config.yml'), OLD_CONFIG);            // 老 config
+      const opts = { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js', installHook: true };
+      const a1 = alignAssets(root, lore, opts);
+      const assets = a1.map(x => x.asset);
+      assert.ok(assets.some(x => x.startsWith('shell:')));
+      assert.ok(assets.includes('hook-stub'));
+      assert.ok(assets.some(x => x.startsWith('config:+')));
+      assert.ok(assets.some(x => x.startsWith('gitignore:')));
+      assert.ok(assets.includes('gitattributes'));
+      assert.ok(assets.includes('claude-md') && assets.includes('mcp-json'));
+      assert.ok(!a1.some(x => x.action === 'error'));
+      assert.deepEqual(alignAssets(root, lore, opts), []);            // 幂等
+    } finally { rmSync(eng, { recursive: true, force: true }); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('alignAssets: resident:false config → 不装 CLAUDE.md/.mcp.json，其余照常', () => {
+  const root = tmp();
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'resident: false\n' + OLD_CONFIG);
+    const eng = tmp();
+    try {
+      writeFileSync(join(eng, 'index.html'), '<html/>');
+      const a = alignAssets(root, lore, { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js' });
+      assert.ok(!a.some(x => x.asset === 'claude-md' || x.asset === 'mcp-json'));
+      assert.equal(existsSync(join(root, 'CLAUDE.md')), false);
+      assert.ok(a.some(x => x.asset.startsWith('gitignore:')));
+    } finally { rmSync(eng, { recursive: true, force: true }); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync: 返回 migrate 动作数组，migrate 异常不挡 finalize', () => {
+  const root = tmp();
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    const lore = join(root, '.lore');
+    for (const d of ['journal', 'wiki', '.state']) mkdirSync(join(lore, d), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), renderConfigYaml(['lib']));
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'seed'], { cwd: root });
+    const r = finalizeSync(lore, '2026-06-11T00:00:00Z');
+    assert.ok(Array.isArray(r.migrate));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('alignHookStub: journal hook:false → disabled 不装；非 git 目录 → no-git', () => {
   const root = tmp();
   try {
     execFileSync('git', ['init', '-q'], { cwd: root });
-    assert.equal(alignHookStub(root, 'D:/e/hook.js', 'journal:\n  hook: false\n').status, 'disabled');
+    assert.equal(alignHookStub(root, 'D:/e/hook.js', 'journal:\n  hook: false\n', { install: true }).status, 'disabled');
     assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), false);
     const plain = tmp();
     try { assert.equal(alignHookStub(plain, 'D:/e/hook.js', '').status, 'no-git'); }

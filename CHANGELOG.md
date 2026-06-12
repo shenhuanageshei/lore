@@ -7,6 +7,7 @@ All notable changes to **lore** are documented here. Format loosely follows
 
 - **自动迁移**：引擎升级后 repo 内资产随下次 finalize 自动收敛（壳/hook stub/.mcp.json/CLAUDE.md 节/config 补缺块），无需重跑 init；`node lib/migrate.js <repo>` 可手动触发；一次性动作（config 块/resident 首装/gitignore/gitattributes）记 .state/migrations.json，用户删除不复活。
 - **facts-only git 边界**：`.lore/wiki/`、`.lore/site/` 不再进库（生成物，clone 后 /lore:sync 再生）；journal/config 保留进库；journal ndjson 启用 `merge=union`，多机各自 commit 不再冲突。
+- **活 wiki 三缺口**：serve 默认 node（python 须显式 --python）；`node lib/portal.js autostart` 开机自启；auto 重写工单扩到 theme/flow/HOME（stale≥阈值入单，prompt 按轴分支）；壳 stale 徽标点击即排队重写。
 - hook stub 不再「装过就永不更新」——引擎路径/stub 文案变更自动刷新（含 lore 标记才动，foreign hook 永不碰；首装仍只在 init）。
 - fresh-clone 引导：CLAUDE.md resident 节与 lore_ask 在 wiki 缺失时提示先跑 /lore:sync。
 

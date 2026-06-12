@@ -23,3 +23,5 @@ axes:
 journal:
   hook: true                 # post-commit hook 已装（每 commit 写 journal 骨架原子）
   mine: [commits, changelog, claude_md_pitfalls]
+
+# resident: true             # CLAUDE.md 注入 + .mcp.json 注册开关（false 关；详见 README agent 常驻）

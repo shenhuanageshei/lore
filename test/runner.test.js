@@ -1,7 +1,7 @@
 // test/runner.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldRunAuto, qualityGate } from '../lib/runner.js';
+import { shouldRunAuto, qualityGate, axisPrompt } from '../lib/runner.js';
 
 const NOW = new Date('2026-06-10T12:00:00');
 const cfgAuto = { mode: 'auto', debounce_minutes: 10, schedule: null, max_pages: 5 };
@@ -55,6 +55,13 @@ test('qualityGate: HOME 页查 HOME_STATUS 哨兵；普通页仍查 JOURNAL；�
   assert.equal(qualityGate(homeMat, '', { path: 'HOME.md' }).ok, true);
   // 普通页带 HOME 哨兵不算（仍要 JOURNAL）
   assert.equal(qualityGate(homeMat, '', { path: 'theme/x.md' }).ok, false);
+});
+
+test('axisPrompt: 四轴 prompt 关键词正确', () => {
+  assert.match(axisPrompt({ axis: 'component', path: 'component/a.md' }), /两档页面标准/);
+  assert.match(axisPrompt({ axis: 'theme', path: 'theme/x.md' }), /横切主线/);
+  assert.match(axisPrompt({ axis: 'flow', path: 'flow/x.md' }), /端到端/);
+  assert.match(axisPrompt({ axis: 'HOME', path: 'HOME.md' }), /LORE_HOME_STATUS/);
 });
 
 // --- runAuto 主流程（fake backend 注入，不真调 claude）---
@@ -167,5 +174,38 @@ test('runAuto: maxPages 截断', async () => {
     const backend = { rewritePage: async () => FAKE_OK };
     const res = await runAuto(lore, { backend, maxPages: 0, spawnFn: noopSpawn, now: () => new Date() });
     assert.equal(res.pages.length, 0);                       // 0 页上限 → 啥都不跑（截断生效）
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runAuto 扩轴: 非 component 页按 manifest stale≥阈值入单且 stale 降序；低于阈值不入', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-runax-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    const lore = join(root, '.lore');
+    for (const d of ['journal', '.state', 'wiki/component', 'wiki/theme', 'wiki/flow']) mkdirSync(join(lore, d), { recursive: true });
+    wf(join(lore, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [lib]\n  theme:\n    values:\n    - { id: ioc, desc: d, match: [x] }\n  flow:\n    values:\n    - { id: pipe, spans: [lib] }\n');
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    wf(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    const PAGE = (t, sent) => `---\ntitle: ${t}\nsummary: s\n---\n# ${t}\n\n${sent}\n\n` + '正文足够长一点免截断检查。'.repeat(5);
+    wf(join(lore, 'wiki', 'HOME.md'), PAGE('HOME', '{{LORE_HOME_STATUS}}'));
+    wf(join(lore, 'wiki', 'theme', 'ioc.md'), PAGE('ioc', '{{LORE_JOURNAL}}'));
+    wf(join(lore, 'wiki', 'flow', 'pipe.md'), PAGE('pipe', '{{LORE_JOURNAL}}'));
+    wf(join(lore, 'wiki', '.manifest.json'), JSON.stringify({
+      generated: 'x', axes: [
+        { id: 'HOME', pages: [{ id: 'HOME', path: 'HOME.md', stale: 5 }] },
+        { id: 'theme', pages: [{ id: 'ioc', path: 'theme/ioc.md', stale: 40 }] },
+        { id: 'flow', pages: [{ id: 'pipe', path: 'flow/pipe.md', stale: 20 }] },
+      ],
+    }));
+    const backend = { rewritePage({ page }) { return Promise.resolve(rf(join(lore, 'wiki', page.path), 'utf8')); } };
+    const r = await runAuto(lore, { backend, maxPages: 9, spawnFn: noopSpawn, now: () => new Date() });
+    const order = r.pages.map(x => x.page);
+    assert.ok(order.includes('theme/ioc.md') && order.includes('flow/pipe.md'));
+    assert.ok(!order.includes('HOME.md'));                                       // 5 < 阈值 15
+    assert.ok(order.indexOf('theme/ioc.md') < order.indexOf('flow/pipe.md'));    // stale 降序
+    for (const p of ['theme/ioc.md', 'flow/pipe.md']) {                          // 原样回吐过门（component/lib 页 fixture 未建，不查它）
+      assert.equal(r.pages.find(x => x.page === p)?.ok, true);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -45,6 +45,18 @@ test('qualityGate: mermaid 坏图拒（复用 lint 第五检）', () => {
   assert.match(qualityGate(bad, OLD_PAGE).reason, /mermaid/);
 });
 
+test('qualityGate: HOME 页查 HOME_STATUS 哨兵；普通页仍查 JOURNAL；互不串味', () => {
+  const home = '---\ntitle: H\nsummary: s\n---\n# HOME\n\n{{LORE_HOME_STATUS}}\n\n' + '正文足够长免截断。'.repeat(10);
+  assert.equal(qualityGate(home, '', { path: 'HOME.md' }).ok, true);
+  const homeLost = '---\ntitle: H\nsummary: s\n---\n# HOME\n\n' + '正文没了哨兵。'.repeat(10);
+  assert.match(qualityGate(homeLost, '', { path: 'HOME.md' }).reason, /sentinel/);
+  // HOME 哨兵区物化形态也认
+  const homeMat = home.replace('{{LORE_HOME_STATUS}}', '<!-- LORE_HOME_STATUS:START -->x<!-- LORE_HOME_STATUS:END -->');
+  assert.equal(qualityGate(homeMat, '', { path: 'HOME.md' }).ok, true);
+  // 普通页带 HOME 哨兵不算（仍要 JOURNAL）
+  assert.equal(qualityGate(homeMat, '', { path: 'theme/x.md' }).ok, false);
+});
+
 // --- runAuto 主流程（fake backend 注入，不真调 claude）---
 import { runAuto } from '../lib/runner.js';
 import { mkdtempSync, mkdirSync, writeFileSync as wf, readFileSync as rf, rmSync } from 'node:fs';

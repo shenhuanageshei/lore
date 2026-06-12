@@ -5,6 +5,28 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPortalServer } from '../server.js';
+import { autostart } from '../lib/portal.js';
+
+test('autostart: win32 写/删 Startup vbs，幂等，内容指向 portal.js 绝对路径', () => {
+  const fakeAppData = mkdtempSync(join(tmpdir(), 'lore-appdata-'));
+  try {
+    const r1 = autostart('on', { appData: fakeAppData, platform: 'win32' });
+    assert.equal(r1.status, 'installed');
+    const vbs = join(fakeAppData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'lore-portal.vbs');
+    assert.ok(existsSync(vbs));
+    const text = readFileSync(vbs, 'utf8');
+    assert.match(text, /portal\.js"" start/);
+    assert.match(text, /, 0, False/);                      // 隐藏窗口
+    assert.equal(autostart('on', { appData: fakeAppData, platform: 'win32' }).status, 'present');
+    assert.equal(autostart('off', { appData: fakeAppData, platform: 'win32' }).status, 'removed');
+    assert.equal(existsSync(vbs), false);
+    assert.equal(autostart('off', { appData: fakeAppData, platform: 'win32' }).status, 'absent');
+  } finally { rmSync(fakeAppData, { recursive: true, force: true }); }
+});
+
+test('autostart: 非 win32 → unsupported（不写文件）', () => {
+  assert.equal(autostart('on', { platform: 'linux' }).status, 'unsupported');
+});
 
 function listen(server) {
   return new Promise(res => server.listen(0, '127.0.0.1', () => res(server.address().port)));

@@ -17,6 +17,13 @@ test('shouldRunAuto: debounce 未到 false；已到 true（reason debounce）', 
   assert.deepEqual(r, { run: true, reason: 'debounce' });
 });
 
+test('shouldRunAuto: 轮间冷却——上次 run 距今 < debounce → false（失败页留队不再风暴）；≥ debounce → 放行', () => {
+  // pending 很老（必过 debounce），但上次 run 刚结束 5 分钟 → 冷却拦下
+  assert.equal(shouldRunAuto({ config: cfgAuto, pendingTs: '2026-06-10T11:00:00', lastRunDate: '2026-06-10', lastRunTs: '2026-06-10T11:55:00', now: NOW, runnerAlive: false }).run, false);
+  // 上次 run 已是 15 分钟前 → 放行
+  assert.equal(shouldRunAuto({ config: cfgAuto, pendingTs: '2026-06-10T11:00:00', lastRunDate: '2026-06-10', lastRunTs: '2026-06-10T11:45:00', now: NOW, runnerAlive: false }).run, true);
+});
+
 test('shouldRunAuto: schedule 到点且今天没跑 → true；今天跑过 → false；无 pending 无 schedule → false', () => {
   const cfg = { ...cfgAuto, schedule: '03:00' };
   const r = shouldRunAuto({ config: cfg, pendingTs: null, lastRunDate: '2026-06-09', now: NOW, runnerAlive: false });

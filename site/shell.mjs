@@ -132,8 +132,9 @@ export function buildMeta(page) {
     { icon: '🔗', text: `${f.atoms} atoms · ${f.commits} commits`, kind: 'plain' },
     { icon: '⎇', text: `code_sha ${page.code_sha ?? '—'}`, kind: 'plain' },
   ];
+  // stale 徽标是动作不是提示：机械 sync 清不掉 stale（prose 要 LLM 重写）——点击=排队，别再误导跑 sync
   chips.push(page.stale > 0
-    ? { icon: '⚠', text: `落后 ${page.stale} commits · 跑 /lore:sync`, kind: 'stale' }
+    ? { icon: '⚠', text: `落后 ${page.stale} commits · 点击排队重写`, kind: 'stale', action: 'queue', path: page.path }
     : { icon: '✓', text: '最新', kind: 'fresh' });
   return { chips };
 }

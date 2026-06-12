@@ -100,6 +100,17 @@ test('buildMeta produces freshness chips (stale and fresh)', () => {
   assert.equal(fresh.chips.some(c => /14 atoms/.test(c.text)), true);
 });
 
+test('buildMeta: stale chip 带排队 action 与 path（点击即排队，不再误导跑 sync）；fresh 无 action', () => {
+  const m = buildMeta({ stale: 12, path: 'theme/ioc.md', last_updated: 'x', code_sha: 'y' });
+  const stale = m.chips.find(c => c.kind === 'stale');
+  assert.equal(stale.action, 'queue');
+  assert.equal(stale.path, 'theme/ioc.md');
+  assert.match(stale.text, /点击排队重写/);
+  assert.doesNotMatch(stale.text, /lore:sync/);
+  const f = buildMeta({ stale: 0, path: 'a.md' });
+  assert.equal(f.chips.find(c => c.kind === 'fresh').action, undefined);
+});
+
 test('renderMarkdown renders ```mermaid as <div class="mermaid">, escaped not <pre>', () => {
   const html = renderMarkdown('```mermaid\nflowchart TD\nA-->B\n```');
   assert.match(html, /<div class="mermaid">/);

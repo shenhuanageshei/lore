@@ -370,8 +370,9 @@ function buildSidebar() {
 
 function renderMeta(page) {
   const cls = { plain: 'chip', stale: 'chip stale', fresh: 'chip fresh' };
-  return buildMeta(page).chips.map(c =>
-    `<span class="${cls[c.kind]}">${c.icon} ${c.text}</span>`).join('');
+  return buildMeta(page).chips.map(c => c.action === 'queue'
+    ? `<button class="${cls[c.kind]}" data-queue-page="${c.path}">${c.icon} ${c.text}</button>`
+    : `<span class="${cls[c.kind]}">${c.icon} ${c.text}</span>`).join('');
 }
 
 function renderTranslateState(page, localized) {
@@ -425,6 +426,15 @@ async function route() {
       }
     };
   }
+  // stale 徽标点击=排队重写（与控制台 ✍ 同一 API）；静态服务下失败给降级文案
+  document.querySelectorAll('#content button[data-queue-page]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = '排队中…';
+    try {
+      const res = await fetch(BASE + 'api/sync/rewrite-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: b.dataset.queuePage }) });
+      if (!res.ok) throw new Error(String(res.status));
+      b.textContent = '已排队 ✍（auto 档后台消化；或会话跑 /lore:sync）';
+    } catch { b.textContent = '⚠ 排队不可用（静态服务）——/lore:serve 重启后可用'; }
+  });
   document.getElementById('main').scrollTop = 0;
 }
 

@@ -117,3 +117,15 @@ test('mcp: view=agent 剥概览档；section 取单节；描述含触发词；as
     assert.equal(byId.get(5).result.isError, true);                       // 未知节报错
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('mcp: lore_ask 无 manifest（fresh clone）→ 返回 /lore:sync 引导', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mcpempty-'));
+  try {
+    mkdirSync(join(root, '.lore', 'wiki'), { recursive: true });        // 有 wiki 目录、无 manifest
+    const replies = await rpc(root, [
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'lore_ask', arguments: { query: 'anything' } } },
+    ]);
+    const payload = JSON.parse(replies.find(r => r.id === 1).result.content[0].text);
+    assert.match(payload.notice, /lore:sync/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS } from '../lib/migrate.js';
+import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS, alignGitignore, alignGitattributes, GITIGNORE_LINES } from '../lib/migrate.js';
 import { renderConfigYaml } from '../lib/init.js';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-mig-')); }
@@ -176,6 +176,36 @@ test('renderConfigYaml: 从 CONFIG_BLOCKS 拼装 —— 含全部块 + 动态 co
     const probe = b.key ? new RegExp(`^(#\\s*)?\\s*${b.key}:`, 'm') : /^# resident: true/m;
     assert.match(yaml, probe, `block ${b.id} missing from template`);
   }
+});
+
+test('alignGitignore: 三行补缺 + 已有行保留 + 幂等 + 删行 applied 不复活', () => {
+  const root = tmp();
+  try {
+    writeFileSync(join(root, '.gitignore'), 'node_modules/\n.lore/.state/\n');
+    const applied = new Set(); const rec = id => applied.add(id);
+    const a1 = alignGitignore(root, applied, rec);
+    assert.equal(a1.length, 2);                                          // wiki + site（.state 已在）
+    const txt = readFileSync(join(root, '.gitignore'), 'utf8');
+    assert.match(txt, /^node_modules\/$/m);                              // 已有行保留
+    for (const l of GITIGNORE_LINES) assert.ok(txt.split(/\r?\n/).some(x => x.trim() === l));
+    assert.deepEqual(alignGitignore(root, applied, rec), []);            // 幂等
+    // 用户删 wiki 行 → applied → 不复活
+    writeFileSync(join(root, '.gitignore'), txt.split('\n').filter(l => l !== '.lore/wiki/').join('\n'));
+    assert.deepEqual(alignGitignore(root, applied, rec), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('alignGitattributes: 缺文件创建 / 已有追加 / 幂等 / 删行 applied 不复活', () => {
+  const root = tmp();
+  try {
+    const applied = new Set(); const rec = id => applied.add(id);
+    const a1 = alignGitattributes(root, applied, rec);
+    assert.deepEqual(a1, [{ asset: 'gitattributes', action: 'appended' }]);
+    assert.match(readFileSync(join(root, '.gitattributes'), 'utf8'), /journal\/\*\*\/\*\.ndjson merge=union/);
+    assert.deepEqual(alignGitattributes(root, applied, rec), []);
+    writeFileSync(join(root, '.gitattributes'), '# emptied\n');
+    assert.deepEqual(alignGitattributes(root, applied, rec), []);        // 不复活
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('alignHookStub: journal hook:false → disabled 不装；非 git 目录 → no-git', () => {

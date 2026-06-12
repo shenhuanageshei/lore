@@ -426,8 +426,8 @@ async function route() {
       }
     };
   }
-  // stale 徽标点击=排队重写（与控制台 ✍ 同一 API）；静态服务下失败给降级文案
-  document.querySelectorAll('#content button[data-queue-page]').forEach(b => b.onclick = async () => {
+  // stale 徽标点击=排队重写（与控制台 ✍ 同一 API）；静态服务下失败给降级文案。徽标住 #meta（不是 #content）
+  document.querySelectorAll('#meta button[data-queue-page]').forEach(b => b.onclick = async () => {
     b.disabled = true; b.textContent = '排队中…';
     try {
       const res = await fetch(BASE + 'api/sync/rewrite-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: b.dataset.queuePage }) });

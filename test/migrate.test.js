@@ -5,9 +5,17 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets } from '../lib/migrate.js';
+import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS } from '../lib/migrate.js';
+import { renderConfigYaml } from '../lib/init.js';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-mig-')); }
+
+const OLD_CONFIG = `# old config
+axes:
+  component:
+    discover: auto
+    code_roots: [src]
+`;
 
 test('migrations: 缺文件/坏 JSON → 空 Set；append → 读回；幂等', () => {
   const st = tmp();
@@ -98,6 +106,76 @@ test('alignResidentAssets: CLAUDE.md 节文案/stats 过期 → refreshed（节�
     assert.ok(a.some(x => x.asset === 'claude-md' && x.action === 'refreshed'));
     assert.doesNotMatch(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /old body/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('alignConfig: 老 config 补全缺失块 —— 顶层 append + axes 二级锚定插入；已有行逐字节不变', () => {
+  const lore = tmp();
+  try {
+    writeFileSync(join(lore, 'config.yml'), OLD_CONFIG);
+    const applied = new Set(); const rec = id => applied.add(id);
+    const actions = alignConfig(lore, applied, rec);
+    const text = readFileSync(join(lore, 'config.yml'), 'utf8');
+    assert.ok(text.startsWith(OLD_CONFIG.trimEnd()));                  // 已有行原样开头
+    assert.match(text, /^language:/m);                                  // 顶层补上
+    assert.match(text, /^journal:/m);
+    assert.match(text, /^# resident: true/m);                           // 可发现性注释块
+    assert.match(text, /^  docs:/m);                                    // axes 二级补上
+    assert.match(text, /^  flow:/m);
+    assert.match(text, /^  theme:/m);
+    // 二级块插在 axes 块内（component 之后、下一个顶层键之前）
+    assert.ok(text.indexOf('  docs:') > text.indexOf('  component:'));
+    assert.ok(applied.has('config:axes.docs') && applied.has('config:language'));
+    assert.ok(actions.length >= 6);
+    // 幂等：再跑零动作
+    assert.deepEqual(alignConfig(lore, applied, rec), []);
+  } finally { rmSync(lore, { recursive: true, force: true }); }
+});
+
+test('alignConfig: 删块且 applied → 不复活；fresh 模板 → 零动作；axes 锚缺 → 二级 skip 不记；无 config → 零动作', () => {
+  const lore = tmp();
+  try {
+    // fresh 模板零动作（renderConfigYaml 含全部块）
+    writeFileSync(join(lore, 'config.yml'), renderConfigYaml(['lib']));
+    assert.deepEqual(alignConfig(lore, new Set(), () => {}), []);
+    // 删块 + applied → 不复活
+    writeFileSync(join(lore, 'config.yml'), OLD_CONFIG);
+    const applied = new Set(CONFIG_BLOCKS.map(b => b.id));
+    assert.deepEqual(alignConfig(lore, applied, () => {}), []);
+    assert.doesNotMatch(readFileSync(join(lore, 'config.yml'), 'utf8'), /^language:/m);
+    // axes 锚缺 → 二级 skip 且不记 applied
+    writeFileSync(join(lore, 'config.yml'), '# bare\n');
+    const ap2 = new Set(); const recd = [];
+    alignConfig(lore, ap2, id => { ap2.add(id); recd.push(id); });
+    assert.ok(!recd.includes('config:axes.docs'));                      // 二级没记
+    assert.ok(recd.includes('config:language'));                        // 顶层照补
+    // 无 config.yml → 不是迁移场景
+    const lore2 = tmp();
+    try { assert.deepEqual(alignConfig(lore2, new Set(), () => {}), []); }
+    finally { rmSync(lore2, { recursive: true, force: true }); }
+  } finally { rmSync(lore, { recursive: true, force: true }); }
+});
+
+test('alignConfig: CRLF config 保持行尾风格，已有行不变', () => {
+  const lore = tmp();
+  try {
+    const crlf = OLD_CONFIG.replace(/\n/g, '\r\n');
+    writeFileSync(join(lore, 'config.yml'), crlf);
+    alignConfig(lore, new Set(), () => {});
+    const text = readFileSync(join(lore, 'config.yml'), 'utf8');
+    assert.ok(text.startsWith(crlf.trimEnd()));
+    assert.equal(text.split('\r\n').length > 10, true);                 // 新增行也是 CRLF
+    assert.doesNotMatch(text, /[^\r]\n  docs:/);                        // 无孤 LF 行
+  } finally { rmSync(lore, { recursive: true, force: true }); }
+});
+
+test('renderConfigYaml: 从 CONFIG_BLOCKS 拼装 —— 含全部块 + 动态 code_roots/sample', () => {
+  const yaml = renderConfigYaml(['m1', 'm2']);
+  assert.match(yaml, /code_roots: \[m1, m2\]/);
+  assert.match(yaml, /spans: \[m1\]/);                                  // sample 注入 flow 示例
+  for (const b of CONFIG_BLOCKS) {
+    const probe = b.key ? new RegExp(`^(#\\s*)?\\s*${b.key}:`, 'm') : /^# resident: true/m;
+    assert.match(yaml, probe, `block ${b.id} missing from template`);
+  }
 });
 
 test('alignHookStub: journal hook:false → disabled 不装；非 git 目录 → no-git', () => {

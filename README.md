@@ -73,7 +73,8 @@ node lib/lint.js /path/to/your-repo/.lore
 | `/lore:note` | 捕获②（人工 why） | agent 决策当下记 `kind:decision` 原子（why + facets） | agent |
 | `/lore:sync` | 合成 | component/theme/flow 三轴页（agent 写架构 prose；Node 折 journal + INDEX + manifest） | 混合 |
 | `/lore:serve` | 浏览 + 控制 | 本地 server + 浏览器壳（侧栏分组/搜索/多主题/mermaid lightbox）+ **同步控制台**（档位切换/立即刷新/重写排队/auto 参数） | 否 |
-| `/lore:portal` | 浏览（聚合） | 单机常驻门户（7842）聚合本机所有 lore 仓库：切仓下拉、跨仓搜索、控制台可操作（API 按 repo 转发）、接管各仓 auto 调度 | 否 |
+| `/lore:portal` | 浏览（聚合） | 单机常驻门户（7842）聚合本机所有 lore 仓库：切仓下拉、跨仓搜索、控制台可操作（API 按 repo 转发）、接管各仓 auto 调度；`autostart` 子命令开机自启（Windows） | 否 |
+| **migrate**（自动） | 迁移 | 引擎升级后 repo 内资产自动收敛（壳 / hook stub / config 补缺块 / resident），每次 finalize 触发，`node lib/migrate.js <repo>` 可手动 | 否 |
 | `/lore:translate` | 双语 | 按需生成翻译 sidecar（语言切换器 + stale 检测） | agent |
 | `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
 | `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing / unfolded / **mermaid 语法五检**），不自动改 | 否 |
@@ -83,18 +84,18 @@ node lib/lint.js /path/to/your-repo/.lore
 
 ```
 目标仓库/
-├── .lore/                       # git 跟踪（除 .state/）
-│   ├── config.yml               # 唯一存放本 repo 特定信息处（axes / code_roots / theme.match / flow.spans / journal）
-│   ├── journal/YYYY/MM/*.ndjson # append-only 决策原子（耐久知识层）
-│   ├── wiki/                    # 合成的物化视图
+├── .lore/                       # facts-only 进库：journal+config 跟踪；wiki/site/.state gitignored
+│   ├── config.yml               # 唯一存放本 repo 特定信息处（axes / code_roots / theme.match / flow.spans / journal）——进库
+│   ├── journal/YYYY/MM/*.ndjson # append-only 决策原子（耐久知识层）——进库，merge=union 多机不冲突
+│   ├── wiki/                    # 合成的物化视图（生成物，clone 后 /lore:sync 再生）——gitignored
 │   │   ├── INDEX.md             # 全轴目录（人读）
 │   │   ├── .manifest.json       # 机读投影（壳 + ask 消费）
 │   │   ├── component/<id>.md    # 轴：代码结构
 │   │   ├── theme/<id>.md        # 轴：横切主线（关键词 match 打标）
 │   │   └── flow/<id>.md         # 轴：数据流（component ∈ spans 打标）
-│   ├── site/index.html          # 浏览器壳（init 拷入）
-│   └── .state/                  # 引擎缓存 + serve.pid（gitignored）
-└── .git/hooks/post-commit       # lore 装的唯一 .git 产物
+│   ├── site/index.html          # 浏览器壳（引擎领地，对齐器自动刷新）——gitignored
+│   └── .state/                  # 引擎缓存 + serve.pid + migrations.json（gitignored）
+└── .git/hooks/post-commit       # lore 装的唯一 .git 产物（引擎升级自动刷新 stub）
 ```
 
 **原子 schema**（ndjson 一行一原子）：`id · ts · kind(commit|decision) · commit · title · why · what_changed · facets{component,flow,theme} · refs{files,pitfall,related} · source(hook|agent|miner:commits) · enriched · confidence`。
@@ -113,7 +114,7 @@ node lib/lint.js /path/to/your-repo/.lore
 ## 开发
 
 ```bash
-node --test        # 全部测试（380+，零外部依赖）
+node --test test/*.test.js        # 全部测试（420+，零外部依赖）
 ```
 
 - 流程：每功能走 brainstorming → spec（`docs/superpowers/specs/`）→ plan（`docs/superpowers/plans/`）→ TDD → 双审 → 合并。
@@ -121,7 +122,7 @@ node --test        # 全部测试（380+，零外部依赖）
 
 ## 路线图
 
-见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。v1 核心（捕获三源 + journal + 三轴合成 + lint + serve + ask）已完整；后续：changelog/pitfalls miner、per-facet confidence「(推断)」显示、resident-mode（agent grep 前先查 wiki 的强制纪律）、note enrich 骨架 + fold-by-id、增量 sync、codegraph 可选集成（AST 接地架构段）。
+见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。核心链路已完整：捕获三源 + journal + 多轴合成（component/theme/flow/docs + 深度页两档标准）+ lint + serve/portal + ask 节级检索 + **resident-mode**（CLAUDE.md 注入 + MCP，agent 冷启动实测省 25% token）+ **auto 档**（runner token 态重写 + 五道质量门）+ **自动迁移**（引擎升级资产自动收敛）。后续：docs 自动发现、ask-miss 质量环（查询落空→补页工单）、裸 API/codex 后端、codegraph 可选集成。
 
 ## 变更
 

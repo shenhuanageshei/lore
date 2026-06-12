@@ -3,8 +3,14 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
-## [0.8.0] — 2026-06-11
+## [0.8.0] — 2026-06-12
 
+- **runner 可靠性包**（threat-intel 真实战场尸检驱动，四病灶全修）：
+  - **token 态重写**：物化决策史哨兵区（可达 95K）不再过 LLM 往返——prompt 要求输出单行 `{{LORE_JOURNAL}}`，finalize 重新物化。根治 3/5 超时，输出量降约 20 倍。
+  - **质量门对等比较**：防截断阈值改在 token 态比较（两边剥哨兵区）——物化态旧页 vs token 态新页直接比长度必误杀（实测 96K vs 5K 被拒）。
+  - **轮间冷却**：失败页留队时队列时间戳恒旧，ticker 每分钟重启失败轮（实测 5 分钟 3 轮重试风暴）——上次 run 距今 < debounce 一律不再触发。
+  - 失败原因记 stderr 300 字符（原 80 字符只是命令行回显，等于零信息）。
+- **重写标准加「枚举完整性」**：入口全景/dispatch 表/跳过原因全集必须出表——对照实验实证清单型事实是 wiki 相对源码的最高价值内容（源码组 43 次工具调用 vs wiki 一张表）。
 - **自动迁移**：引擎升级后 repo 内资产随下次 finalize 自动收敛（壳/hook stub/.mcp.json/CLAUDE.md 节/config 补缺块），无需重跑 init；`node lib/migrate.js <repo>` 可手动触发；一次性动作（config 块/resident 首装/gitignore/gitattributes）记 .state/migrations.json，用户删除不复活。
 - **facts-only git 边界**：`.lore/wiki/`、`.lore/site/` 不再进库（生成物，clone 后 /lore:sync 再生）；journal/config 保留进库；journal ndjson 启用 `merge=union`，多机各自 commit 不再冲突。
 - **活 wiki 三缺口**：serve 默认 node（python 须显式 --python）；`node lib/portal.js autostart` 开机自启；auto 重写工单扩到 theme/flow/HOME（stale≥阈值入单，prompt 按轴分支）；壳 stale 徽标点击即排队重写。

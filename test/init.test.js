@@ -187,6 +187,19 @@ test('renderConfigYaml includes language defaults', () => {
   assert.match(out, /available: \[en\]/);
 });
 
+test('renderConfigYaml: 注入发现的 docs_glob + 元文档 sources', () => {
+  const yaml = renderConfigYaml(['sub/m1'], { docsGlobs: ['sub/docs/**/*.md'], metaDocs: [{ kind: 'changelog', path: 'sub/CHANGELOG.md' }, { kind: 'readme', path: 'sub/README.md' }] });
+  assert.match(yaml, /docs_glob:\s*sub\/docs\/\*\*\/\*\.md/);
+  assert.match(yaml, /sources:\s*\[[^\]]*changelog[^\]]*\]/);
+  assert.match(yaml, /sources:\s*\[[^\]]*readme[^\]]*\]/);
+  assert.match(yaml, /sources:\s*\[[^\]]*claude_md_pitfalls[^\]]*\]/);
+});
+
+test('renderConfigYaml: 无发现结果 → 默认 docs/**/*.md（向后兼容）', () => {
+  const yaml = renderConfigYaml(['lib']);
+  assert.match(yaml, /docs_glob:\s*docs\/\*\*\/\*\.md/);
+});
+
 function fakeSrcSite() {
   const src = mkdtempSync(join(tmpdir(), 'lore-srcsite-'));
   writeFileSync(join(src, 'index.html'), '<!doctype html>shell');

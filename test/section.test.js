@@ -71,7 +71,8 @@ test('agentView: 剥「## 概览」到「## 机制详解」之间的人读内容
   assert.doesNotMatch(v, /比喻给人看的/);
   assert.match(v, /机制详解/);
   assert.match(v, /撕裂读由 notify 兜底/);          // 机制档保留
-  assert.match(v, /LORE_JOURNAL:START/);             // 决策史保留
+  assert.doesNotMatch(v, /LORE_JOURNAL:START/);      // 决策史物化区剥掉（读厚页不烧决策史）
+  assert.match(v, /决策史按需取/);                    // 替换为指针行（教 agent 怎么取）
   assert.match(v, /^---\ntitle: X/);                 // frontmatter 保留
   const plain = '# 普通页\n\n没有两档结构。\n';
   assert.equal(agentView(plain), plain);             // 容错：原样

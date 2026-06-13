@@ -107,6 +107,7 @@ test('mcp: view=agent 剥概览档；section 取单节；描述含触发词；as
     const agent = JSON.parse(byId.get(2).result.content[0].text);
     assert.doesNotMatch(agent.content, /比喻给人看的/);                    // 概览剥了
     assert.match(agent.content, /机制详解/);                              // 机制档在
+    assert.match(agent.content, /决策史按需取/);                          // 决策史物化区剥了 → 指针行
     const sec = JSON.parse(byId.get(3).result.content[0].text);
     assert.match(sec.content, /f\(a\) → b/);
     assert.doesNotMatch(sec.content, /概览/);                             // 只有该节

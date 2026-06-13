@@ -15,6 +15,9 @@ test('residentSection: 动态状态进文案 + 标记包裹', () => {
   assert.match(s, /40 页 · 8 个组件深度页 · 最后更新 2026-06-11/);
   assert.match(s, /lore_ask/);
   assert.match(s, /lore:sync/);          // fresh-clone 引导（wiki 不进库）
+  assert.match(s, /锚点/);                // 混合范式：按 func@file 锚点下钻
+  assert.match(s, /下钻/);
+  assert.match(s, /section=/);            // 决策史按需取
   assert.match(s, /<!-- LORE_RESIDENT:END -->/);
 });
 

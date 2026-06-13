@@ -397,19 +397,19 @@ test('emitManifest: docs 轴组间固定序 + 组内时间降序 + paired_plan �
     const page = (id, group, date, extra = '') =>
       writeFileSync(join(wiki, 'docs', `${id}.md`),
         `---\ntitle: ${id}\nsummary: s\nlast_updated: ${date}\ngroup: ${group}\n${extra}---\nbody\n`);
-    page('old-spec', '设计与计划', '2026-06-01', 'paired_plan: old-plan\n');
-    page('old-plan', '设计与计划', '2026-06-01');
-    page('new-spec', '设计与计划', '2026-06-09');
+    page('old-spec', '设计', '2026-06-01', 'paired_plan: old-plan\n');
+    page('old-plan', '计划', '2026-06-01');
+    page('new-spec', '设计', '2026-06-09');
     page('changelog', '项目状态', '2026-06-07');
     page('ROADMAP', '项目状态', '');
-    page('a-note', 'notes', '2026-06-02');
+    page('a-note', '笔记', '2026-06-02');
     const m = emitManifest({
       wikiDir: wiki, currentSha: 'cur', countCommitsSince: () => 0, now: 't0',
     });
     const docs = m.axes.find(a => a.id === 'docs');
     assert.deepEqual(docs.pages.map(p => p.id),
-      ['changelog', 'ROADMAP', 'new-spec', 'old-plan', 'old-spec', 'a-note']);
-      // 项目状态(时间降序,无日期垫底) → 设计与计划(同上;同日期 id 字母序) → notes
+      ['changelog', 'ROADMAP', 'new-spec', 'old-spec', 'old-plan', 'a-note']);
+      // 项目状态(时间降序,无日期垫底) → 设计(降序) → 计划 → 笔记
     assert.equal(docs.pages.find(p => p.id === 'old-spec').paired_plan, 'old-plan');
     assert.equal(docs.pages.find(p => p.id === 'changelog').paired_plan, '');
     assert.equal(docs.pages.find(p => p.id === 'changelog').group, '项目状态');   // frontmatter 优先

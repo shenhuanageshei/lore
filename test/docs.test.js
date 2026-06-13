@@ -123,7 +123,7 @@ import { renderDocsPage } from '../lib/docs.js';
 
 test('renderDocsPage: spec with body → embeds body, plain-text source ref, no link, no # docs:', () => {
   const md = renderDocsPage({ id: 'a', title: 'Doc A', summary: 'about A', sourcePath: 'docs/a.md', date: '2026-06-04', body: '# Doc A\n\nfull content here.\n' });
-  assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\ngroup: 项目状态\n---/);
+  assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\ngroup: 其它\n---/);
   assert.match(md, /> 源文档：`docs\/a\.md`/);     // plain-text reference
   assert.match(md, /# Doc A\n\nfull content here\./); // body embedded verbatim
   assert.doesNotMatch(md, /\]\(\.\.\/\.\.\/\.\.\//);  // NO markdown link → no 404
@@ -215,14 +215,22 @@ test('buildDocsAxis: returns specs sorted by date desc (tiebreak id)', () => {
 
 import { docGroup, pairDocs } from '../lib/docs.js';
 
-test('docGroup: superpowers specs/plans → 设计与计划；notes → notes；其余 → 项目状态', () => {
-  assert.equal(docGroup('docs/superpowers/specs/2026-06-08-x-design.md'), '设计与计划');
-  assert.equal(docGroup('docs/superpowers/plans/2026-06-08-x.md'), '设计与计划');
-  assert.equal(docGroup('docs/superpowers/notes/2026-06-02-y.md'), 'notes');
+test('docGroup: 元文档→项目状态；语义子目录段映射；未知→其它；win 反斜杠容错', () => {
+  // 元文档（不论路径）→ 项目状态（置顶组）
   assert.equal(docGroup('docs/ROADMAP.md'), '项目状态');
-  assert.equal(docGroup('CHANGELOG.md'), '项目状态');           // 折叠页 sourcePath
-  assert.equal(docGroup('CLAUDE.md'), '项目状态');              // pitfalls
-  assert.equal(docGroup('docs\\superpowers\\specs\\2026-06-08-w-design.md'), '设计与计划');   // win 反斜杠容错
+  assert.equal(docGroup('CHANGELOG.md'), '项目状态');
+  assert.equal(docGroup('threat-intel/README.md'), '项目状态');
+  assert.equal(docGroup('CLAUDE.md'), '项目状态');                          // pitfalls
+  // 语义子目录段
+  assert.equal(docGroup('docs/superpowers/specs/2026-06-08-x-design.md'), '设计');
+  assert.equal(docGroup('docs/superpowers/plans/2026-06-08-x.md'), '计划');
+  assert.equal(docGroup('threat-intel/docs/debugging/x.md'), '调试');
+  assert.equal(docGroup('threat-intel/docs/api/x.md'), '接口');
+  assert.equal(docGroup('threat-intel/docs/architecture/x.md'), '架构');
+  assert.equal(docGroup('docs/superpowers/notes/2026-06-02-y.md'), '笔记');
+  assert.equal(docGroup('docs\\superpowers\\specs\\2026-06-08-w-design.md'), '设计');   // win 反斜杠容错
+  // 未知 → 其它
+  assert.equal(docGroup('threat-intel/docs/DEPLOY.md'), '其它');
 });
 
 test('pairDocs: 同 date+slug 的 spec↔plan 配对；date 同 slug 异不配；孤页不标', () => {
@@ -254,11 +262,11 @@ test('buildDocsAxis: 物化页 frontmatter 含 group；配对 spec 含 paired_pl
     buildDocsAxis(lore, root, { sources: ['docs'], docsGlob: 'docs/**/*.md' });
 
     const spec = readFileSync(join(lore, 'wiki', 'docs', 'superpowers-specs-2026-06-08-thing-design.md'), 'utf8');
-    assert.match(spec, /^group: 设计与计划$/m);
+    assert.match(spec, /^group: 设计$/m);
     assert.match(spec, /^paired_plan: superpowers-plans-2026-06-08-thing$/m);
 
     const plan = readFileSync(join(lore, 'wiki', 'docs', 'superpowers-plans-2026-06-08-thing.md'), 'utf8');
-    assert.match(plan, /^group: 设计与计划$/m);
+    assert.match(plan, /^group: 计划$/m);
     assert.doesNotMatch(plan, /paired_plan/);            // plan 侧不标
 
     const rm = readFileSync(join(lore, 'wiki', 'docs', 'ROADMAP.md'), 'utf8');

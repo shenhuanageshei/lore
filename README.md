@@ -29,6 +29,16 @@ lore 是**带 `func @ file` 锚点的导航层，不是源码替代**——agent
 - **弱优势**：小 repo（几个文件，源码一眼看完）装了优势不明显——lore 的价值随 repo 规模和模块数增长。
 - **正确姿势**：wiki 建框架 + 锚点下钻源码的**混合流程**（resident-mode 已把这条路径注入每个 agent 的 CLAUDE.md）；纯 wiki 到不了实现层细节，纯源码冷启动慢——混合才是最优。
 
+**让 agent 真的用起来（三档可选）**：CLAUDE.md 注入是 session 级软提示、长对话会稀释。要更硬的「每轮注入」，可选装 `UserPromptSubmit` hook：
+
+| 档 | 装法 | 行为 |
+|---|---|---|
+| **软**（默认） | 零配置 | CLAUDE.md resident，session 开头一次 |
+| **中** | `node lib/lorehook.js install notice` | 每轮注入「先 lore_ask 建框架 + 锚点下钻」提示 |
+| **强** | `node lib/lorehook.js install inject` | 每轮**门控**：代码问题才自动跑 lore_ask、把命中切片注入 context（agent 开局就有框架）；闲聊不注入 |
+
+opt-in，默认写本机 `.claude/settings.local.json`（`--project` 写团队共享）；`uninstall` 回落软档。
+
 ## 核心理念
 
 | 理念 | 含义 |

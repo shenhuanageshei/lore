@@ -12,3 +12,4 @@ rtk/
 .preview-serve.cjs
 .lore/wiki/
 .lore/site/
+.claude/settings.local.json

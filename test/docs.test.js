@@ -93,6 +93,20 @@ test('changelogExtractor: file with no version headings → []', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('changelogExtractor: ## 标题 (date) 格式也认（无方括号版本号，真实世界常见）', () => {
+  const root = tmp();
+  try {
+    writeFileSync(join(root, 'CHANGELOG.md'),
+      '# Changelog\n\n## 修复推文管道早退 (2026-06-11)\n- x\n\n## 文档结构整理 (2026-06-10)\n- y\n');
+    const specs = changelogExtractor(root);
+    assert.equal(specs[0].entries.length, 2);
+    assert.equal(specs[0].entries[0].date, '2026-06-11');
+    assert.match(specs[0].entries[0].version, /修复推文管道早退/);
+    assert.doesNotMatch(specs[0].entries[0].version, /2026/);   // date 已剥离
+    assert.equal(specs[0].date, '2026-06-11');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('changelogExtractor: 子目录 CHANGELOG 也能收（threat-intel 式代码在子目录）', () => {
   const root = tmp();
   try {

@@ -32,9 +32,13 @@ test('discoverDocs: 根目录散落 md 不当 docs 根（下钻到专门 docs/ �
     for (const f of ['CHANGELOG.md', 'README.md', 'NOTES.md']) writeFileSync(join(root, f), '# x');
     mkdirSync(join(root, 'docs'), { recursive: true });
     for (const f of ['a.md', 'b.md', 'c.md']) writeFileSync(join(root, 'docs', f), '# d');
+    // 第三方插件目录（addons，Godot 式）里的 md 不算本仓文档
+    mkdirSync(join(root, 'addons', 'plugin'), { recursive: true });
+    for (const f of ['p.md', 'q.md', 'r.md']) writeFileSync(join(root, 'addons', 'plugin', f), '# third');
     const r = discoverDocs(root);
     assert.ok(!r.docsGlobs.includes('**/*.md'));                                       // 不把全仓当 docs
-    assert.ok(r.docsGlobs.some(g => g.replace(/\\/g, '/') === 'docs/**/*.md'));        // 命中专门 docs/ 子目录
+    assert.equal(r.docsGlobs[0].replace(/\\/g, '/'), 'docs/**/*.md');                  // 专门 docs/ 优先（取 [0]）
+    assert.ok(!r.docsGlobs.some(g => g.includes('addons')));                           // 第三方插件目录排除
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -134,6 +134,7 @@ plan 之前先读 `<loreDir>/.state/rewrite-requests.ndjson`（每行 `{ts, page
 - 跑完提示 `/lore:serve` 浏览。
 - theme 页讲横切主线（质量/性能/时效…）的演进，决策历史 token 自动折该 theme 的原子；先确保 config 的 `theme.values` 填了 + 跑过 `/lore:mine` 让原子带 theme facet。
 - flow 页讲一条数据流端到端怎么跑（入口→阶段→出口）；先在 config 的 `flow.values` 用 `spans:[组件…]` 声明、跑过 `/lore:mine` 让原子带 flow facet。
+- **theme / flow 排版**：单档页（`Current state` / `End-to-end path`）易写成一大段密集文字——用 `###` 小标题切 3-6 段，枚举/对照/规则用列表或表格承载，单段控制 ~150 字内（component 两档不受此限）。
 - **docs 轴**（若 config 声明 `axes.docs`）由 finalize **机械生成**（读当前 `docs/**/*.md` + `CHANGELOG.md` + `CLAUDE.md` 踩坑 → `wiki/docs/<id>.md`，nuke-rebuild）。你（agent）**不用**写 docs 页。
 - **出图**：component 页「Current architecture」顶部放一张 mermaid 架构图（入口/关键模块/依赖），flow 页「End-to-end path」顶部放数据流图（入口→各阶段(组件)→出口）。据真实代码画、~5-15 节点、保持可读；图是文本 → git 可 diff、随历史演进。坏语法不阻断页面但会丢该图；label 避免裸 `"`/`<`（壳已转义，简洁优先）。
 - 零侵入：只写 `.lore/wiki/`，绝不改业务源码。

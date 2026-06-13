@@ -83,6 +83,11 @@ test('axisPrompt: 四轴 prompt 关键词正确', () => {
   assert.match(axisPrompt({ axis: 'HOME', path: 'HOME.md' }), /LORE_HOME_STATUS/);
 });
 
+test('axisPrompt: theme/flow 含排版分层要求（小标题/表格，杜绝大段）', () => {
+  assert.match(axisPrompt({ axis: 'theme', path: 'theme/x.md' }), /小标题|分层|表格/);
+  assert.match(axisPrompt({ axis: 'flow', path: 'flow/x.md' }), /小标题|分层|表格/);
+});
+
 // --- runAuto 主流程（fake backend 注入，不真调 claude）---
 import { runAuto } from '../lib/runner.js';
 import { mkdtempSync, mkdirSync, writeFileSync as wf, readFileSync as rf, rmSync } from 'node:fs';

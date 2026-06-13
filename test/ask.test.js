@@ -5,9 +5,23 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { searchPages } from '../lib/ask.js';
+import { searchPages, formatHits } from '../lib/ask.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-ask-')); }
+
+test('formatHits: 默认带节切片内容；--paths 只列路径；长节截断；空→提示', () => {
+  const hits = [{ axis: 'component', id: 'lib', title: 'Lib', path: 'component/lib.md', score: 2, section: '① 接口' }];
+  const page = '# x\n\n<details>\n<summary><b>① 接口</b> —— 导出</summary>\n\nf(a) → b\n\n</details>\n';
+  const readPage = () => page;
+  const def = formatHits(hits, { readPage });
+  assert.match(def, /component\/lib\.md#① 接口/);              // 路径#节
+  assert.match(def, /f\(a\) → b/);                             // 切片内容（不只路径）
+  const paths = formatHits(hits, { paths: true, readPage });
+  assert.equal(paths, 'component/lib.md#① 接口');               // --paths 只列路径
+  const bigPage = '# x\n\n<details>\n<summary><b>① 接口</b> —— 导出</summary>\n\n' + 'A'.repeat(3000) + '\n\n</details>\n';
+  assert.match(formatHits(hits, { readPage: () => bigPage, sliceCap: 500 }), /截断/);
+  assert.equal(formatHits([], {}), 'no matching pages');
+});
 
 const MANIFEST = {
   axes: [

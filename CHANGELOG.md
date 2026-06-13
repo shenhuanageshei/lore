@@ -3,6 +3,14 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.8.1] — 2026-06-13
+
+- **docs 轴在子目录项目上重生**（threat-intel 连环暴露：74 篇文档一篇没收 → 全堆一组 → 元文档找不到）：
+  - **docs 自动发现**：`discoverDocs` 探测文档目录（不止根 `docs/`，含子目录如 `<pkg>/docs/`）+ 元文档位置（子目录的 CHANGELOG/README/ROADMAP），init 写进 config；排除 node_modules/.build/dist/worktrees 噪音。
+  - **docGroup 通用化**：从「只认 lore 自己 superpowers 路径」改为元文档独立置顶组 + 语义子目录段映射（specs→设计 / plans→计划 / debugging→调试 / api→接口 / architecture→架构 / notes→笔记 / 其余→其它）。
+  - **元文档收录**：changelog/readme/roadmap extractor 支持子目录；changelogExtractor 放宽兼容 `## 标题 (date)` 风格（不止 Keep-a-Changelog `## [version]`）。
+  - **theme/flow 排版标准**：单档页要求 `###` 小标题分层 + 列表/表格，杜绝大段密集文字（axisPrompt + sync.md）。dogfood：threat-intel 84 篇文档分 7 组、CHANGELOG/README 进「项目状态」置顶组、theme 4 页 + flow 3 页重排分层。
+
 ## [0.8.0] — 2026-06-12
 
 - **runner 可靠性包**（threat-intel 真实战场尸检驱动，四病灶全修）：

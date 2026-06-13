@@ -93,6 +93,9 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 ### docs 轴重构（分组置顶 + feature 配对 + 默认折叠）✅ 已实现（C-呈现 ②）
 - 已实现：docs 轴侧栏三组分流——「📌 项目状态」（changelog/ROADMAP/pitfalls）置顶常开、「📐 设计与计划」spec↔plan 按 date+slug 配对成行（plan 徽标直达，dogfood 25 对）默认折叠、「📝 notes」折叠；折叠态 localStorage 记忆；搜索穿透折叠组（data-search 含英文 slug）。group/paired_plan 由 `docs.js` 物化进 frontmatter，manifest 组间排序（单一来源），壳 `buildDocsRows` 纯函数可测。无 superpowers 结构 repo 零影响。设计见 `docs/superpowers/specs/2026-06-10-lore-docs-axis-regroup-design.md`。
 
+### docs 轴 + 呈现质量升级（子目录项目 / 元文档 / 排版）✅ 已实现（2026-06-13）
+- 已实现：threat-intel 连环暴露——「代码/文档在子目录」的项目 docs 轴开箱即空、85 页堆一组、CHANGELOG/README 找不到、theme 页大段难读。修复：`discoverDocs` 自动探测文档目录（含子目录）+ 元文档位置（排噪音）；`docGroup` 通用化（元文档置顶组 + 语义子目录段映射 specs/plans/debugging/api/arch/notes）；元文档 extractor 子目录适配 + changelog 格式放宽（`## 标题 (date)`）；theme/flow 排版标准（`###` 分层 + 列表/表格，axisPrompt + sync.md）。dogfood：threat-intel 84 篇分 7 组、元文档进「项目状态」置顶、theme 4 + flow 3 页重排。设计见 `docs/superpowers/specs/2026-06-13-lore-docs-axis-presentation.md`。
+
 ### lint：未打标 / 矛盾检查（母 §5）
 - 现 lint 三检（stale/orphan/missing）。加：未打标原子（只 component 缺 flow/theme，flow/theme 落地后才有意义）、矛盾（页「当前架构」声明 vs 更新原子冲突 → 轻 LLM）。
 

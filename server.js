@@ -261,10 +261,13 @@ sel.onchange=()=>{document.documentElement.setAttribute('data-theme',sel.value);
 </script></body></html>`;
 }
 
-// 单机共享门户：一个端口聚合本机所有 lore repo。repoMap: { name -> loreDir }。
-// MVP 只读：/<name>/api/… 一律 404（无 write 面 → 无 DNS-rebind 写风险）。配合 .listen 仅绑 127.0.0.1。
-export function createPortalServer(repoMap) {
+// 单机共享门户：一个端口聚合本机所有 lore repo。
+// 入参可为固定 map { name -> loreDir } 或 **函数** ()=>map——传函数则每请求重读 registry，
+// 新 /lore:init 的仓库免重启 portal 自动出现在路由+切仓下拉（修「启动快照」bug）。
+export function createPortalServer(repoMapOrFn) {
+  const getMap = typeof repoMapOrFn === 'function' ? repoMapOrFn : () => repoMapOrFn;
   return http.createServer(async (req, res) => {
+    const repoMap = getMap();
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }

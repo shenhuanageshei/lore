@@ -25,6 +25,19 @@ test('discoverDocs: 探测含≥3 md 的目录（排噪音）+ 子目录元文�
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('discoverDocs: 根目录散落 md 不当 docs 根（下钻到专门 docs/ 子目录）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-ddroot-'));
+  try {
+    // 根散 3 个 md（CHANGELOG/README/skills 式，游戏/代码仓库常态）
+    for (const f of ['CHANGELOG.md', 'README.md', 'NOTES.md']) writeFileSync(join(root, f), '# x');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    for (const f of ['a.md', 'b.md', 'c.md']) writeFileSync(join(root, 'docs', f), '# d');
+    const r = discoverDocs(root);
+    assert.ok(!r.docsGlobs.includes('**/*.md'));                                       // 不把全仓当 docs
+    assert.ok(r.docsGlobs.some(g => g.replace(/\\/g, '/') === 'docs/**/*.md'));        // 命中专门 docs/ 子目录
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('findMetaDoc: 根优先，否则一层子目录（排噪音）；缺 → null', () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-fm-'));
   try {

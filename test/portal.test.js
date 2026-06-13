@@ -59,6 +59,27 @@ test('portal: /<name>/wiki/... 命中对应 repo（白名单路由）', async ()
   }
 });
 
+test('portal 热重载: 传函数 → 每请求重读 registry，新仓库免重启自动出现', async () => {
+  const loreA = makeLoreDir('A');
+  const loreB = makeLoreDir('B');
+  let repos = { lore: loreA };                            // 初始只有一个
+  const server = createPortalServer(() => repos);
+  const port = await listen(server);
+  try {
+    let r = await (await fetch(`http://127.0.0.1:${port}/repos.json`)).json();
+    assert.deepEqual(r.repos, ['lore']);
+    repos = { lore: loreA, ti: loreB };                  // 模拟新 init 登记（registry 变化）
+    r = await (await fetch(`http://127.0.0.1:${port}/repos.json`)).json();
+    assert.deepEqual(r.repos.sort(), ['lore', 'ti']);    // 免重启，新仓库自动出现
+    const b = await fetch(`http://127.0.0.1:${port}/ti/wiki/.manifest.json`);
+    assert.equal(b.status, 200);                          // 且新仓库路由可达
+  } finally {
+    server.close();
+    rmSync(loreA, { recursive: true, force: true });
+    rmSync(loreB, { recursive: true, force: true });
+  }
+});
+
 test('portal: GET / 列出每个登记仓库的链接', async () => {
   const loreA = makeLoreDir('A');
   const loreB = makeLoreDir('B');

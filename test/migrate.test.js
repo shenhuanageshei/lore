@@ -159,6 +159,24 @@ test('alignConfig: 删块且 applied → 不复活；fresh 模板 → 零动作�
   } finally { rmSync(lore, { recursive: true, force: true }); }
 });
 
+test('alignConfig: 缺 docs 轴 + repo 有 docs/ → 补可用真 glob（migrate 缺口修复，非注释默认）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-migdocs-'));
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [src]\n');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    for (const f of ['a.md', 'b.md', 'c.md']) writeFileSync(join(root, 'docs', f), '# d');
+    const applied = new Set();
+    alignConfig(lore, applied, id => applied.add(id));
+    const t = readFileSync(join(lore, 'config.yml'), 'utf8');
+    assert.match(t, /docs_glob: docs\/\*\*\/\*\.md/);                  // 可用真 glob
+    assert.match(t, /sources: \[docs/);                                // 真 sources（非注释 #）
+    assert.doesNotMatch(t, /#\s*docs_glob/);                           // 不是注释默认
+    assert.ok(applied.has('config:axes.docs'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('alignConfig: CRLF config 保持行尾风格，已有行不变', () => {
   const lore = tmp();
   try {

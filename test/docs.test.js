@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { docsExtractor, changelogExtractor, pitfallsExtractor, buildDocsAxis } from '../lib/docs.js';
+import { docsExtractor, changelogExtractor, pitfallsExtractor, buildDocsAxis, readmeExtractor, roadmapExtractor } from '../lib/docs.js';
 import { existsSync as exists } from 'node:fs';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-docs-')); }
@@ -90,6 +90,43 @@ test('changelogExtractor: file with no version headings → []', () => {
   try {
     writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n\njust prose, no versions\n');
     assert.deepEqual(changelogExtractor(root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('changelogExtractor: 子目录 CHANGELOG 也能收（threat-intel 式代码在子目录）', () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'CHANGELOG.md'), '## [1.2.0] — 2026-06-01\n- x\n## [1.1.0] — 2026-05-01\n- y');
+    const specs = changelogExtractor(root);
+    assert.equal(specs.length, 1);
+    assert.equal(specs[0].id, 'changelog');
+    assert.match(specs[0].sourcePath.replace(/\\/g, '/'), /app\/CHANGELOG\.md/);
+    assert.equal(specs[0].entries.length, 2);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('readmeExtractor: 子目录 README → 单页，首段为 summary', () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'README.md'), '# My Project\n\n一句话介绍这个项目。\n\n## 安装\n\nsteps');
+    const specs = readmeExtractor(root);
+    assert.equal(specs[0].id, 'readme');
+    assert.equal(specs[0].title, 'My Project');
+    assert.match(specs[0].summary, /一句话介绍/);
+    assert.match(specs[0].sourcePath.replace(/\\/g, '/'), /app\/README\.md/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('roadmapExtractor: 缺 ROADMAP → []；存在 → 单页', () => {
+  const root = tmp();
+  try {
+    assert.deepEqual(roadmapExtractor(root), []);
+    writeFileSync(join(root, 'ROADMAP.md'), '# 路线图\n\n这是路线图概述。\n');
+    const specs = roadmapExtractor(root);
+    assert.equal(specs[0].id, 'roadmap');
+    assert.equal(specs[0].title, '路线图');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

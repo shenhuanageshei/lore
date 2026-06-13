@@ -21,6 +21,14 @@ lore 把这些**决策与架构知识沉淀成 git 内的活文档**：
 
 知识活在 `.lore/` 内、随 git 跟踪 → 「commit X 时架构长啥样」「这条质量主线怎么演进」全靠 git 原生历史免费拿到，分支局部 wiki 匹配分支代码。
 
+## 何时用 lore（优势区）
+
+lore 是**带 `func @ file` 锚点的导航层，不是源码替代**——agent 用 wiki 30 秒建全局框架 + 顺锚点精准下钻，省掉冷启动盲目 grep。冷启动对照测试（3 轮双盲，被测项目脱敏见 [benchmark](docs/superpowers/notes/2026-06-13-lore-agent-consumption-benchmark.md)）显示优势分布不均：
+
+- **强优势**：① **大型多模块 repo 的 agent 冷启动**（跨文件建框架，repo 越大越省）；② **散在多文件的清单型事实**（入口全景 / dispatch 表 / 过滤原因全集——wiki 一张表 vs 源码十几次 grep，实测某子管道问题 wiki 省 55% token、1/3 工具调用）；③ **决策史 / 「为什么不那样做」**（源码注释和 git log 都查不动）。
+- **弱优势**：小 repo（几个文件，源码一眼看完）装了优势不明显——lore 的价值随 repo 规模和模块数增长。
+- **正确姿势**：wiki 建框架 + 锚点下钻源码的**混合流程**（resident-mode 已把这条路径注入每个 agent 的 CLAUDE.md）；纯 wiki 到不了实现层细节，纯源码冷启动慢——混合才是最优。
+
 ## 核心理念
 
 | 理念 | 含义 |

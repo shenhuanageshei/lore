@@ -4,9 +4,38 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, re
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook, discoverDocs, findMetaDoc } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
+
+test('discoverDocs: 探测含≥3 md 的目录（排噪音）+ 子目录元文档', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-dd-'));
+  try {
+    mkdirSync(join(root, 'sub', 'docs', 'specs'), { recursive: true });
+    for (const f of ['a.md', 'b.md', 'c.md']) writeFileSync(join(root, 'sub', 'docs', 'specs', f), '# x');
+    writeFileSync(join(root, 'sub', 'CHANGELOG.md'), '## [1.0.0] — 2026-01-01');
+    writeFileSync(join(root, 'sub', 'README.md'), '# proj');
+    mkdirSync(join(root, 'sub', 'node_modules', 'pkg'), { recursive: true });
+    for (const f of ['x.md', 'y.md', 'z.md', 'w.md']) writeFileSync(join(root, 'sub', 'node_modules', 'pkg', f), '# n');
+    const r = discoverDocs(root);
+    assert.ok(r.docsGlobs.some(g => g.replace(/\\/g, '/') === 'sub/docs/specs/**/*.md'));
+    assert.ok(!r.docsGlobs.some(g => g.includes('node_modules')));
+    assert.equal(r.metaDocs.find(m => m.kind === 'changelog')?.path.replace(/\\/g, '/'), 'sub/CHANGELOG.md');
+    assert.equal(r.metaDocs.find(m => m.kind === 'readme')?.path.replace(/\\/g, '/'), 'sub/README.md');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('findMetaDoc: 根优先，否则一层子目录（排噪音）；缺 → null', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-fm-'));
+  try {
+    assert.equal(findMetaDoc(root, 'CHANGELOG.md'), null);
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'CHANGELOG.md'), 'x');
+    assert.equal(findMetaDoc(root, 'CHANGELOG.md').replace(/\\/g, '/'), 'app/CHANGELOG.md');
+    writeFileSync(join(root, 'CHANGELOG.md'), 'x');
+    assert.equal(findMetaDoc(root, 'CHANGELOG.md'), 'CHANGELOG.md');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test('scaffold creates journal/wiki/site/.state and is idempotent', () => {
   const root = tmpRepo();

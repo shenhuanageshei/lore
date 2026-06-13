@@ -82,11 +82,12 @@ export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
     if (!res.headersSent) res.writeHead(500);
     res.end();
   });
-  // no-cache（≠no-store）：每次 revalidate。本地 127.0.0.1 毫秒级零体感，
-  // 根治浏览器 module 缓存旧 shell.mjs（缺新 export → import 炸 → 整壳白屏）。
+  // no-store：本地工具彻底不缓存。no-cache 无验证器（无 Last-Modified/ETag）时，
+  // 浏览器对 SPA fetch 仍可能吃 disk cache → 显示旧 wiki 页 / 旧 shell.mjs（白屏）。
+  // 127.0.0.1 毫秒级重下，零体感——用 no-store 根治，别留缓存歧义。
   res.writeHead(200, {
     'content-type': MIME[extname(full)] ?? 'application/octet-stream',
-    'cache-control': 'no-cache',
+    'cache-control': 'no-store',
   });
   stream.pipe(res);
 }

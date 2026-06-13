@@ -34,3 +34,7 @@
 **问题**：壳 stale 徽标点击无反应且无报错——事件绑定选择器写了 `#content button[...]`，而 chips 实际渲染在 `#meta` 容器。
 **修复**：选择器改 `#meta button[data-queue-page]`。
 **预防**：壳的页面元数据徽标住 `#meta` 不在 `#content`，绑事件先确认容器。
+
+**问题**：重写后的 wiki 页浏览器顽固显示旧内容，且 server 端 curl 已证实是新版——疑似缓存但响应头已设 `no-cache`。
+**修复**：`no-cache` ≠ `no-store`——无验证器（Last-Modified/ETag）时浏览器对 SPA fetch 仍吃 disk cache；serveStatic 改发 `no-store` 彻底不缓存（127.0.0.1 重下零体感）。
+**预防**：本地工具的动态内容（wiki md / manifest / shell.mjs）用 `no-store` 不用 `no-cache`，别留缓存歧义——否则「server 是新的、用户看到旧的」会反复甩锅缓存却治不了。

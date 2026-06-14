@@ -105,7 +105,7 @@ test('buildMeta: stale chip 带排队 action 与 path（点击即排队，不再
   const stale = m.chips.find(c => c.kind === 'stale');
   assert.equal(stale.action, 'queue');
   assert.equal(stale.path, 'theme/ioc.md');
-  assert.match(stale.text, /点击排队重写/);
+  assert.match(stale.text, /点击排队同步/);     // 机械徽标 = 排队同步（追代码），「重写」专给带指令按钮
   assert.doesNotMatch(stale.text, /lore:sync/);
   const f = buildMeta({ stale: 0, path: 'a.md' });
   assert.equal(f.chips.find(c => c.kind === 'fresh').action, undefined);

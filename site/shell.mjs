@@ -132,17 +132,15 @@ export function buildMeta(page) {
     { icon: '🔗', text: `${f.atoms} atoms · ${f.commits} commits`, kind: 'plain' },
     { icon: '⎇', text: `code_sha ${page.code_sha ?? '—'}`, kind: 'plain' },
   ];
-  // stale 徽标是动作不是提示：机械 sync 清不掉 stale（prose 要 LLM 重写）——点击=排队，别再误导跑 sync
+  // 机械徽标 = 排队/同步意图（追代码 / 补缺失结构，无指令）——和带指令的「✏️ 重写这页」分开概念。
   chips.push(page.stale > 0
-    ? { icon: '⚠', text: `落后 ${page.stale} commits · 点击排队重写`, kind: 'stale', action: 'queue', path: page.path }
+    ? { icon: '⚠', text: `落后 ${page.stale} commits · 点击排队同步`, kind: 'stale', action: 'queue', path: page.path }
     : { icon: '✓', text: '最新', kind: 'fresh' });
-  // 架构图质量门：component/flow 页缺 mermaid（hasDiagram===false）→ 可见徽标，点击排队重写补图。
   if (page.hasDiagram === false) {
-    chips.push({ icon: '🖼', text: '缺架构图 · 点击排队重写', kind: 'stale', action: 'queue', path: page.path });
+    chips.push({ icon: '🖼', text: '缺架构图 · 点击排队补', kind: 'stale', action: 'queue', path: page.path });
   }
-  // 两档质量门：深度页缺机制详解档（hasMechanism===false）→ 可见徽标，点击排队重写补档。
   if (page.hasMechanism === false) {
-    chips.push({ icon: '📖', text: '缺机制详解 · 点击排队重写', kind: 'stale', action: 'queue', path: page.path });
+    chips.push({ icon: '📖', text: '缺机制详解 · 点击排队补', kind: 'stale', action: 'queue', path: page.path });
   }
   return { chips };
 }

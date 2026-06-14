@@ -370,9 +370,13 @@ function buildSidebar() {
 
 function renderMeta(page) {
   const cls = { plain: 'chip', stale: 'chip stale', fresh: 'chip fresh' };
-  return buildMeta(page).chips.map(c => c.action === 'queue'
+  const chips = buildMeta(page).chips.map(c => c.action === 'queue'
     ? `<button class="${cls[c.kind]}" data-queue-page="${c.path}">${c.icon} ${c.text}</button>`
     : `<span class="${cls[c.kind]}">${c.icon} ${c.text}</span>`).join('');
+  // 「✏️ 重写这页」=带指令的质量改进（不限 stale，fresh 也能点）——和机械「排队同步」分开概念。docs 物化页不重写 prose。
+  const rewrite = page.axis === 'docs' ? ''
+    : `<button class="chip" data-rewrite-page="${page.path}" title="按你的要求改进这页（可填具体指令）">✏️ 重写这页</button>`;
+  return chips + rewrite;
 }
 
 function renderTranslateState(page, localized) {
@@ -426,7 +430,7 @@ async function route() {
       }
     };
   }
-  // stale 徽标点击=排队重写（与控制台 ✍ 同一 API）；静态服务下失败给降级文案。徽标住 #meta（不是 #content）
+  // 机械徽标点击=排队/同步（追代码 / 补缺结构，无指令）。徽标住 #meta（不是 #content）
   document.querySelectorAll('#meta button[data-queue-page]').forEach(b => b.onclick = async () => {
     b.disabled = true; b.textContent = '排队中…';
     try {
@@ -434,6 +438,17 @@ async function route() {
       if (!res.ok) throw new Error(String(res.status));
       b.textContent = '已排队 ✍（auto 档后台消化；或会话跑 /lore:sync）';
     } catch { b.textContent = '⚠ 排队不可用（静态服务）——/lore:serve 重启后可用'; }
+  });
+  // 「✏️ 重写这页」=带指令的质量改进：弹框填要求 → 进队列带 instruction → runner/sync 按你的意图重写
+  document.querySelectorAll('#meta button[data-rewrite-page]').forEach(b => b.onclick = async () => {
+    const instruction = prompt('重写要求（留空 = 通用重写/追代码；填写 = 按你的要求改进这页，例：精简概览段、加个调用例子、换个叙述角度）');
+    if (instruction === null) return;   // 取消
+    b.disabled = true; b.textContent = '排队中…';
+    try {
+      const res = await fetch(BASE + 'api/sync/rewrite-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: b.dataset.rewritePage, instruction }) });
+      if (!res.ok) throw new Error(String(res.status));
+      b.textContent = instruction.trim() ? '已排队 ✏️（带指令 · auto 档后台消化 / 或 /lore:sync）' : '已排队 ✍（通用重写）';
+    } catch { b.textContent = '⚠ 排队不可用（静态服务）'; }
   });
   document.getElementById('main').scrollTop = 0;
 }

@@ -88,6 +88,15 @@ test('axisPrompt: theme/flow 含排版分层要求（小标题/表格，杜绝�
   assert.match(axisPrompt({ axis: 'flow', path: 'flow/x.md' }), /小标题|分层|表格/);
 });
 
+test('axisPrompt: page.instruction 注入「额外要求」段；无指令不变（重写带意图）', () => {
+  const withInstr = axisPrompt({ axis: 'component', path: 'component/x.md', instruction: '精简概览段，加个调用例子' });
+  assert.match(withInstr, /额外要求/);
+  assert.match(withInstr, /精简概览段，加个调用例子/);
+  const without = axisPrompt({ axis: 'component', path: 'component/x.md' });
+  assert.doesNotMatch(without, /额外要求/);
+  assert.doesNotMatch(axisPrompt({ axis: 'component', path: 'component/x.md', instruction: '  ' }), /额外要求/);  // 空白指令不注入
+});
+
 // --- runAuto 主流程（fake backend 注入，不真调 claude）---
 import { runAuto } from '../lib/runner.js';
 import { mkdtempSync, mkdirSync, writeFileSync as wf, readFileSync as rf, rmSync } from 'node:fs';
@@ -115,6 +124,17 @@ function autoRepo() {
 
 const FAKE_OK = `---\ntitle: Lib\nsummary: better\n---\n# Lib\n\n新正文，质量门要求长度不短于旧文三分之一，这里足够长完全没问题。\n\n<!-- LORE_JOURNAL:START -->\n- x\n<!-- LORE_JOURNAL:END -->\n`;
 const noopSpawn = () => ({ unref() {}, once() {} });
+
+test('runAuto: 队列带 instruction → 透传到 backend 的 page.instruction（重写带意图）', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    appendRewriteRequest(join(lore, '.state'), { page: 'component/lib.md', instruction: '精简概览段' });
+    let seen;
+    const backend = { rewritePage: async ({ page }) => { seen = page.instruction; return FAKE_OK; } };
+    await runAuto(lore, { backend, maxPages: 5, spawnFn: noopSpawn, now: () => new Date('2026-06-10T12:00:00') });
+    assert.equal(seen, '精简概览段');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test('runAuto: 好页写盘+队列移除+历史记录+pid 清理', async () => {
   const { root, lore } = autoRepo();

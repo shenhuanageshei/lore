@@ -152,6 +152,22 @@ test('appendRewriteRequest: 同页未消化不重复排（去重）', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('appendRewriteRequest: 带 instruction → 更新同页条目（指令可改写）；无指令仍去重', () => {
+  const dir = tmp();
+  try {
+    appendRewriteRequest(dir, { page: 'component/sync.md', now: 't1' });
+    assert.equal(appendRewriteRequest(dir, { page: 'component/sync.md', now: 't2' }).queued, false);   // 无指令 → 去重
+    const r = appendRewriteRequest(dir, { page: 'component/sync.md', instruction: '精简概览段', now: 't3' });
+    assert.equal(r.queued, true);                                          // 有指令 → 更新（非跳过）
+    const q = readRewriteRequests(dir);
+    assert.equal(q.length, 1);                                             // 同页不重复
+    assert.equal(q[0].instruction, '精简概览段');                          // 指令持久化 + 读回
+    appendRewriteRequest(dir, { page: 'component/sync.md', instruction: '改主意：加个例子', now: 't4' });
+    assert.equal(readRewriteRequests(dir)[0].instruction, '改主意：加个例子');   // 指令可覆盖（改主意）
+    assert.equal(readRewriteRequests(dir).length, 1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('readRewriteRequests: 缺文件 → []；坏行跳过好行保留', () => {
   const dir = tmp();
   try {

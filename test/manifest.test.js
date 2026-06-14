@@ -110,6 +110,7 @@ test('emitManifest builds axes->pages with stale + provenance', () => {
     assert.equal(page.stale, 3);                  // def5678 != HEAD
     assert.equal(page.code_sha, 'def5678');
     assert.deepEqual(page.synthesized_from, { atoms: 8, commits: 5 });
+    assert.equal(page.hasDiagram, false);          // component 页 m3_nlp 无 mermaid → 缺图标记（质量门）
     const theme = m.axes.find(a => a.id === 'theme');
     assert.equal(theme.pages[0].stale, 0);        // abc1234 == HEAD
   } finally {

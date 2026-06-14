@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -45,7 +45,7 @@ function gitRepo() {
 function page(loreDir, id, codeSha) {
   const dir = join(loreDir, 'wiki', 'component');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, `${id}.md`), `---\ntitle: ${id}\ncode_sha: ${codeSha}\n---\n# ${id}\n`);
+  writeFileSync(join(dir, `${id}.md`), `---\ntitle: ${id}\ncode_sha: ${codeSha}\n---\n# ${id}\n\n\`\`\`mermaid\nflowchart TD\n  A --> B\n\`\`\`\n`);
 }
 
 test('lint orchestrator reports stale + orphan + missing', () => {
@@ -82,7 +82,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -279,4 +279,19 @@ test('lintMermaid: 扫页报坏图（页名+第几个图+问题）；好页不�
     assert.equal(out[0].diagram, 1);
     assert.match(out[0].issue, /reserved id/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintMissingDiagram: component/flow 缺 mermaid → 报；有图不报；翻译 sidecar 跳过', () => {
+  const lore = tmpDir();
+  try {
+    const wiki = join(lore, 'wiki');
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    mkdirSync(join(wiki, 'flow'), { recursive: true });
+    writeFileSync(join(wiki, 'component', 'good.md'), '# x\n\n```mermaid\nflowchart TD\n  A --> B\n```\n');
+    writeFileSync(join(wiki, 'component', 'bad.md'), '# x\n\n没有架构图\n');
+    writeFileSync(join(wiki, 'component', 'bad.en.md'), '# x\n\n翻译 sidecar 不检测\n');
+    writeFileSync(join(wiki, 'flow', 'f.md'), '# f\n\n无图\n');
+    const out = lintMissingDiagram(wiki).sort();
+    assert.deepEqual(out, ['component/bad.md', 'flow/f.md']);   // good 有图、.en 翻译跳过
+  } finally { rmSync(lore, { recursive: true, force: true }); }
 });

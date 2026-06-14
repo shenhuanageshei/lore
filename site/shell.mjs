@@ -136,6 +136,10 @@ export function buildMeta(page) {
   chips.push(page.stale > 0
     ? { icon: '⚠', text: `落后 ${page.stale} commits · 点击排队重写`, kind: 'stale', action: 'queue', path: page.path }
     : { icon: '✓', text: '最新', kind: 'fresh' });
+  // 架构图质量门：component/flow 页缺 mermaid（hasDiagram===false）→ 可见徽标，点击排队重写补图。
+  if (page.hasDiagram === false) {
+    chips.push({ icon: '🖼', text: '缺架构图 · 点击排队重写', kind: 'stale', action: 'queue', path: page.path });
+  }
   return { chips };
 }
 

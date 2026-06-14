@@ -111,6 +111,18 @@ test('buildMeta: stale chip 带排队 action 与 path（点击即排队，不再
   assert.equal(f.chips.find(c => c.kind === 'fresh').action, undefined);
 });
 
+test('buildMeta: component/flow 缺架构图(hasDiagram=false)→ 可点击排队徽标；有图/非检测轴不报', () => {
+  const miss = buildMeta({ axis: 'component', hasDiagram: false, path: 'component/art.md', stale: 0 });
+  const chip = miss.chips.find(c => /缺架构图/.test(c.text));
+  assert.ok(chip);
+  assert.equal(chip.action, 'queue');
+  assert.equal(chip.path, 'component/art.md');
+  const has = buildMeta({ axis: 'component', hasDiagram: true, path: 'component/lib.md', stale: 0 });
+  assert.ok(!has.chips.some(c => /缺架构图/.test(c.text)));        // 有图不报
+  const docs = buildMeta({ axis: 'docs', path: 'docs/x.md', last_updated: 'x' });
+  assert.ok(!docs.chips.some(c => /缺架构图/.test(c.text)));       // docs 不检测（无 hasDiagram 字段）
+});
+
 test('renderMarkdown renders ```mermaid as <div class="mermaid">, escaped not <pre>', () => {
   const html = renderMarkdown('```mermaid\nflowchart TD\nA-->B\n```');
   assert.match(html, /<div class="mermaid">/);

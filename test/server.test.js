@@ -217,6 +217,14 @@ test('GET/POST /api/sync/rewrite-requests：排队 + 读回 + 去重 + 非法 pa
     const list = await (await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`)).json();
     assert.equal(list.requests.length, 1);
     assert.equal(list.requests[0].page, 'component/sync.md');
+    // 带 instruction 的重写 → 透传 + 更新同页条目（重写/改进语义）
+    await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ page: 'component/sync.md', instruction: '精简概览段' }),
+    });
+    const list2 = await (await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`)).json();
+    assert.equal(list2.requests.length, 1);                          // 同页更新非新增
+    assert.equal(list2.requests[0].instruction, '精简概览段');       // 指令透传持久化
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

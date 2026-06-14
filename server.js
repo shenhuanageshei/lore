@@ -208,7 +208,10 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
           const body = await readJson(req);
           const page = String(body.page ?? '');
           if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
-          return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page }) });
+          // 重写/改进：透传用户指令（截断防滥用）；无指令 = 排队/同步语义
+          const instruction = body.instruction != null && String(body.instruction).trim()
+            ? String(body.instruction).slice(0, 500) : undefined;
+          return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page, instruction }) });
         } catch { return sendJson(res, 400, { error: 'bad json' }); }
       }
     }

@@ -140,6 +140,10 @@ export function buildMeta(page) {
   if (page.hasDiagram === false) {
     chips.push({ icon: '🖼', text: '缺架构图 · 点击排队重写', kind: 'stale', action: 'queue', path: page.path });
   }
+  // 两档质量门：深度页缺机制详解档（hasMechanism===false）→ 可见徽标，点击排队重写补档。
+  if (page.hasMechanism === false) {
+    chips.push({ icon: '📖', text: '缺机制详解 · 点击排队重写', kind: 'stale', action: 'queue', path: page.path });
+  }
   return { chips };
 }
 

@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -82,7 +82,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], missingMechanism: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -293,5 +293,19 @@ test('lintMissingDiagram: component/flow 缺 mermaid → 报；有图不报；�
     writeFileSync(join(wiki, 'flow', 'f.md'), '# f\n\n无图\n');
     const out = lintMissingDiagram(wiki).sort();
     assert.deepEqual(out, ['component/bad.md', 'flow/f.md']);   // good 有图、.en 翻译跳过
+  } finally { rmSync(lore, { recursive: true, force: true }); }
+});
+
+test('lintMissingMechanism: 深度页缺「## 机制详解」→ 报；有档不报；非深度页（不在 deep）不检测', () => {
+  const lore = tmpDir();
+  try {
+    const wiki = join(lore, 'wiki');
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    const deep = { lib: { order: ['sync', 'runner'], groups: [] } };
+    writeFileSync(join(wiki, 'component', 'sync.md'), '# sync\n\n## 概览\n\nx\n\n## 机制详解\n\n<details>...</details>\n');
+    writeFileSync(join(wiki, 'component', 'runner.md'), '# runner\n\n## 概览\n\n只有概览，没机制档\n');
+    writeFileSync(join(wiki, 'component', 'lib.md'), '# lib\n\n## 概览\n\n鸟瞰页不在 deep order，不检测\n');
+    const out = lintMissingMechanism(wiki, deep);
+    assert.deepEqual(out, ['component/runner.md']);   // sync 有档、runner 缺档、lib 非深度页不查
   } finally { rmSync(lore, { recursive: true, force: true }); }
 });

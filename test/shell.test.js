@@ -123,6 +123,18 @@ test('buildMeta: component/flow 缺架构图(hasDiagram=false)→ 可点击排�
   assert.ok(!docs.chips.some(c => /缺架构图/.test(c.text)));       // docs 不检测（无 hasDiagram 字段）
 });
 
+test('buildMeta: 深度页缺机制详解(hasMechanism=false)→ 可点击排队徽标；有档/鸟瞰页不报', () => {
+  const miss = buildMeta({ axis: 'component', hasMechanism: false, hasDiagram: true, path: 'component/sync.md', stale: 0 });
+  const chip = miss.chips.find(c => /缺机制详解/.test(c.text));
+  assert.ok(chip);
+  assert.equal(chip.action, 'queue');
+  assert.equal(chip.path, 'component/sync.md');
+  const has = buildMeta({ axis: 'component', hasMechanism: true, hasDiagram: true, path: 'component/runner.md', stale: 0 });
+  assert.ok(!has.chips.some(c => /缺机制详解/.test(c.text)));       // 有机制档不报
+  const birdseye = buildMeta({ axis: 'component', hasDiagram: true, path: 'component/lib.md', stale: 0 });
+  assert.ok(!birdseye.chips.some(c => /缺机制详解/.test(c.text)));  // 鸟瞰页（无 hasMechanism 字段）不报
+});
+
 test('renderMarkdown renders ```mermaid as <div class="mermaid">, escaped not <pre>', () => {
   const html = renderMarkdown('```mermaid\nflowchart TD\nA-->B\n```');
   assert.match(html, /<div class="mermaid">/);

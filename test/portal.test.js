@@ -17,6 +17,8 @@ test('autostart: win32 写/删 Startup vbs，幂等，内容指向 portal.js 绝
     const text = readFileSync(vbs, 'utf8');
     assert.match(text, /portal\.js"" start/);
     assert.match(text, /, 0, False/);                      // 隐藏窗口
+    assert.doesNotMatch(text, /Run "node /);               // 不用裸 node（开机 Startup 环境 PATH 常无 node）
+    assert.ok(text.includes(process.execPath.replace(/\\/g, '/')));   // 用 node 绝对路径
     assert.equal(autostart('on', { appData: fakeAppData, platform: 'win32' }).status, 'present');
     assert.equal(autostart('off', { appData: fakeAppData, platform: 'win32' }).status, 'removed');
     assert.equal(existsSync(vbs), false);

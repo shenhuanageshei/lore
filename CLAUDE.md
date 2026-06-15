@@ -46,3 +46,7 @@
 **问题**：约一半 component 页 auto 重写撞 600s timeout 永过不去（与上「回吐物化区」不同根因：这次是 token 态下纯读源码慢）——成功的 scripts.md 就吃 492s（上限 82%），autoload 实测需 625s，卡在 600s 外侧 25 秒、连续两轮被砍。
 **修复**：per-page timeout 600→1200s（正常 ~500s 的 2.4x 冗余）；`RUNNER_STALE_MS` 90→180min 联动，否则长轮被误判死 pid、ticker 双开 runner。
 **预防**：单页重写耗时由「读多少源码」定、不由页大小（最小的 art.md 反最慢）；timeout 给正常耗时留 2-3x 冗余别卡中位数。改 per-page timeout 必同步抬 stale 上限。
+
+**问题**：serve.test.js `start is idempotent` 在全量并行 `node --test test/*.test.js` 下偶发失败（a.pid≠b.pid / reused≠true），单跑 serve.test.js 稳定。根因：`start` 就绪探测 `waitForPort` 只验「端口上有人监听」、不验「是我 spawn 的子进程活着」。并行时大量 sibling 测试 `listen(0)` 抢临时端口（server.test.js 一家就 22 处），`findPort(0)` 探到端口→子进程 bind 之间的 TOCTOU 窗口里端口被抢，子进程 EADDRINUSE 崩溃（server.js 的 listen 无 error handler），`waitForPort` 却连到抢占者 → 误判就绪 → start 返回已死 pid → 下次 start 见死 pid 不复用、重启。
+**修复**：就绪探测改 child-aware `waitForServer`（ready/died/timeout：连上后还 `isAlive(child.pid)` 确认是自己的子进程）；输掉端口竞争（died）换新端口有界重试（`START_ATTEMPTS=3`）；alive-but-never-bound（timeout）不重试、保留 `/did not bind/` 语义。竞态靠并行撞运气复现不了（实测 lean 子集 30 轮 0 复现），用注入「死子进程+端口被占」确定性测。
+**预防**：起子进程 server 的就绪判定必须验「我的子进程在监听」、不能只验「端口有人应答」——临时端口（port:0）在并行/高负载下会被别的进程抢，纯端口 ping 分不清自己的子进程和抢占者（同 runner.pid「`isAlive` 只答这号有进程、不答还是我那个」一脉）。

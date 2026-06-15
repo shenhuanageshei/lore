@@ -111,7 +111,7 @@ test('runnerAlive: 活+新 ts→true；活+旧 ts(残留/卡死)→false；死 p
     assert.equal(runnerAlive(dir, () => true, 1000), false);                  // 无文件
     writeRunnerPid(dir, 999, 1000);
     assert.equal(runnerAlive(dir, () => true, 1000 + 60_000), true);          // 活 + 1min 前（< 90min）
-    assert.equal(runnerAlive(dir, () => true, 1000 + 100 * 60_000), false);   // 活但 100min 前（> 90min）→ 残留
+    assert.equal(runnerAlive(dir, () => true, 1000 + 200 * 60_000), false);   // 活但 200min 前（> 180min）→ 残留
     assert.equal(runnerAlive(dir, () => false, 1000 + 60_000), false);        // 死 pid
     writeFileSync(join(dir, 'runner.pid'), JSON.stringify({ pid: 999 }));     // 旧格式无 ts
     assert.equal(runnerAlive(dir, () => true, 1e12), false);                 // 无 ts → 视为过期（自动解旧残留死锁）

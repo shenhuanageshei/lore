@@ -282,7 +282,7 @@ test('CLI: node lib/init.js <repo> initializes, prints summary, registers for po
     assert.equal(existsSync(join(root, '.lore', 'site', 'shell.mjs')), true);
     // init 把本 repo 登记进（隔离的）portal registry
     const repos = JSON.parse(readFileSync(join(home, '.lore', 'repos.json'), 'utf8'));
-    assert.equal(repos.some(e => e.loreDir === join(root, '.lore')), true);
+    assert.equal(repos.some(e => e.loreDir === join(root, '.lore').replace(/\\/g, '/')), true);   // registerRepo 归一正斜杠
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

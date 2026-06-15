@@ -7,6 +7,8 @@ import { writeSyncMode, readSyncMode } from '../lib/syncstate.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, createPortalServer } from '../server.js';
+import { execFileSync } from 'node:child_process';
+import net from 'node:net';
 
 function listen(server) {
   return new Promise(res => server.listen(0, '127.0.0.1', () => res(server.address().port)));
@@ -26,6 +28,25 @@ test('serves a file with correct mime', async () => {
   } finally {
     server.close(); rmSync(root, { recursive: true, force: true });
   }
+});
+
+// The CLI binds a port handed to it by lib/serve.js start(). If that port was stolen in
+// the findPort→bind TOCTOU window, listen() emits EADDRINUSE — which must exit cleanly with
+// a diagnostic (start() detects the exit and re-rolls), not crash as an uncaught exception.
+test('CLI: server.js exits cleanly with a diagnostic when the port is already taken', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-bind-'));
+  mkdirSync(join(root, 'site'), { recursive: true });
+  writeFileSync(join(root, 'site', 'index.html'), 'ok');
+  const squatter = net.createServer();
+  const port = await new Promise(res => squatter.listen(0, '127.0.0.1', () => res(squatter.address().port)));
+  let err = null;
+  try {
+    execFileSync('node', ['server.js', root, String(port)], { cwd: process.cwd(), stdio: 'pipe', timeout: 8000 });
+  } catch (e) { err = e; }
+  squatter.close();
+  rmSync(root, { recursive: true, force: true });
+  assert.notEqual(err, null);                            // non-zero exit, did not hang or bind
+  assert.match(String(err.stderr), /failed to bind/i);  // clean message, not an uncaught EADDRINUSE stack
 });
 
 test('目录请求无尾斜杠 → 301 加斜杠（相对 import 解析基准）', async () => {

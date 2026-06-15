@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { probeRuntime, readPid, writePid, isAlive, killPid, findPort, start, stop, stablePort, listRunning, stopAllRunning } from '../lib/serve.js';
 import { spawn, execFileSync as exec } from 'node:child_process';
+import net from 'node:net';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync as mkd, writeFileSync as wf } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
@@ -123,6 +124,82 @@ test('start is idempotent: second call reuses running server', async () => {
     assert.equal(b.reused, true);
     await stop({ loreDir: pjoin(root, '.lore') });
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// Regression for the parallel-load flaky: under `node --test test/*.test.js` many
+// sibling tests call listen(0), so the ephemeral port that findPort just released can
+// be stolen before our detached child binds it. server.js has no listen error handler,
+// so the child crashes (EADDRINUSE) — yet a port probe still connects (to the thief),
+// which used to make start() report a dead pid as "running". The next start() then saw
+// a dead pid and restarted instead of reusing → a.pid≠b.pid / reused≠true. start() must
+// detect its child died and retry on a fresh port rather than trust the port alone.
+test('start recovers when its first child loses the port race (no dead-pid false-positive)', async () => {
+  const root = mkdtempSync(pjoin(tmpdir(), 'lore-race-'));
+  const thieves = [];
+  try {
+    const wiki = pjoin(root, '.lore', 'wiki');
+    mkd(wiki, { recursive: true });
+    wf(pjoin(wiki, '.manifest.json'), '{"axes":[]}');
+    mkd(pjoin(root, '.lore', 'site'), { recursive: true });
+    wf(pjoin(root, '.lore', 'site', 'index.html'), 'ok');
+
+    let attempt = 0;
+    const spawnFn = (cmd, args, opts) => {
+      attempt++;
+      const chosen = Number(args[args.length - 1]);   // buildArgs => [server.js, dir, port]
+      if (attempt === 1) {
+        // thief steals the just-probed port; our child "dies" before binding (dead pid).
+        const thief = net.createServer(s => s.destroy());
+        thief.listen(chosen, '127.0.0.1');
+        thieves.push(thief);
+        return { pid: 2 ** 31 - 1, unref() {} };       // implausible pid → already dead
+      }
+      return spawn(cmd, args, opts);                    // real bundled node server on retry
+    };
+
+    const info = await start({ loreDir: pjoin(root, '.lore'), port: 0, canRun: () => false, spawnFn, now: 't' });
+    assert.equal(isAlive(info.pid), true);             // a LIVE server, never a dead pid
+    assert.equal(info.reused, false);
+    const r = await fetch(info.url + 'index.html');    // and it actually serves
+    assert.equal(r.status, 200);
+
+    await stop({ loreDir: pjoin(root, '.lore') });
+  } finally {
+    for (const t of thieves) { try { t.close(); } catch {} }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The invariant from the other side: if the port is stolen on *every* attempt, start()
+// must give up loudly rather than report a dead pid as a running server (which would
+// poison the next start()'s reuse check). No dead pid is ever left in the pid file.
+test('start gives up instead of reporting a dead pid when every attempt loses the race', async () => {
+  const root = mkdtempSync(pjoin(tmpdir(), 'lore-race2-'));
+  const thieves = [];
+  try {
+    const wiki = pjoin(root, '.lore', 'wiki');
+    mkd(wiki, { recursive: true });
+    wf(pjoin(wiki, '.manifest.json'), '{"axes":[]}');
+    mkd(pjoin(root, '.lore', 'site'), { recursive: true });
+    wf(pjoin(root, '.lore', 'site', 'index.html'), 'ok');
+
+    const spawnFn = (cmd, args, opts) => {
+      const chosen = Number(args[args.length - 1]);
+      const thief = net.createServer(s => s.destroy());
+      thief.listen(chosen, '127.0.0.1');                 // steal it every single time
+      thieves.push(thief);
+      return { pid: 2 ** 31 - 1, unref() {} };           // dead child every single time
+    };
+
+    await assert.rejects(
+      () => start({ loreDir: pjoin(root, '.lore'), port: 0, canRun: () => false, spawnFn, now: 't' }),
+      /gave up after/,
+    );
+    assert.equal(readPid(pjoin(root, '.lore', '.state')), null);   // no dead pid left behind
+  } finally {
+    for (const t of thieves) { try { t.close(); } catch {} }
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('stop on nothing-running is a no-op', async () => {

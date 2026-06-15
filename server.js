@@ -307,7 +307,16 @@ export function createPortalServer(repoMapOrFn) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [, , rootDir, portStr] = process.argv;
   if (!rootDir || !portStr) { console.error('usage: node server.js <rootDir> <port>'); process.exit(1); }
-  createServer(rootDir).listen(Number(portStr), '127.0.0.1',
+  const srv = createServer(rootDir);
+  // EADDRINUSE: the port was stolen between start()'s probe and our bind (findPort TOCTOU).
+  // Exit cleanly with a diagnostic instead of crashing as an uncaught 'error' event — lib/serve.js
+  // start() watches for this non-zero exit and re-rolls the port. stdio is 'ignore' under start(),
+  // so the message only surfaces when server.js is run by hand, which is exactly when it's useful.
+  srv.on('error', (e) => {
+    console.error(`lore: server failed to bind 127.0.0.1:${portStr}: ${e.code || e.message}`);
+    process.exit(1);
+  });
+  srv.listen(Number(portStr), '127.0.0.1',
     () => console.log(`lore static server on 127.0.0.1:${portStr} root=${rootDir}`));
   // B2 ticker：统一调度静默期与 schedule。判定+触发在 runner.tickAuto（与 portal 共用，永不抛）。
   // 动态 import——ticker 是进程级关注点，不把判定链拖进 createServer 工厂（测试零影响）。

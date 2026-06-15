@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
-  readSyncConfig, readRunnerPid, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
+  readSyncConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
 import { isAlive } from './lib/serve.js';
 
 const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
@@ -148,8 +148,7 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
       let lastFinalize = null;
       try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
       catch { /* 无 manifest（未 sync）→ null */ }
-      const pid = readRunnerPid(stateDir);
-      return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: pid != null && isAlive(pid) });
+      return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: runnerAlive(stateDir, isAlive) });
     }
 
     if (req.method === 'POST' && pathname === '/api/sync/config') {

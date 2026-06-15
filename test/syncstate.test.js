@@ -47,7 +47,7 @@ test('writeSyncMode: 非法值 throw；auto 自 B2 起合法', () => {
 });
 
 import { readSyncConfig, writeSyncConfig, writeAutoPending, readAutoPending, clearAutoPending,
-  writeRunnerPid, readRunnerPid, clearRunnerPid, appendAutoRun, readAutoRuns } from '../lib/syncstate.js';
+  writeRunnerPid, readRunnerPid, clearRunnerPid, runnerAlive, appendAutoRun, readAutoRuns } from '../lib/syncstate.js';
 
 test('readSyncConfig: 默认值兜底 + B1 形状向后兼容 + 扩展字段', () => {
   const dir = tmp();
@@ -102,6 +102,19 @@ test('runner pid: 写读清；坏 JSON → null', () => {
     assert.equal(readRunnerPid(dir), null);
     writeFileSync(join(dir, 'runner.pid'), '{oops');
     assert.equal(readRunnerPid(dir), null);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('runnerAlive: 活+新 ts→true；活+旧 ts(残留/卡死)→false；死 pid→false；旧格式无 ts→false（解 pid 复用死锁）', () => {
+  const dir = tmp();
+  try {
+    assert.equal(runnerAlive(dir, () => true, 1000), false);                  // 无文件
+    writeRunnerPid(dir, 999, 1000);
+    assert.equal(runnerAlive(dir, () => true, 1000 + 60_000), true);          // 活 + 1min 前（< 90min）
+    assert.equal(runnerAlive(dir, () => true, 1000 + 100 * 60_000), false);   // 活但 100min 前（> 90min）→ 残留
+    assert.equal(runnerAlive(dir, () => false, 1000 + 60_000), false);        // 死 pid
+    writeFileSync(join(dir, 'runner.pid'), JSON.stringify({ pid: 999 }));     // 旧格式无 ts
+    assert.equal(runnerAlive(dir, () => true, 1e12), false);                 // 无 ts → 视为过期（自动解旧残留死锁）
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

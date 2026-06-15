@@ -5,6 +5,30 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPortalServer } from '../server.js';
+import { autostart } from '../lib/portal.js';
+
+test('autostart: win32 写/删 Startup vbs，幂等，内容指向 portal.js 绝对路径', () => {
+  const fakeAppData = mkdtempSync(join(tmpdir(), 'lore-appdata-'));
+  try {
+    const r1 = autostart('on', { appData: fakeAppData, platform: 'win32' });
+    assert.equal(r1.status, 'installed');
+    const vbs = join(fakeAppData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'lore-portal.vbs');
+    assert.ok(existsSync(vbs));
+    const text = readFileSync(vbs, 'utf8');
+    assert.match(text, /portal\.js"" start/);
+    assert.match(text, /, 0, False/);                      // 隐藏窗口
+    assert.doesNotMatch(text, /Run "node /);               // 不用裸 node（开机 Startup 环境 PATH 常无 node）
+    assert.ok(text.includes(process.execPath.replace(/\\/g, '/')));   // 用 node 绝对路径
+    assert.equal(autostart('on', { appData: fakeAppData, platform: 'win32' }).status, 'present');
+    assert.equal(autostart('off', { appData: fakeAppData, platform: 'win32' }).status, 'removed');
+    assert.equal(existsSync(vbs), false);
+    assert.equal(autostart('off', { appData: fakeAppData, platform: 'win32' }).status, 'absent');
+  } finally { rmSync(fakeAppData, { recursive: true, force: true }); }
+});
+
+test('autostart: 非 win32 → unsupported（不写文件）', () => {
+  assert.equal(autostart('on', { platform: 'linux' }).status, 'unsupported');
+});
 
 function listen(server) {
   return new Promise(res => server.listen(0, '127.0.0.1', () => res(server.address().port)));
@@ -30,6 +54,27 @@ test('portal: /<name>/wiki/... 命中对应 repo（白名单路由）', async ()
     const b = await fetch(`http://127.0.0.1:${port}/ti/wiki/.manifest.json`);
     assert.equal(b.status, 200);
     assert.deepEqual(await b.json(), { tag: 'B' });
+  } finally {
+    server.close();
+    rmSync(loreA, { recursive: true, force: true });
+    rmSync(loreB, { recursive: true, force: true });
+  }
+});
+
+test('portal 热重载: 传函数 → 每请求重读 registry，新仓库免重启自动出现', async () => {
+  const loreA = makeLoreDir('A');
+  const loreB = makeLoreDir('B');
+  let repos = { lore: loreA };                            // 初始只有一个
+  const server = createPortalServer(() => repos);
+  const port = await listen(server);
+  try {
+    let r = await (await fetch(`http://127.0.0.1:${port}/repos.json`)).json();
+    assert.deepEqual(r.repos, ['lore']);
+    repos = { lore: loreA, ti: loreB };                  // 模拟新 init 登记（registry 变化）
+    r = await (await fetch(`http://127.0.0.1:${port}/repos.json`)).json();
+    assert.deepEqual(r.repos.sort(), ['lore', 'ti']);    // 免重启，新仓库自动出现
+    const b = await fetch(`http://127.0.0.1:${port}/ti/wiki/.manifest.json`);
+    assert.equal(b.status, 200);                          // 且新仓库路由可达
   } finally {
     server.close();
     rmSync(loreA, { recursive: true, force: true });

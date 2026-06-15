@@ -7,6 +7,8 @@ import { writeSyncMode, readSyncMode } from '../lib/syncstate.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, createPortalServer } from '../server.js';
+import { execFileSync } from 'node:child_process';
+import net from 'node:net';
 
 function listen(server) {
   return new Promise(res => server.listen(0, '127.0.0.1', () => res(server.address().port)));
@@ -26,6 +28,25 @@ test('serves a file with correct mime', async () => {
   } finally {
     server.close(); rmSync(root, { recursive: true, force: true });
   }
+});
+
+// The CLI binds a port handed to it by lib/serve.js start(). If that port was stolen in
+// the findPort→bind TOCTOU window, listen() emits EADDRINUSE — which must exit cleanly with
+// a diagnostic (start() detects the exit and re-rolls), not crash as an uncaught exception.
+test('CLI: server.js exits cleanly with a diagnostic when the port is already taken', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-bind-'));
+  mkdirSync(join(root, 'site'), { recursive: true });
+  writeFileSync(join(root, 'site', 'index.html'), 'ok');
+  const squatter = net.createServer();
+  const port = await new Promise(res => squatter.listen(0, '127.0.0.1', () => res(squatter.address().port)));
+  let err = null;
+  try {
+    execFileSync('node', ['server.js', root, String(port)], { cwd: process.cwd(), stdio: 'pipe', timeout: 8000 });
+  } catch (e) { err = e; }
+  squatter.close();
+  rmSync(root, { recursive: true, force: true });
+  assert.notEqual(err, null);                            // non-zero exit, did not hang or bind
+  assert.match(String(err.stderr), /failed to bind/i);  // clean message, not an uncaught EADDRINUSE stack
 });
 
 test('目录请求无尾斜杠 → 301 加斜杠（相对 import 解析基准）', async () => {
@@ -217,6 +238,14 @@ test('GET/POST /api/sync/rewrite-requests：排队 + 读回 + 去重 + 非法 pa
     const list = await (await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`)).json();
     assert.equal(list.requests.length, 1);
     assert.equal(list.requests[0].page, 'component/sync.md');
+    // 带 instruction 的重写 → 透传 + 更新同页条目（重写/改进语义）
+    await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ page: 'component/sync.md', instruction: '精简概览段' }),
+    });
+    const list2 = await (await fetch(`http://127.0.0.1:${port}/api/sync/rewrite-requests`)).json();
+    assert.equal(list2.requests.length, 1);                          // 同页更新非新增
+    assert.equal(list2.requests[0].instruction, '精简概览段');       // 指令透传持久化
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -226,7 +255,7 @@ test('GET /api/sync/status: B2 扩展形状（config + runner_running）', async
   const port = await listen(server);
   try {
     const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
-    assert.deepEqual(body.config, { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5 });
+    assert.deepEqual(body.config, { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15 });
     assert.equal(body.runner_running, false);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });

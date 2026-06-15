@@ -33,7 +33,9 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 
 ## 北极星 agent 端 —— ✅ 基本已实现
 
-- **agent 友好 graph + MCP 暴露** ✅ —— `graph.js` 把 wiki 合成机器可遍历结构（节点：页/原子/组件；边：facet/refs_related），`mcp.js` 暴露 `lore_ask`/`lore_page`/`lore_neighbors` 三工具让 agent 顺图谱检索/推理。**内容质量 C 的源文件级深度页让图谱可遍历到模块级**（dogfood：lib 从 1→7 个 component 节点）。**余项**：`lore_stale` 工具 + resident-mode 消费纪律（grep/读大文件前先查 wiki）。
+- **agent 友好 graph + MCP 暴露** ✅ —— `graph.js` 把 wiki 合成机器可遍历结构（节点：页/原子/组件；边：facet/refs_related），`mcp.js` 暴露 `lore_ask`/`lore_page`/`lore_neighbors` 三工具让 agent 顺图谱检索/推理。**内容质量 C 的源文件级深度页让图谱可遍历到模块级**（dogfood：lib 从 1→7 个 component 节点）。~~resident-mode 消费纪律~~ ✅ 已实现（2026-06-11，agent 常驻消费）：init 默认注入 CLAUDE.md 标记节（动态 N页/M深度页/日期，finalize 刷新，resident:false 关）+ .mcp.json 注册 + 工具描述触发词化；节级检索（manifest sections 索引 → ask 节命中 → lore_page section/view=agent）。**冷启动复测**（新问题集）：wiki+MCP 链路 49.5k tokens vs 基线 65.6k（降 25%），与 source-only 打平（46.7k）但「决策/呈现类」问题 source 组答不全（侧栏行为/设计取舍只有 wiki 有）——非对称优势区实证。设计见 docs/superpowers/specs/2026-06-11-lore-agent-residency-design.md。**余项**：`lore_stale` 工具；ask 返回的 section 标题含行内格式（反引号）时 sliceSection 精确匹配 miss（宽松化 heading 比对，小修复）。
+- ~~迁移机制~~ ✅ 已实现（2026-06-11，期望态对齐器）：`lib/migrate.js`——收敛型资产（壳/hook stub/.mcp.json/CLAUDE.md 节）每次 finalize「算期望→比实际→不同才写」；一次性迁移（config 补缺块/resident 首装/gitignore/gitattributes）记 `.state/migrations.json`，用户删除不复活。hook stub 终结「装过就永不更新」（含 lore 标记才动，foreign 永不碰；首装仅 init——finalize 不往没要过 hook 的 repo 塞 hook）。git 边界改 facts-only：wiki/site 出库（可再生，对齐器/sync 再生），journal/config 进库（事实源），journal ndjson `merge=union` 终结多机追加冲突。设计见 docs/superpowers/specs/2026-06-11-lore-migrate-design.md。
+- ~~活 wiki 三缺口（A 常驻/C stale 动作化/B 工单扩轴）~~ ✅ 已实现（2026-06-12，threat-intel 四问诊断驱动）：serve 默认 node（python 降为显式 --python，曾致控制台全灰/缓存旧页/auto 失效）；`portal autostart`（Windows Startup vbs，重启自愈）；runner 工单扩到 theme/flow/HOME（manifest stale≥`auto.stale_threshold`(15) 入单、stale 降序、prompt 按轴分支、HOME 用 HOME_STATUS 哨兵门）——theme/ioc 的 stale 63 死局解除；壳 stale 徽标点击即排队（不再误导跑 sync）。**下轮议题 D/E**：D 存量页标准升级工单（单档→两档）；E ask-miss 质量环（lore_ask 落空记录→补页工单——dispatch 表类缺口目前靠人工对比测试才暴露）。
 
 ## 近期（高价值、自洽）
 
@@ -90,6 +92,9 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 
 ### docs 轴重构（分组置顶 + feature 配对 + 默认折叠）✅ 已实现（C-呈现 ②）
 - 已实现：docs 轴侧栏三组分流——「📌 项目状态」（changelog/ROADMAP/pitfalls）置顶常开、「📐 设计与计划」spec↔plan 按 date+slug 配对成行（plan 徽标直达，dogfood 25 对）默认折叠、「📝 notes」折叠；折叠态 localStorage 记忆；搜索穿透折叠组（data-search 含英文 slug）。group/paired_plan 由 `docs.js` 物化进 frontmatter，manifest 组间排序（单一来源），壳 `buildDocsRows` 纯函数可测。无 superpowers 结构 repo 零影响。设计见 `docs/superpowers/specs/2026-06-10-lore-docs-axis-regroup-design.md`。
+
+### docs 轴 + 呈现质量升级（子目录项目 / 元文档 / 排版）✅ 已实现（2026-06-13）
+- 已实现：threat-intel 连环暴露——「代码/文档在子目录」的项目 docs 轴开箱即空、85 页堆一组、CHANGELOG/README 找不到、theme 页大段难读。修复：`discoverDocs` 自动探测文档目录（含子目录）+ 元文档位置（排噪音）；`docGroup` 通用化（元文档置顶组 + 语义子目录段映射 specs/plans/debugging/api/arch/notes）；元文档 extractor 子目录适配 + changelog 格式放宽（`## 标题 (date)`）；theme/flow 排版标准（`###` 分层 + 列表/表格，axisPrompt + sync.md）。dogfood：threat-intel 84 篇分 7 组、元文档进「项目状态」置顶、theme 4 + flow 3 页重排。设计见 `docs/superpowers/specs/2026-06-13-lore-docs-axis-presentation.md`。
 
 ### lint：未打标 / 矛盾检查（母 §5）
 - 现 lint 三检（stale/orphan/missing）。加：未打标原子（只 component 缺 flow/theme，flow/theme 落地后才有意义）、矛盾（页「当前架构」声明 vs 更新原子冲突 → 轻 LLM）。

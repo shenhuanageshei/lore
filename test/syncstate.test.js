@@ -47,19 +47,21 @@ test('writeSyncMode: 非法值 throw；auto 自 B2 起合法', () => {
 });
 
 import { readSyncConfig, writeSyncConfig, writeAutoPending, readAutoPending, clearAutoPending,
-  writeRunnerPid, readRunnerPid, clearRunnerPid, appendAutoRun, readAutoRuns } from '../lib/syncstate.js';
+  writeRunnerPid, readRunnerPid, clearRunnerPid, runnerAlive, appendAutoRun, readAutoRuns } from '../lib/syncstate.js';
 
 test('readSyncConfig: 默认值兜底 + B1 形状向后兼容 + 扩展字段', () => {
   const dir = tmp();
   try {
-    assert.deepEqual(readSyncConfig(dir), { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15 });
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'manual' }));            // B1 形状
     assert.equal(readSyncConfig(dir).mode, 'manual');
     assert.equal(readSyncConfig(dir).debounce_minutes, 10);
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2, future_field: 1 }));
-    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2, stale_threshold: 15 });
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', schedule: 'not-a-time' }));
     assert.equal(readSyncConfig(dir).schedule, null);            // 非法 schedule 回默认
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', stale_threshold: 'lots' }));
+    assert.equal(readSyncConfig(dir).stale_threshold, 15);       // 非法 stale_threshold 回默认
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -68,10 +70,11 @@ test('writeSyncConfig: 部分更新合并（mode 保留）+ 校验非法值拒�
   try {
     writeSyncMode(dir, 'auto');
     writeSyncConfig(dir, { debounce_minutes: 3, schedule: '03:30' });
-    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:30', max_pages: 5 });
-    writeSyncConfig(dir, { schedule: null, max_pages: 2 });            // schedule 可清空
-    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: null, max_pages: 2 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:30', max_pages: 5, stale_threshold: 15 });
+    writeSyncConfig(dir, { schedule: null, max_pages: 2, stale_threshold: 30 });            // schedule 可清空
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: null, max_pages: 2, stale_threshold: 30 });
     assert.throws(() => writeSyncConfig(dir, { debounce_minutes: -1 }), /invalid/);
+    assert.throws(() => writeSyncConfig(dir, { stale_threshold: 0 }), /stale_threshold/);
     assert.throws(() => writeSyncConfig(dir, { schedule: '25:99' }), /invalid/);
     assert.throws(() => writeSyncConfig(dir, { max_pages: 0 }), /invalid/);
     assert.equal(readSyncConfig(dir).debounce_minutes, 3);              // 非法不落盘
@@ -99,6 +102,19 @@ test('runner pid: 写读清；坏 JSON → null', () => {
     assert.equal(readRunnerPid(dir), null);
     writeFileSync(join(dir, 'runner.pid'), '{oops');
     assert.equal(readRunnerPid(dir), null);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('runnerAlive: 活+新 ts→true；活+旧 ts(残留/卡死)→false；死 pid→false；旧格式无 ts→false（解 pid 复用死锁）', () => {
+  const dir = tmp();
+  try {
+    assert.equal(runnerAlive(dir, () => true, 1000), false);                  // 无文件
+    writeRunnerPid(dir, 999, 1000);
+    assert.equal(runnerAlive(dir, () => true, 1000 + 60_000), true);          // 活 + 1min 前（< 90min）
+    assert.equal(runnerAlive(dir, () => true, 1000 + 200 * 60_000), false);   // 活但 200min 前（> 180min）→ 残留
+    assert.equal(runnerAlive(dir, () => false, 1000 + 60_000), false);        // 死 pid
+    writeFileSync(join(dir, 'runner.pid'), JSON.stringify({ pid: 999 }));     // 旧格式无 ts
+    assert.equal(runnerAlive(dir, () => true, 1e12), false);                 // 无 ts → 视为过期（自动解旧残留死锁）
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -146,6 +162,22 @@ test('appendRewriteRequest: 同页未消化不重复排（去重）', () => {
     const r3 = appendRewriteRequest(dir, { page: 'component/hook.md' });
     assert.equal(r3.queued, true);
     assert.equal(readRewriteRequests(dir).length, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('appendRewriteRequest: 带 instruction → 更新同页条目（指令可改写）；无指令仍去重', () => {
+  const dir = tmp();
+  try {
+    appendRewriteRequest(dir, { page: 'component/sync.md', now: 't1' });
+    assert.equal(appendRewriteRequest(dir, { page: 'component/sync.md', now: 't2' }).queued, false);   // 无指令 → 去重
+    const r = appendRewriteRequest(dir, { page: 'component/sync.md', instruction: '精简概览段', now: 't3' });
+    assert.equal(r.queued, true);                                          // 有指令 → 更新（非跳过）
+    const q = readRewriteRequests(dir);
+    assert.equal(q.length, 1);                                             // 同页不重复
+    assert.equal(q[0].instruction, '精简概览段');                          // 指令持久化 + 读回
+    appendRewriteRequest(dir, { page: 'component/sync.md', instruction: '改主意：加个例子', now: 't4' });
+    assert.equal(readRewriteRequests(dir)[0].instruction, '改主意：加个例子');   // 指令可覆盖（改主意）
+    assert.equal(readRewriteRequests(dir).length, 1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

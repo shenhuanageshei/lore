@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
-  readSyncConfig, readRunnerPid, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
+  readSyncConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
 import { isAlive } from './lib/serve.js';
 
 const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
@@ -82,11 +82,12 @@ export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
     if (!res.headersSent) res.writeHead(500);
     res.end();
   });
-  // no-cache（≠no-store）：每次 revalidate。本地 127.0.0.1 毫秒级零体感，
-  // 根治浏览器 module 缓存旧 shell.mjs（缺新 export → import 炸 → 整壳白屏）。
+  // no-store：本地工具彻底不缓存。no-cache 无验证器（无 Last-Modified/ETag）时，
+  // 浏览器对 SPA fetch 仍可能吃 disk cache → 显示旧 wiki 页 / 旧 shell.mjs（白屏）。
+  // 127.0.0.1 毫秒级重下，零体感——用 no-store 根治，别留缓存歧义。
   res.writeHead(200, {
     'content-type': MIME[extname(full)] ?? 'application/octet-stream',
-    'cache-control': 'no-cache',
+    'cache-control': 'no-store',
   });
   stream.pipe(res);
 }
@@ -147,8 +148,7 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
       let lastFinalize = null;
       try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
       catch { /* 无 manifest（未 sync）→ null */ }
-      const pid = readRunnerPid(stateDir);
-      return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: pid != null && isAlive(pid) });
+      return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: runnerAlive(stateDir, isAlive) });
     }
 
     if (req.method === 'POST' && pathname === '/api/sync/config') {
@@ -207,7 +207,10 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
           const body = await readJson(req);
           const page = String(body.page ?? '');
           if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
-          return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page }) });
+          // 重写/改进：透传用户指令（截断防滥用）；无指令 = 排队/同步语义
+          const instruction = body.instruction != null && String(body.instruction).trim()
+            ? String(body.instruction).slice(0, 500) : undefined;
+          return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page, instruction }) });
         } catch { return sendJson(res, 400, { error: 'bad json' }); }
       }
     }
@@ -260,10 +263,13 @@ sel.onchange=()=>{document.documentElement.setAttribute('data-theme',sel.value);
 </script></body></html>`;
 }
 
-// 单机共享门户：一个端口聚合本机所有 lore repo。repoMap: { name -> loreDir }。
-// MVP 只读：/<name>/api/… 一律 404（无 write 面 → 无 DNS-rebind 写风险）。配合 .listen 仅绑 127.0.0.1。
-export function createPortalServer(repoMap) {
+// 单机共享门户：一个端口聚合本机所有 lore repo。
+// 入参可为固定 map { name -> loreDir } 或 **函数** ()=>map——传函数则每请求重读 registry，
+// 新 /lore:init 的仓库免重启 portal 自动出现在路由+切仓下拉（修「启动快照」bug）。
+export function createPortalServer(repoMapOrFn) {
+  const getMap = typeof repoMapOrFn === 'function' ? repoMapOrFn : () => repoMapOrFn;
   return http.createServer(async (req, res) => {
+    const repoMap = getMap();
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
@@ -301,7 +307,16 @@ export function createPortalServer(repoMap) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [, , rootDir, portStr] = process.argv;
   if (!rootDir || !portStr) { console.error('usage: node server.js <rootDir> <port>'); process.exit(1); }
-  createServer(rootDir).listen(Number(portStr), '127.0.0.1',
+  const srv = createServer(rootDir);
+  // EADDRINUSE: the port was stolen between start()'s probe and our bind (findPort TOCTOU).
+  // Exit cleanly with a diagnostic instead of crashing as an uncaught 'error' event — lib/serve.js
+  // start() watches for this non-zero exit and re-rolls the port. stdio is 'ignore' under start(),
+  // so the message only surfaces when server.js is run by hand, which is exactly when it's useful.
+  srv.on('error', (e) => {
+    console.error(`lore: server failed to bind 127.0.0.1:${portStr}: ${e.code || e.message}`);
+    process.exit(1);
+  });
+  srv.listen(Number(portStr), '127.0.0.1',
     () => console.log(`lore static server on 127.0.0.1:${portStr} root=${rootDir}`));
   // B2 ticker：统一调度静默期与 schedule。判定+触发在 runner.tickAuto（与 portal 共用，永不抛）。
   // 动态 import——ticker 是进程级关注点，不把判定链拖进 createServer 工厂（测试零影响）。

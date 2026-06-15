@@ -4,9 +4,55 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, re
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook, discoverDocs, findMetaDoc } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
+
+test('discoverDocs: 探测含≥3 md 的目录（排噪音）+ 子目录元文档', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-dd-'));
+  try {
+    mkdirSync(join(root, 'sub', 'docs', 'specs'), { recursive: true });
+    for (const f of ['a.md', 'b.md', 'c.md']) writeFileSync(join(root, 'sub', 'docs', 'specs', f), '# x');
+    writeFileSync(join(root, 'sub', 'CHANGELOG.md'), '## [1.0.0] — 2026-01-01');
+    writeFileSync(join(root, 'sub', 'README.md'), '# proj');
+    mkdirSync(join(root, 'sub', 'node_modules', 'pkg'), { recursive: true });
+    for (const f of ['x.md', 'y.md', 'z.md', 'w.md']) writeFileSync(join(root, 'sub', 'node_modules', 'pkg', f), '# n');
+    const r = discoverDocs(root);
+    assert.ok(r.docsGlobs.some(g => g.replace(/\\/g, '/') === 'sub/docs/specs/**/*.md'));
+    assert.ok(!r.docsGlobs.some(g => g.includes('node_modules')));
+    assert.equal(r.metaDocs.find(m => m.kind === 'changelog')?.path.replace(/\\/g, '/'), 'sub/CHANGELOG.md');
+    assert.equal(r.metaDocs.find(m => m.kind === 'readme')?.path.replace(/\\/g, '/'), 'sub/README.md');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverDocs: 根目录散落 md 不当 docs 根（下钻到专门 docs/ 子目录）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-ddroot-'));
+  try {
+    // 根散 3 个 md（CHANGELOG/README/skills 式，游戏/代码仓库常态）
+    for (const f of ['CHANGELOG.md', 'README.md', 'NOTES.md']) writeFileSync(join(root, f), '# x');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    for (const f of ['a.md', 'b.md', 'c.md']) writeFileSync(join(root, 'docs', f), '# d');
+    // 第三方插件目录（addons，Godot 式）里的 md 不算本仓文档
+    mkdirSync(join(root, 'addons', 'plugin'), { recursive: true });
+    for (const f of ['p.md', 'q.md', 'r.md']) writeFileSync(join(root, 'addons', 'plugin', f), '# third');
+    const r = discoverDocs(root);
+    assert.ok(!r.docsGlobs.includes('**/*.md'));                                       // 不把全仓当 docs
+    assert.equal(r.docsGlobs[0].replace(/\\/g, '/'), 'docs/**/*.md');                  // 专门 docs/ 优先（取 [0]）
+    assert.ok(!r.docsGlobs.some(g => g.includes('addons')));                           // 第三方插件目录排除
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('findMetaDoc: 根优先，否则一层子目录（排噪音）；缺 → null', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-fm-'));
+  try {
+    assert.equal(findMetaDoc(root, 'CHANGELOG.md'), null);
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'CHANGELOG.md'), 'x');
+    assert.equal(findMetaDoc(root, 'CHANGELOG.md').replace(/\\/g, '/'), 'app/CHANGELOG.md');
+    writeFileSync(join(root, 'CHANGELOG.md'), 'x');
+    assert.equal(findMetaDoc(root, 'CHANGELOG.md'), 'CHANGELOG.md');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test('scaffold creates journal/wiki/site/.state and is idempotent', () => {
   const root = tmpRepo();
@@ -158,6 +204,19 @@ test('renderConfigYaml includes language defaults', () => {
   assert.match(out, /available: \[en\]/);
 });
 
+test('renderConfigYaml: 注入发现的 docs_glob + 元文档 sources', () => {
+  const yaml = renderConfigYaml(['sub/m1'], { docsGlobs: ['sub/docs/**/*.md'], metaDocs: [{ kind: 'changelog', path: 'sub/CHANGELOG.md' }, { kind: 'readme', path: 'sub/README.md' }] });
+  assert.match(yaml, /docs_glob:\s*sub\/docs\/\*\*\/\*\.md/);
+  assert.match(yaml, /sources:\s*\[[^\]]*changelog[^\]]*\]/);
+  assert.match(yaml, /sources:\s*\[[^\]]*readme[^\]]*\]/);
+  assert.match(yaml, /sources:\s*\[[^\]]*claude_md_pitfalls[^\]]*\]/);
+});
+
+test('renderConfigYaml: 无发现结果 → 默认 docs/**/*.md（向后兼容）', () => {
+  const yaml = renderConfigYaml(['lib']);
+  assert.match(yaml, /docs_glob:\s*docs\/\*\*\/\*\.md/);
+});
+
 function fakeSrcSite() {
   const src = mkdtempSync(join(tmpdir(), 'lore-srcsite-'));
   writeFileSync(join(src, 'index.html'), '<!doctype html>shell');
@@ -198,8 +257,11 @@ test('init re-run keeps user-edited config.yml, still refreshes shell', () => {
     writeFileSync(cfg, '# user edited\naxes: {}\n');                    // simulate user edit
     writeFileSync(join(src, 'index.html'), '<!doctype html>UPGRADED');  // engine upgraded shell
     const r2 = init({ repoRoot: root, srcSiteDir: src });
-    assert.equal(r2.configWritten, false);
-    assert.equal(readFileSync(cfg, 'utf8'), '# user edited\naxes: {}\n'); // preserved
+    assert.equal(r2.configWritten, false);                               // 不整文件覆盖
+    const cfgText = readFileSync(cfg, 'utf8');
+    assert.ok(cfgText.startsWith('# user edited\naxes: {}\n'));          // 用户行逐字保留为前缀
+    assert.match(cfgText, /^language:/m);                                // 迁移补缺块 append 其后
+    assert.doesNotMatch(cfgText, /^  docs:/m);                           // axes 是 inline form → 锚不识别，二级不强插
     assert.equal(readFileSync(join(root, '.lore', 'site', 'index.html'), 'utf8'), '<!doctype html>UPGRADED'); // refreshed
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -220,7 +282,7 @@ test('CLI: node lib/init.js <repo> initializes, prints summary, registers for po
     assert.equal(existsSync(join(root, '.lore', 'site', 'shell.mjs')), true);
     // init 把本 repo 登记进（隔离的）portal registry
     const repos = JSON.parse(readFileSync(join(home, '.lore', 'repos.json'), 'utf8'));
-    assert.equal(repos.some(e => e.loreDir === join(root, '.lore')), true);
+    assert.equal(repos.some(e => e.loreDir === join(root, '.lore').replace(/\\/g, '/')), true);   // registerRepo 归一正斜杠
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

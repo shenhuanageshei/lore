@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { docsExtractor, changelogExtractor, pitfallsExtractor, buildDocsAxis } from '../lib/docs.js';
+import { docsExtractor, changelogExtractor, pitfallsExtractor, buildDocsAxis, readmeExtractor, roadmapExtractor } from '../lib/docs.js';
 import { existsSync as exists } from 'node:fs';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-docs-')); }
@@ -93,6 +93,57 @@ test('changelogExtractor: file with no version headings → []', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('changelogExtractor: ## 标题 (date) 格式也认（无方括号版本号，真实世界常见）', () => {
+  const root = tmp();
+  try {
+    writeFileSync(join(root, 'CHANGELOG.md'),
+      '# Changelog\n\n## 修复推文管道早退 (2026-06-11)\n- x\n\n## 文档结构整理 (2026-06-10)\n- y\n');
+    const specs = changelogExtractor(root);
+    assert.equal(specs[0].entries.length, 2);
+    assert.equal(specs[0].entries[0].date, '2026-06-11');
+    assert.match(specs[0].entries[0].version, /修复推文管道早退/);
+    assert.doesNotMatch(specs[0].entries[0].version, /2026/);   // date 已剥离
+    assert.equal(specs[0].date, '2026-06-11');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('changelogExtractor: 子目录 CHANGELOG 也能收（threat-intel 式代码在子目录）', () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'CHANGELOG.md'), '## [1.2.0] — 2026-06-01\n- x\n## [1.1.0] — 2026-05-01\n- y');
+    const specs = changelogExtractor(root);
+    assert.equal(specs.length, 1);
+    assert.equal(specs[0].id, 'changelog');
+    assert.match(specs[0].sourcePath.replace(/\\/g, '/'), /app\/CHANGELOG\.md/);
+    assert.equal(specs[0].entries.length, 2);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('readmeExtractor: 子目录 README → 单页，首段为 summary', () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'README.md'), '# My Project\n\n一句话介绍这个项目。\n\n## 安装\n\nsteps');
+    const specs = readmeExtractor(root);
+    assert.equal(specs[0].id, 'readme');
+    assert.equal(specs[0].title, 'My Project');
+    assert.match(specs[0].summary, /一句话介绍/);
+    assert.match(specs[0].sourcePath.replace(/\\/g, '/'), /app\/README\.md/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('roadmapExtractor: 缺 ROADMAP → []；存在 → 单页', () => {
+  const root = tmp();
+  try {
+    assert.deepEqual(roadmapExtractor(root), []);
+    writeFileSync(join(root, 'ROADMAP.md'), '# 路线图\n\n这是路线图概述。\n');
+    const specs = roadmapExtractor(root);
+    assert.equal(specs[0].id, 'roadmap');
+    assert.equal(specs[0].title, '路线图');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('pitfallsExtractor: Problem/Fix/Prevention blocks → single folded spec', () => {
   const root = tmp();
   try {
@@ -123,7 +174,7 @@ import { renderDocsPage } from '../lib/docs.js';
 
 test('renderDocsPage: spec with body → embeds body, plain-text source ref, no link, no # docs:', () => {
   const md = renderDocsPage({ id: 'a', title: 'Doc A', summary: 'about A', sourcePath: 'docs/a.md', date: '2026-06-04', body: '# Doc A\n\nfull content here.\n' });
-  assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\ngroup: 项目状态\n---/);
+  assert.match(md, /^---\ntitle: Doc A\nsummary: about A\nsource_path: docs\/a\.md\nlast_updated: 2026-06-04\ngroup: 其它\n---/);
   assert.match(md, /> 源文档：`docs\/a\.md`/);     // plain-text reference
   assert.match(md, /# Doc A\n\nfull content here\./); // body embedded verbatim
   assert.doesNotMatch(md, /\]\(\.\.\/\.\.\/\.\.\//);  // NO markdown link → no 404
@@ -215,14 +266,22 @@ test('buildDocsAxis: returns specs sorted by date desc (tiebreak id)', () => {
 
 import { docGroup, pairDocs } from '../lib/docs.js';
 
-test('docGroup: superpowers specs/plans → 设计与计划；notes → notes；其余 → 项目状态', () => {
-  assert.equal(docGroup('docs/superpowers/specs/2026-06-08-x-design.md'), '设计与计划');
-  assert.equal(docGroup('docs/superpowers/plans/2026-06-08-x.md'), '设计与计划');
-  assert.equal(docGroup('docs/superpowers/notes/2026-06-02-y.md'), 'notes');
+test('docGroup: 元文档→项目状态；语义子目录段映射；未知→其它；win 反斜杠容错', () => {
+  // 元文档（不论路径）→ 项目状态（置顶组）
   assert.equal(docGroup('docs/ROADMAP.md'), '项目状态');
-  assert.equal(docGroup('CHANGELOG.md'), '项目状态');           // 折叠页 sourcePath
-  assert.equal(docGroup('CLAUDE.md'), '项目状态');              // pitfalls
-  assert.equal(docGroup('docs\\superpowers\\specs\\2026-06-08-w-design.md'), '设计与计划');   // win 反斜杠容错
+  assert.equal(docGroup('CHANGELOG.md'), '项目状态');
+  assert.equal(docGroup('threat-intel/README.md'), '项目状态');
+  assert.equal(docGroup('CLAUDE.md'), '项目状态');                          // pitfalls
+  // 语义子目录段
+  assert.equal(docGroup('docs/superpowers/specs/2026-06-08-x-design.md'), '设计');
+  assert.equal(docGroup('docs/superpowers/plans/2026-06-08-x.md'), '计划');
+  assert.equal(docGroup('threat-intel/docs/debugging/x.md'), '调试');
+  assert.equal(docGroup('threat-intel/docs/api/x.md'), '接口');
+  assert.equal(docGroup('threat-intel/docs/architecture/x.md'), '架构');
+  assert.equal(docGroup('docs/superpowers/notes/2026-06-02-y.md'), '笔记');
+  assert.equal(docGroup('docs\\superpowers\\specs\\2026-06-08-w-design.md'), '设计');   // win 反斜杠容错
+  // 未知 → 其它
+  assert.equal(docGroup('threat-intel/docs/DEPLOY.md'), '其它');
 });
 
 test('pairDocs: 同 date+slug 的 spec↔plan 配对；date 同 slug 异不配；孤页不标', () => {
@@ -254,11 +313,11 @@ test('buildDocsAxis: 物化页 frontmatter 含 group；配对 spec 含 paired_pl
     buildDocsAxis(lore, root, { sources: ['docs'], docsGlob: 'docs/**/*.md' });
 
     const spec = readFileSync(join(lore, 'wiki', 'docs', 'superpowers-specs-2026-06-08-thing-design.md'), 'utf8');
-    assert.match(spec, /^group: 设计与计划$/m);
+    assert.match(spec, /^group: 设计$/m);
     assert.match(spec, /^paired_plan: superpowers-plans-2026-06-08-thing$/m);
 
     const plan = readFileSync(join(lore, 'wiki', 'docs', 'superpowers-plans-2026-06-08-thing.md'), 'utf8');
-    assert.match(plan, /^group: 设计与计划$/m);
+    assert.match(plan, /^group: 计划$/m);
     assert.doesNotMatch(plan, /paired_plan/);            // plan 侧不标
 
     const rm = readFileSync(join(lore, 'wiki', 'docs', 'ROADMAP.md'), 'utf8');

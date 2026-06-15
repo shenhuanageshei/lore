@@ -100,6 +100,41 @@ test('buildMeta produces freshness chips (stale and fresh)', () => {
   assert.equal(fresh.chips.some(c => /14 atoms/.test(c.text)), true);
 });
 
+test('buildMeta: stale chip 带排队 action 与 path（点击即排队，不再误导跑 sync）；fresh 无 action', () => {
+  const m = buildMeta({ stale: 12, path: 'theme/ioc.md', last_updated: 'x', code_sha: 'y' });
+  const stale = m.chips.find(c => c.kind === 'stale');
+  assert.equal(stale.action, 'queue');
+  assert.equal(stale.path, 'theme/ioc.md');
+  assert.match(stale.text, /点击排队同步/);     // 机械徽标 = 排队同步（追代码），「重写」专给带指令按钮
+  assert.doesNotMatch(stale.text, /lore:sync/);
+  const f = buildMeta({ stale: 0, path: 'a.md' });
+  assert.equal(f.chips.find(c => c.kind === 'fresh').action, undefined);
+});
+
+test('buildMeta: component/flow 缺架构图(hasDiagram=false)→ 可点击排队徽标；有图/非检测轴不报', () => {
+  const miss = buildMeta({ axis: 'component', hasDiagram: false, path: 'component/art.md', stale: 0 });
+  const chip = miss.chips.find(c => /缺架构图/.test(c.text));
+  assert.ok(chip);
+  assert.equal(chip.action, 'queue');
+  assert.equal(chip.path, 'component/art.md');
+  const has = buildMeta({ axis: 'component', hasDiagram: true, path: 'component/lib.md', stale: 0 });
+  assert.ok(!has.chips.some(c => /缺架构图/.test(c.text)));        // 有图不报
+  const docs = buildMeta({ axis: 'docs', path: 'docs/x.md', last_updated: 'x' });
+  assert.ok(!docs.chips.some(c => /缺架构图/.test(c.text)));       // docs 不检测（无 hasDiagram 字段）
+});
+
+test('buildMeta: 深度页缺机制详解(hasMechanism=false)→ 可点击排队徽标；有档/鸟瞰页不报', () => {
+  const miss = buildMeta({ axis: 'component', hasMechanism: false, hasDiagram: true, path: 'component/sync.md', stale: 0 });
+  const chip = miss.chips.find(c => /缺机制详解/.test(c.text));
+  assert.ok(chip);
+  assert.equal(chip.action, 'queue');
+  assert.equal(chip.path, 'component/sync.md');
+  const has = buildMeta({ axis: 'component', hasMechanism: true, hasDiagram: true, path: 'component/runner.md', stale: 0 });
+  assert.ok(!has.chips.some(c => /缺机制详解/.test(c.text)));       // 有机制档不报
+  const birdseye = buildMeta({ axis: 'component', hasDiagram: true, path: 'component/lib.md', stale: 0 });
+  assert.ok(!birdseye.chips.some(c => /缺机制详解/.test(c.text)));  // 鸟瞰页（无 hasMechanism 字段）不报
+});
+
 test('renderMarkdown renders ```mermaid as <div class="mermaid">, escaped not <pre>', () => {
   const html = renderMarkdown('```mermaid\nflowchart TD\nA-->B\n```');
   assert.match(html, /<div class="mermaid">/);

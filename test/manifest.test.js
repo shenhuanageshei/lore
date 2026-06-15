@@ -110,6 +110,8 @@ test('emitManifest builds axes->pages with stale + provenance', () => {
     assert.equal(page.stale, 3);                  // def5678 != HEAD
     assert.equal(page.code_sha, 'def5678');
     assert.deepEqual(page.synthesized_from, { atoms: 8, commits: 5 });
+    assert.equal(page.hasDiagram, false);          // component 页 m3_nlp 无 mermaid → 缺图标记（质量门）
+    assert.equal(page.hasMechanism, undefined);    // 非深度页（无分组）不检测机制档
     const theme = m.axes.find(a => a.id === 'theme');
     assert.equal(theme.pages[0].stale, 0);        // abc1234 == HEAD
   } finally {
@@ -397,21 +399,34 @@ test('emitManifest: docs 轴组间固定序 + 组内时间降序 + paired_plan �
     const page = (id, group, date, extra = '') =>
       writeFileSync(join(wiki, 'docs', `${id}.md`),
         `---\ntitle: ${id}\nsummary: s\nlast_updated: ${date}\ngroup: ${group}\n${extra}---\nbody\n`);
-    page('old-spec', '设计与计划', '2026-06-01', 'paired_plan: old-plan\n');
-    page('old-plan', '设计与计划', '2026-06-01');
-    page('new-spec', '设计与计划', '2026-06-09');
+    page('old-spec', '设计', '2026-06-01', 'paired_plan: old-plan\n');
+    page('old-plan', '计划', '2026-06-01');
+    page('new-spec', '设计', '2026-06-09');
     page('changelog', '项目状态', '2026-06-07');
     page('ROADMAP', '项目状态', '');
-    page('a-note', 'notes', '2026-06-02');
+    page('a-note', '笔记', '2026-06-02');
     const m = emitManifest({
       wikiDir: wiki, currentSha: 'cur', countCommitsSince: () => 0, now: 't0',
     });
     const docs = m.axes.find(a => a.id === 'docs');
     assert.deepEqual(docs.pages.map(p => p.id),
-      ['changelog', 'ROADMAP', 'new-spec', 'old-plan', 'old-spec', 'a-note']);
-      // 项目状态(时间降序,无日期垫底) → 设计与计划(同上;同日期 id 字母序) → notes
+      ['changelog', 'ROADMAP', 'new-spec', 'old-spec', 'old-plan', 'a-note']);
+      // 项目状态(时间降序,无日期垫底) → 设计(降序) → 计划 → 笔记
     assert.equal(docs.pages.find(p => p.id === 'old-spec').paired_plan, 'old-plan');
     assert.equal(docs.pages.find(p => p.id === 'changelog').paired_plan, '');
     assert.equal(docs.pages.find(p => p.id === 'changelog').group, '项目状态');   // frontmatter 优先
+  } finally { rmSync(wiki, { recursive: true, force: true }); }
+});
+
+test('pageEntry: sections 节索引进 manifest（##/### + ①-⑧）', () => {
+  const wiki = mkdtempSync(join(tmpdir(), 'lore-sec-'));
+  try {
+    mkdirSync(join(wiki, 'component'), { recursive: true });
+    writeFileSync(join(wiki, 'component', 'x.md'),
+      '---\ntitle: X\ncode_sha: c\n---\n# x\n\n## 概览\n\np\n\n## 机制详解\n\n<details>\n<summary><b>① 接口</b></summary>\nb\n</details>\n');
+    const m = emitManifest({ wikiDir: wiki, currentSha: 'c', countCommitsSince: () => 0, now: 't' });
+    const page = m.axes.find(a => a.id === 'component').pages[0];
+    assert.deepEqual(page.sections.map(s => s.heading), ['概览', '机制详解', '① 接口']);
+    assert.equal(typeof page.sections[0].line, 'number');
   } finally { rmSync(wiki, { recursive: true, force: true }); }
 });

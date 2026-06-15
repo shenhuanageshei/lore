@@ -10,16 +10,18 @@ axes:
     deep:                      # 源文件级深度页；按流水线分组（捕获→合成）驱动侧栏排序
       lib:
         捕获: [hook, mine, fold]
-        合成: [sync, manifest, fingerprint]
+        合成: [sync, manifest, fingerprint, syncstate, runner]
   flow:                      # 声明轴 — "数据怎么端到端跑"（示例，按需填）
     values: []
     # - { id: article-pipeline, spans: [lib] }
   theme:                     # 自定义横切轴 — "这条长期主线怎么演进"（示例，按需填）
     values: []
     # - { id: quality, desc: "质量保证", match: [质量, accuracy, 误报] }
-  docs:                      # 文档轴 — docs/ + CHANGELOG + CLAUDE.md 收进 wiki（机械、物化视图）
-    sources: [docs, changelog]
+  docs:                      # 文档轴 — docs/ + CHANGELOG + CLAUDE.md 踩坑 收进 wiki（机械、物化视图）
+    sources: [docs, changelog, claude_md_pitfalls]
     docs_glob: docs/**/*.md
 journal:
   hook: true                 # post-commit hook 已装（每 commit 写 journal 骨架原子）
   mine: [commits, changelog, claude_md_pitfalls]
+
+# resident: true             # CLAUDE.md 注入 + .mcp.json 注册开关（false 关；详见 README agent 常驻）

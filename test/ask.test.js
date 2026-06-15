@@ -5,9 +5,23 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { searchPages } from '../lib/ask.js';
+import { searchPages, formatHits } from '../lib/ask.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-ask-')); }
+
+test('formatHits: 默认带节切片内容；--paths 只列路径；长节截断；空→提示', () => {
+  const hits = [{ axis: 'component', id: 'lib', title: 'Lib', path: 'component/lib.md', score: 2, section: '① 接口' }];
+  const page = '# x\n\n<details>\n<summary><b>① 接口</b> —— 导出</summary>\n\nf(a) → b\n\n</details>\n';
+  const readPage = () => page;
+  const def = formatHits(hits, { readPage });
+  assert.match(def, /component\/lib\.md#① 接口/);              // 路径#节
+  assert.match(def, /f\(a\) → b/);                             // 切片内容（不只路径）
+  const paths = formatHits(hits, { paths: true, readPage });
+  assert.equal(paths, 'component/lib.md#① 接口');               // --paths 只列路径
+  const bigPage = '# x\n\n<details>\n<summary><b>① 接口</b> —— 导出</summary>\n\n' + 'A'.repeat(3000) + '\n\n</details>\n';
+  assert.match(formatHits(hits, { readPage: () => bigPage, sliceCap: 500 }), /截断/);
+  assert.equal(formatHits([], {}), 'no matching pages');
+});
 
 const MANIFEST = {
   axes: [
@@ -83,4 +97,18 @@ test('integration: init → write page → sync → ask finds it', () => {
     const out = execFileSync('node', ['lib/ask.js', lore, 'dedup accuracy'], { cwd: process.cwd() }).toString();
     assert.match(out, /component\/lib\.md/);   // ask finds the page by its summary keywords
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('searchPages: 节级命中（heading 含词）→ 带 section 字段，分数并入；id 进搜索域', () => {
+  const manifest = { axes: [{ id: 'component', pages: [
+    { id: 'fp', title: '指纹层', summary: '', path: 'component/fp.md',
+      sections: [{ heading: '⑤ 边界 / 坑', line: 30 }, { heading: '概览', line: 5 }] },
+  ] }] };
+  const hits = searchPages(manifest, '边界');
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].section, '⑤ 边界 / 坑');     // 命中节
+  assert.ok(hits[0].score >= 1);
+  const pageHit = searchPages(manifest, '指纹');
+  assert.equal(pageHit[0].section, undefined);       // 页级命中无 section
+  assert.equal(searchPages(manifest, 'fp')[0].id, 'fp');   // 英文 slug 可搜
 });

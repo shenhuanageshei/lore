@@ -10,3 +10,6 @@ rtk/
 # preview self-test (local debug tooling, not project code)
 .claude/
 .preview-serve.cjs
+.lore/wiki/
+.lore/site/
+.claude/settings.local.json

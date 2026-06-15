@@ -11,6 +11,7 @@ description: 启动/停止单机共享门户，一个端口聚合本机所有 lo
 - `/lore:portal start` —— 启动门户（已在跑则幂等返回 URL）
 - `/lore:portal stop` —— 停止门户
 - `/lore:portal list` —— 列出本机已登记的 lore 仓库
+- `/lore:portal autostart`（或 `autostart off`）—— 开机自启（Windows：Startup 文件夹 vbs，登录后台静默起 portal）
 
 ## 行为
 

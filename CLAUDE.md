@@ -1,7 +1,7 @@
 <!-- LORE_RESIDENT:START -->
 ## lore wiki（本仓库的活文档）
 
-本 repo 由 lore 维护多轴 wiki（83 页 · 8 个组件深度页 · 最后更新 2026-06-14）。
+本 repo 由 lore 维护多轴 wiki（83 页 · 8 个组件深度页 · 最后更新 2026-06-15）。
 **理解架构/查模块/查决策时，先用 wiki 建框架、再按锚点下钻源码——别一上来全文 grep。**
 - **建框架**：`lore_ask "<关键词>"`（返回命中节切片，含内容）→ `lore_page view=agent`（跳概览+决策史，只看机制骨架，省约 60% token）。无 MCP 时跑 `node <lore>/lib/ask.js .lore "<关键词>"` 或读 `.lore/wiki/INDEX.md` 定位。
 - **精准下钻**：wiki 页内锚点写作 `func @ file`——顺锚点直接 Read 那个函数/文件，不要全文 grep（wiki 是带导航的源码地图）。
@@ -38,3 +38,11 @@
 **问题**：重写后的 wiki 页浏览器顽固显示旧内容，且 server 端 curl 已证实是新版——疑似缓存但响应头已设 `no-cache`。
 **修复**：`no-cache` ≠ `no-store`——无验证器（Last-Modified/ETag）时浏览器对 SPA fetch 仍吃 disk cache；serveStatic 改发 `no-store` 彻底不缓存（127.0.0.1 重下零体感）。
 **预防**：本地工具的动态内容（wiki md / manifest / shell.mjs）用 `no-store` 不用 `no-cache`，别留缓存歧义——否则「server 是新的、用户看到旧的」会反复甩锅缓存却治不了。
+
+**问题**：auto 档表面亮着、底下永不重写——机器重启后旧 runner 的 pid 被别的进程复用，而 runner.pid 只存裸 pid，`isAlive` 误判 true，ticker 永以为「runner 在跑」不再触发（实测 jpm 锁着已复用的 27064、auto-runs 却从没跑完一轮）。
+**修复**：runner.pid 改存 `{pid, ts}`，`runnerAlive` 要求进程活 **且** pid 未超龄（`RUNNER_STALE_MS`）；旧格式无 ts 自动判过期，开机自愈。
+**预防**：拿进程存活当互斥锁必带时间戳兜底——pid 会复用（重启后尤甚），`isAlive(pid)` 只答「这号有进程」、不答「还是我那个」。
+
+**问题**：约一半 component 页 auto 重写撞 600s timeout 永过不去（与上「回吐物化区」不同根因：这次是 token 态下纯读源码慢）——成功的 scripts.md 就吃 492s（上限 82%），autoload 实测需 625s，卡在 600s 外侧 25 秒、连续两轮被砍。
+**修复**：per-page timeout 600→1200s（正常 ~500s 的 2.4x 冗余）；`RUNNER_STALE_MS` 90→180min 联动，否则长轮被误判死 pid、ticker 双开 runner。
+**预防**：单页重写耗时由「读多少源码」定、不由页大小（最小的 art.md 反最慢）；timeout 给正常耗时留 2-3x 冗余别卡中位数。改 per-page timeout 必同步抬 stale 上限。

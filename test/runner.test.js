@@ -76,11 +76,18 @@ test('qualityGate: HOME 页查 HOME_STATUS 哨兵；普通页仍查 JOURNAL；�
   assert.equal(qualityGate(homeMat, '', { path: 'theme/x.md' }).ok, false);
 });
 
+test('qualityGate: HOME 无 mermaid 不判失败（首页图非必需，避免误杀正文）', () => {
+  const home = '---\ntitle: H\nsummary: s\n---\n# repo\n\n一句话定位。\n\n{{LORE_HOME_STATUS}}\n\n' + '导航与正文足够长免截断。'.repeat(10);
+  assert.deepEqual(qualityGate(home, '', { path: 'HOME.md' }), { ok: true });
+});
+
 test('axisPrompt: 四轴 prompt 关键词正确', () => {
   assert.match(axisPrompt({ axis: 'component', path: 'component/a.md' }), /两档页面标准/);
   assert.match(axisPrompt({ axis: 'theme', path: 'theme/x.md' }), /横切主线/);
   assert.match(axisPrompt({ axis: 'flow', path: 'flow/x.md' }), /端到端/);
   assert.match(axisPrompt({ axis: 'HOME', path: 'HOME.md' }), /LORE_HOME_STATUS/);
+  assert.match(axisPrompt({ axis: 'HOME', path: 'HOME.md' }), /本仓库总览/);
+  assert.doesNotMatch(axisPrompt({ axis: 'HOME', path: 'HOME.md' }), /Knowledge flow/i);
 });
 
 test('axisPrompt: theme/flow 含排版分层要求（小标题/表格，杜绝大段）', () => {

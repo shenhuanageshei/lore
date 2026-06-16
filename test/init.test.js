@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, re
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook, discoverDocs, findMetaDoc } from '../lib/init.js';
+import { scaffold, copyShell, ensureGitignore, discoverComponents, renderConfigYaml, init, installHook, discoverDocs, findMetaDoc, discoverDeepModules, discoverDeep } from '../lib/init.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-init-')); }
 
@@ -380,6 +380,81 @@ test('init installs the hook and sets config hook: true', () => {
     assert.equal(r.hook, 'installed');
     assert.equal(existsSync(join(root, '.git', 'hooks', 'post-commit')), true);
     assert.match(readFileSync(join(root, '.lore', 'config.yml'), 'utf8'), /hook: true/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(src, { recursive: true, force: true });
+  }
+});
+
+test('discoverDeepModules: scans top-level code files, strips extension, skips tests + __init__', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-deep-'));
+  try {
+    mkdirSync(join(root, 'lib'));
+    writeFileSync(join(root, 'lib', 'hook.js'), 'x');
+    writeFileSync(join(root, 'lib', 'sync.js'), 'x');
+    writeFileSync(join(root, 'lib', 'hook.test.js'), 'x');    // test → skip
+    writeFileSync(join(root, 'lib', 'spec.spec.ts'), 'x');    // spec → skip
+    writeFileSync(join(root, 'lib', '__init__.py'), '');      // py marker → skip
+    writeFileSync(join(root, 'lib', 'README.md'), '# x');     // non-code ext → skip
+    mkdirSync(join(root, 'lib', 'subdir'));                   // subdir → skip (files only)
+    writeFileSync(join(root, 'lib', 'subdir', 'inner.js'), 'x');
+    const mods = discoverDeepModules(join(root, 'lib'));
+    assert.deepEqual(mods, ['hook', 'sync']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverDeepModules: single-file code_root → [] (no sub-modules)', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-deep-file-'));
+  try {
+    writeFileSync(join(root, 'server.js'), 'x');
+    assert.deepEqual(discoverDeepModules(join(root, 'server.js')), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discoverDeepModules: missing path → []', () => {
+  assert.deepEqual(discoverDeepModules('/nonexistent/path/lib'), []);
+});
+
+test('discoverDeep: returns map keyed by code_root with modules, drops empty', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-deep-map-'));
+  try {
+    mkdirSync(join(root, 'lib'));
+    writeFileSync(join(root, 'lib', 'a.js'), 'x');
+    writeFileSync(join(root, 'lib', 'b.js'), 'x');
+    writeFileSync(join(root, 'server.js'), 'x');       // single file → dropped from deep map
+    mkdirSync(join(root, 'empty'));                     // dir but no code → dropped
+    const deep = discoverDeep(root, ['lib', 'server.js', 'empty']);
+    assert.deepEqual(deep, { lib: ['a', 'b'] });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('renderConfigYaml: generates deep block from discovered modules', () => {
+  const yaml = renderConfigYaml(['lib', 'server.js'], undefined, { deepDisc: { lib: ['hook', 'sync', 'runner'] } });
+  assert.match(yaml, /deep:\s*#/);                                       // deep 头 + 注释
+  assert.match(yaml, /lib: \[hook, sync, runner\]/);                     // 列 modules
+  assert.doesNotMatch(yaml, /server\.js: \[/);                           // 单文件不进 deep
+});
+
+test('renderConfigYaml: no deep discovery → comment skeleton (lets user fill)', () => {
+  const yaml = renderConfigYaml(['lib']);
+  assert.match(yaml, /deep:\s*#/);
+  assert.match(yaml, /#\s*<code_root>: \[mod1, mod2, \.\.\.\]/);          // 注释占位
+});
+
+test('init scaffolds config with deep block auto-populated from discovered modules', () => {
+  const root = tmpRepo();
+  const src = fakeSrcSite();
+  try {
+    mkdirSync(join(root, 'lib'));
+    writeFileSync(join(root, 'lib', 'a.js'), 'x');
+    writeFileSync(join(root, 'lib', 'b.js'), 'x');
+    writeFileSync(join(root, 'lib', 'a.test.js'), 'x');                  // must be skipped
+    const r = init({ repoRoot: root, srcSiteDir: src });
+    const cfg = readFileSync(join(root, '.lore', 'config.yml'), 'utf8');
+    assert.match(cfg, /deep:\s*#/);
+    assert.match(cfg, /lib: \[a, b\]/);                                   // 扫到的 modules
+    assert.doesNotMatch(cfg, /a\.test/);                                  // test 文件排除
+    assert.equal(r.configWritten, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(src, { recursive: true, force: true });

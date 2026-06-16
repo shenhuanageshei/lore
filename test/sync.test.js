@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { planSync, stampFrontmatter, buildIndex, finalizeSync, renderDecisionHistory, foldJournal } from '../lib/sync.js';
 import { init } from '../lib/init.js';
@@ -437,6 +437,32 @@ test('finalizeSync writes HOME before manifest and keeps INDEX', () => {
     assert.equal(existsSync(join(lore, 'wiki', 'INDEX.md')), true);
     const manifest = JSON.parse(readFileSync(join(lore, 'wiki', '.manifest.json'), 'utf8'));
     assert.deepEqual(manifest.axes.slice(0, 2).map(a => a.id), ['HOME', 'INDEX']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync: 脚手架 HOME 标题取 package.json name（无现有 HOME 时）', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'language:\n  default: zh\n  available: [zh]\n');
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'my-cli', version: '1.2.3' }));
+    finalizeSync(lore, '2026-06-06T00:00:00Z');
+    const home = readFileSync(join(lore, 'wiki', 'HOME.md'), 'utf8');
+    assert.match(home, /^# my-cli$/m);          // H1 用 package.json name，不再写死 lore
+    assert.doesNotMatch(home, /^# lore$/m);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync: 无 package.json 时 HOME 标题回退到仓库目录名', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'language:\n  default: zh\n  available: [zh]\n');
+    finalizeSync(lore, '2026-06-06T00:00:00Z');
+    const home = readFileSync(join(lore, 'wiki', 'HOME.md'), 'utf8');
+    assert.match(home, new RegExp('^# ' + basename(root) + '$', 'm'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

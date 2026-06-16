@@ -6,11 +6,16 @@ test('defaultHomePage contains the home status token and required sections', () 
   const md = defaultHomePage({ title: 'lore', axisPages: { component: [{ id: 'lib' }], docs: [{ id: 'pitfalls' }, { id: 'changelog' }] } });
   assert.match(md, /title: Home/);
   assert.match(md, /\{\{LORE_HOME_STATUS\}\}/);
-  assert.match(md, /## Knowledge flow/);
-  assert.match(md, /```mermaid/);
+  assert.match(md, /## Architecture overview/);
+  assert.doesNotMatch(md, /## Knowledge flow/);            // 不再印 lore 工具流程图
+  assert.doesNotMatch(md, /```mermaid/);                   // 脚手架占位无图；图由 LLM 重写时生成
   assert.match(md, /## Understand the project/);
   assert.match(md, /## Debug a problem/);
   assert.match(md, /## Decisions and timeline/);
+});
+
+test('defaultHomePage: title renders as the H1 heading', () => {
+  assert.match(defaultHomePage({ title: 'mal-analyze-cli', axisPages: {} }), /^# mal-analyze-cli$/m);
 });
 
 test('buildHomeStatus renders code, axes, language, and translation counts', () => {

@@ -3,6 +3,10 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.8.2] — 2026-06-24
+
+- **runner 重写页面 LLM 尝试 Write 工具而非输出 stdout**：LLM 调 Write 被 `--allowedTools Read,Grep,Glob` 拒绝后 stdout 只剩 "awaiting permission" 消息，质量门 `frontmatter missing title/summary` 全挂（analyst/theme/flow 页 100% 失败，只有偶然输出格式正确的 cli-local-agent-flow 幸存）——加 `--disallowedTools Write,Edit,Bash` 显式封杀 + prompt TAIL 强制指令「绝不调用写盘工具」。
+
 ## [0.8.1] — 2026-06-13
 
 - **docs 轴在子目录项目上重生**（threat-intel 连环暴露：74 篇文档一篇没收 → 全堆一组 → 元文档找不到）：

@@ -1030,6 +1030,53 @@ test('planSync rejects a code root symlink that escapes the repository', t => {
   }
 });
 
+test('planSync rejects a dangling deep-root directory link', t => {
+  const r = fzRepoDeepPython();
+  const linkDir = jN(r.root, 'mal_analyze', 'dangling');
+  const missingTarget = jN(r.root, '..', `${basename(r.root)}-missing-target`);
+  try {
+    try {
+      symlinkN(missingTarget, linkDir, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (err) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes(err.code)) {
+        t.skip(`directory links unavailable: ${err.code}`);
+        return;
+      }
+      throw err;
+    }
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze/dangling: [payload]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-root-invalid', deepRoot: 'mal_analyze/dangling',
+    }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync rejects a cyclic deep-root directory link', t => {
+  const r = fzRepoDeepPython();
+  const linkDir = jN(r.root, 'mal_analyze', 'cycle');
+  try {
+    try {
+      symlinkN(linkDir, linkDir, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (err) {
+      if (['EPERM', 'EACCES', 'ENOTSUP', 'EINVAL'].includes(err.code)) {
+        t.skip(`cyclic directory links unavailable: ${err.code}`);
+        return;
+      }
+      throw err;
+    }
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze/cycle: [payload]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-root-invalid', deepRoot: 'mal_analyze/cycle',
+    }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
 test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {
   const r = fzRepoDeep();
   try {

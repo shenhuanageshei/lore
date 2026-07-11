@@ -925,6 +925,25 @@ test('planSync skips ambiguous and invalid deep entries without blocking valid e
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
 
+test('planSync rejects a deep root that traverses outside the repository', () => {
+  const r = fzRepoDeepPython();
+  const escapeName = `${basename(r.root)}-escape`;
+  const escapeDir = jN(r.root, '..', escapeName);
+  const deepRoot = `mal_analyze/../../${escapeName}`;
+  try {
+    mdN(escapeDir, { recursive: true });
+    wfN(jN(escapeDir, 'payload.py'), 'PAYLOAD = 1\n');
+    wfN(jN(r.loreDir, 'config.yml'),
+      `axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      ${deepRoot}: [payload]\n`);
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{ kind: 'deep-root-invalid', deepRoot }]);
+  } finally {
+    rmN(r.root, { recursive: true, force: true });
+    rmN(escapeDir, { recursive: true, force: true });
+  }
+});
+
 test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {
   const r = fzRepoDeep();
   try {

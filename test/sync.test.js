@@ -944,6 +944,19 @@ test('planSync rejects a deep root that traverses outside the repository', () =>
   }
 });
 
+test('planSync rejects a normalized alias outside the configured deep-root segment', () => {
+  const r = fzRepoDeepPython();
+  const invalidRoot = 'other/../mal_analyze/native_enrichment';
+  try {
+    wfN(jN(r.loreDir, 'config.yml'),
+      `axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze: [cli]\n      ${invalidRoot}: [startup_paths]\n`);
+    const plan = pl(r.loreDir, { all: true });
+    assert.ok(plan.worklist.some(w => w.kind === 'deep' && w.id === 'cli'));
+    assert.equal(plan.worklist.some(w => w.kind === 'deep' && w.id === 'startup_paths'), false);
+    assert.deepEqual(plan.configIssues, [{ kind: 'deep-root-invalid', deepRoot: invalidRoot }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
 test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {
   const r = fzRepoDeep();
   try {

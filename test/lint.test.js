@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -82,7 +82,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], missingMechanism: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], missingMechanism: [], deepConfig: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -238,6 +238,77 @@ test('lintOrphans/lintMissing: deep 页不是孤儿、deep 缺页要报', () => 
   assert.deepEqual(lintMissing(['lib'], ['lib'], { lib: { order: ['sync'], groups: [] } }), ['sync']);
   // 不传 deep → 行为同旧（向后兼容）
   assert.deepEqual(lintOrphans(['lib', 'sync'], ['lib']), ['sync']);
+});
+
+test('lintDeepConfig: accepts configured code roots and nested roots', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'mal_analyze', 'native_enrichment'), { recursive: true });
+    writeFileSync(join(root, 'mal_analyze', 'cli.py'), '');
+    writeFileSync(join(root, 'mal_analyze', 'native_enrichment', 'startup_paths.py'), '');
+    assert.deepEqual(lintDeepConfig(root, ['mal_analyze'], {
+      mal_analyze: { order: ['cli'], groups: [] },
+      'mal_analyze/native_enrichment': { order: ['startup_paths'], groups: [] },
+    }), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintDeepConfig: rejects bare subpackages and similar prefixes', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'mal_analyze'), { recursive: true });
+    assert.deepEqual(lintDeepConfig(root, ['mal_analyze'], {
+      native_enrichment: { order: ['startup_paths'], groups: [] },
+      'mal_analyze_extra/sub': { order: ['x'], groups: [] },
+    }), [
+      { kind: 'invalid-root', deepRoot: 'native_enrichment', message: 'deep root must equal a code_root or be its child' },
+      { kind: 'invalid-root', deepRoot: 'mal_analyze_extra/sub', message: 'deep root must equal a code_root or be its child' },
+    ]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintDeepConfig: reports missing and ambiguous direct sources', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    writeFileSync(join(root, 'pkg', 'entry.py'), '');
+    writeFileSync(join(root, 'pkg', 'entry.js'), '');
+    assert.deepEqual(lintDeepConfig(root, ['pkg'], {
+      pkg: { order: ['absent', 'entry'], groups: [] },
+    }), [
+      { kind: 'missing-source', deepRoot: 'pkg', mod: 'absent', message: 'no supported source file found for pkg/absent' },
+      { kind: 'ambiguous-source', deepRoot: 'pkg', mod: 'entry', candidates: ['pkg/entry.js', 'pkg/entry.py'], message: 'multiple supported source files found for pkg/entry' },
+    ]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('invalid deep roots do not legitimize their module ids', () => {
+  const deep = { native_enrichment: { order: ['startup_paths'], groups: [] } };
+  assert.deepEqual(lintOrphans(['startup_paths'], ['mal_analyze'], deep), ['startup_paths']);
+});
+
+test('valid deep roots keep configured module ids legal when source resolution fails', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    const deep = { pkg: { order: ['absent'], groups: [] } };
+    assert.deepEqual(lintOrphans(['absent'], ['pkg'], deep, root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lint deepConfig diagnostics make lint unclean and appear in CLI output', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(root, 'mal_analyze'), { recursive: true });
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [mal_analyze]\n    deep:\n      native_enrichment: [startup_paths]\n');
+    const result = lint({ loreDir: lore });
+    assert.equal(result.deepConfig[0].kind, 'invalid-root');
+    assert.equal(result.clean, false);
+    const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
+    assert.match(out, /deep-config \(1\)/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 // --- mermaid 语法启发式校验（第五检）---

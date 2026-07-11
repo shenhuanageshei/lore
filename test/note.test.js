@@ -100,7 +100,7 @@ test('integration: mine 骨架 → enrich 短 sha → fold 后 why 演化追加�
     // journal 里同 id 两条（append-only）
     const atoms = readAllAtoms(join(lore, 'journal')).filter(a => a.id === `commit:${fullSha}`);
     assert.equal(atoms.length, 2);
-    assert.equal(atoms[1].enriched, true);
+    assert.equal(atoms.filter(a => a.enriched).length, 1);
     // fold 合并：why 演化追加、骨架 title 保留
     const folded = foldAtoms(atoms);
     assert.equal(folded.length, 1);

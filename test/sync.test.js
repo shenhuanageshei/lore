@@ -910,6 +910,28 @@ for (const heading of ['## 决策史', '## 决策历史', '## 决策历史 (Deci
   });
 }
 
+test('foldJournal: localized heading + sentinel region → replace content and canonicalize', () => {
+  const text = `# C\n\n## 决策历史\n\n${DH_START}\n- **old** (2026-05-01)\n${DH_END}\n\n## Cross-links\n`;
+  const out = foldJournal(text, '- **new** (2026-06-01)', { page: 'c.md', warn: () => {} });
+  assert.match(out, /^## Decision history$/m);
+  assert.doesNotMatch(out, /^## 决策历史$/m);
+  assert.match(out, /- \*\*new\*\* \(2026-06-01\)/);
+  assert.doesNotMatch(out, /old/);
+  assert.equal((out.match(/LORE_JOURNAL:START/g) || []).length, 1);
+  assert.equal((out.match(/LORE_JOURNAL:END/g) || []).length, 1);
+});
+
+test('foldJournal: English heading suffix remains compatible and canonicalizes', () => {
+  const text = '# C\n\n## Decision history (legacy)\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n';
+  const out = foldJournal(text, '- **new** (2026-06-01)', { page: 'c.md', warn: () => {} });
+  assert.match(out, /^## Decision history$/m);
+  assert.doesNotMatch(out, /^## Decision history \(legacy\)$/m);
+  assert.match(out, /- \*\*new\*\* \(2026-06-01\)/);
+  assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
+  assert.equal((out.match(/LORE_JOURNAL:START/g) || []).length, 1);
+  assert.match(out, /## Cross-links/);
+});
+
 test('planSync skips unresolved deep entries and reports configIssues', () => {
   const r = fzRepoDeepPython();
   try {

@@ -895,6 +895,21 @@ test('planSync resolves Python and nested deep worklist metadata', () => {
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
 
+for (const heading of ['## 决策史', '## 决策历史', '## 决策历史 (Decision history)']) {
+  test(`foldJournal: localized heading ${heading} → canonical idempotent sentinel region`, () => {
+    const text = `# C\n\n${heading}\n\n{{LORE_JOURNAL}}\n\n## Cross-links\n\n- [[x]]\n`;
+    const once = foldJournal(text, '- **a** (2026-06-01)', { page: 'c.md', warn: () => {} });
+    assert.match(once, /^## Decision history$/m);
+    assert.doesNotMatch(once, new RegExp(`^${heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+    assert.doesNotMatch(once, /\{\{LORE_JOURNAL\}\}/);
+    assert.equal((once.match(/LORE_JOURNAL:START/g) || []).length, 1);
+    assert.match(once, /## Cross-links\n\n- \[\[x\]\]/);
+
+    const twice = foldJournal(once, '- **a** (2026-06-01)', { page: 'c.md', warn: () => {} });
+    assert.equal(twice, once);
+  });
+}
+
 test('planSync skips unresolved deep entries and reports configIssues', () => {
   const r = fzRepoDeepPython();
   try {

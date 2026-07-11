@@ -130,7 +130,7 @@ plan 之前先读 `<loreDir>/.state/rewrite-requests.ndjson`（每行 `{ts, page
 
 - 只写 `title` + `summary` 半 front-matter；**别手写 `code_sha`/计数/日期** —— finalize 自动盖。
 - 「当前架构」段读真实源码写，别套泛词。
-- 「决策历史」段写占位符 `{{LORE_JOURNAL}}` —— finalize 自动用 journal 原子机械填充（按 component facet 过滤、ts 倒序）。先跑 `/lore:mine` 让 journal 有料。
+- 「决策历史」段写占位符 `{{LORE_JOURNAL}}` —— finalize 自动用 journal 原子机械填充（按 component facet 过滤、ts 倒序）。标题推荐写 `## Decision history`；也兼容 `## 决策史`、`## 决策历史`、`## 决策历史 (Decision history)`，finalize 后统一为英文 canonical 标题。先跑 `/lore:mine` 让 journal 有料。
 - 「交叉链接」段用 worklist 的全组件列表，链相关 sibling。
 - 跑完提示 `/lore:serve` 浏览。
 - theme 页讲横切主线（质量/性能/时效…）的演进，决策历史 token 自动折该 theme 的原子；先确保 config 的 `theme.values` 填了 + 跑过 `/lore:mine` 让原子带 theme facet。

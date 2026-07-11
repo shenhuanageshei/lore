@@ -240,6 +240,15 @@ test('lintOrphans/lintMissing: deep 页不是孤儿、deep 缺页要报', () => 
   assert.deepEqual(lintOrphans(['lib', 'sync'], ['lib']), ['sync']);
 });
 
+test('lintUnfolded: finalized page with localized decision-history heading and literal token → flagged', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    wikiPage(lore, 'component', 'lib', 'title: Lib\ncode_sha: abc1234', '# Lib\n\n## 决策历史\n\n{{LORE_JOURNAL}}\n');
+    assert.deepEqual(lintUnfolded(join(lore, 'wiki')), ['component/lib.md']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('lintDeepConfig: accepts configured code roots and nested roots', () => {
   const root = tmpDir();
   try {

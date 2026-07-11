@@ -909,6 +909,21 @@ test('planSync skips unresolved deep entries and reports configIssues', () => {
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
 
+test('planSync reports a missing source for a valid deep root not created yet', () => {
+  const r = fzRepoDeepPython();
+  try {
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze: [cli]\n      mal_analyze/not_created: [foo]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.ok(plan.worklist.some(w => w.kind === 'deep' && w.id === 'cli'));
+    assert.equal(plan.worklist.some(w => w.kind === 'deep' && w.id === 'foo'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-source-missing', deepRoot: 'mal_analyze/not_created', mod: 'foo',
+      expectedBase: 'mal_analyze/not_created/foo',
+    }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
 test('planSync skips ambiguous and invalid deep entries without blocking valid entries', () => {
   const r = fzRepoDeepPython();
   try {

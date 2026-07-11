@@ -6,6 +6,7 @@ rtk/
 
 # visual companion (brainstorm mockups)
 .superpowers/
+.worktrees/
 
 # preview self-test (local debug tooling, not project code)
 .claude/

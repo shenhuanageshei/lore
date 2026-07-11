@@ -1077,6 +1077,19 @@ test('planSync rejects a cyclic deep-root directory link', t => {
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
 
+test('planSync rejects a deep root whose ancestor is a file', () => {
+  const r = fzRepoDeepPython();
+  try {
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze/cli.py/subdir: [payload]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-root-invalid', deepRoot: 'mal_analyze/cli.py/subdir',
+    }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
 test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {
   const r = fzRepoDeep();
   try {

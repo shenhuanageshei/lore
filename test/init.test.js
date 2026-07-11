@@ -403,6 +403,17 @@ test('discoverDeepModules: scans top-level code files, strips extension, skips t
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('discoverDeepModules: recognizes mixed Python, shell, and JavaScript files', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-deep-mixed-'));
+  try {
+    mkdirSync(join(root, 'tools'));
+    writeFileSync(join(root, 'tools', 'analyze.py'), 'x');
+    writeFileSync(join(root, 'tools', 'build.sh'), 'x');
+    writeFileSync(join(root, 'tools', 'serve.js'), 'x');
+    assert.deepEqual(discoverDeepModules(join(root, 'tools')), ['analyze', 'build', 'serve']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('discoverDeepModules: single-file code_root → [] (no sub-modules)', () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-deep-file-'));
   try {

@@ -932,6 +932,24 @@ test('foldJournal: English heading suffix remains compatible and canonicalizes',
   assert.match(out, /## Cross-links/);
 });
 
+for (const heading of ['## 决策历史', '## Decision history']) {
+  test(`foldJournal: CRLF heading ${heading} → fold and canonicalize`, () => {
+    const text = `# C\r\n\r\n${heading}\r\n\r\n{{LORE_JOURNAL}}\r\n\r\n## Cross-links\r\n`;
+    const out = foldJournal(text, '- **new** (2026-06-01)', { page: 'c.md', warn: () => {} });
+    assert.match(out, /^## Decision history$/m);
+    assert.doesNotMatch(out, /\{\{LORE_JOURNAL\}\}/);
+    assert.equal((out.match(/LORE_JOURNAL:START/g) || []).length, 1);
+    assert.match(out, /## Cross-links\r\n/);
+  });
+}
+
+for (const heading of ['## Decision historybook', '## Decision history中文', '## 决策历史附录']) {
+  test(`foldJournal: lookalike heading ${heading} → no-op`, () => {
+    const text = `# C\n\n${heading}\n\n{{LORE_JOURNAL}}\n`;
+    assert.equal(foldJournal(text, '- **new**', { page: 'c.md', warn: () => {} }), text);
+  });
+}
+
 test('planSync skips unresolved deep entries and reports configIssues', () => {
   const r = fzRepoDeepPython();
   try {

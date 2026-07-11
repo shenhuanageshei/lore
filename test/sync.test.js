@@ -746,7 +746,7 @@ test('finalizeSync writes .graph.json with page/atom nodes and a facet edge', ()
 import { finalizeSync as fz } from '../lib/sync.js';
 import { readFingerprints as rfp } from '../lib/fingerprint.js';
 import { parseFrontmatter as pfm } from '../lib/manifest.js';
-import { mkdtempSync as mkN, rmSync as rmN, mkdirSync as mdN, writeFileSync as wfN, readFileSync as rdN } from 'node:fs';
+import { mkdtempSync as mkN, rmSync as rmN, mkdirSync as mdN, writeFileSync as wfN, readFileSync as rdN, symlinkSync as symlinkN } from 'node:fs';
 import { tmpdir as tmpN } from 'node:os';
 import { join as jN } from 'node:path';
 import { execFileSync as exN2 } from 'node:child_process';
@@ -955,6 +955,64 @@ test('planSync rejects a normalized alias outside the configured deep-root segme
     assert.equal(plan.worklist.some(w => w.kind === 'deep' && w.id === 'startup_paths'), false);
     assert.deepEqual(plan.configIssues, [{ kind: 'deep-root-invalid', deepRoot: invalidRoot }]);
   } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync rejects a deep root symlink that escapes the repository', t => {
+  const r = fzRepoDeepPython();
+  const escapeDir = jN(r.root, '..', `${basename(r.root)}-link-target`);
+  const linkDir = jN(r.root, 'mal_analyze', 'linked');
+  try {
+    mdN(escapeDir, { recursive: true });
+    wfN(jN(escapeDir, 'payload.py'), 'PAYLOAD = 1\n');
+    try {
+      symlinkN(escapeDir, linkDir, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (err) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes(err.code)) {
+        t.skip(`directory links unavailable: ${err.code}`);
+        return;
+      }
+      throw err;
+    }
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze/linked: [payload]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-root-invalid', deepRoot: 'mal_analyze/linked',
+    }]);
+  } finally {
+    rmN(r.root, { recursive: true, force: true });
+    rmN(escapeDir, { recursive: true, force: true });
+  }
+});
+
+test('planSync rejects a code root symlink that escapes the repository', t => {
+  const r = fzRepoDeepPython();
+  const escapeDir = jN(r.root, '..', `${basename(r.root)}-root-link-target`);
+  const linkDir = jN(r.root, 'linked_root');
+  try {
+    mdN(escapeDir, { recursive: true });
+    wfN(jN(escapeDir, 'payload.py'), 'PAYLOAD = 1\n');
+    try {
+      symlinkN(escapeDir, linkDir, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (err) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes(err.code)) {
+        t.skip(`directory links unavailable: ${err.code}`);
+        return;
+      }
+      throw err;
+    }
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [linked_root]\n    deep:\n      linked_root: [payload]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-root-invalid', deepRoot: 'linked_root',
+    }]);
+  } finally {
+    rmN(r.root, { recursive: true, force: true });
+    rmN(escapeDir, { recursive: true, force: true });
+  }
 });
 
 test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {

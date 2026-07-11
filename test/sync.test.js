@@ -33,7 +33,7 @@ test('planSync returns empty when config missing', () => {
   try {
     const lore = join(root, '.lore');
     mkdirSync(lore, { recursive: true });
-    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], flows: [], worklist: [{ axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false }] });
+    assert.deepEqual(planSync(lore), { codeRoots: [], themes: [], flows: [], worklist: [{ axis: 'HOME', id: 'HOME', path: 'HOME.md', priorExists: false }], configIssues: [] });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -863,6 +863,68 @@ function fzRepoDeep() {
   return { root, loreDir: lore, git, sha: () => git('rev-parse', '--short', 'HEAD') };
 }
 
+function fzRepoDeepPython() {
+  const root = mkN(jN(tmpN(), 'lore-deep-python-'));
+  const git = (...a) => exN2('git', a, { cwd: root, stdio: 'pipe' }).toString().trim();
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  mdN(jN(root, 'mal_analyze', 'native_enrichment'), { recursive: true });
+  wfN(jN(root, 'mal_analyze', 'cli.py'), 'CLI = 1\n');
+  wfN(jN(root, 'mal_analyze', 'native_enrichment', 'startup_paths.py'), 'PATHS = 1\n');
+  const lore = jN(root, '.lore');
+  mdN(jN(lore, 'wiki', 'component'), { recursive: true });
+  mdN(jN(lore, 'journal'), { recursive: true });
+  mdN(jN(lore, '.state'), { recursive: true });
+  wfN(jN(lore, 'config.yml'), 'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze: [cli]\n      mal_analyze/native_enrichment: [startup_paths]\n');
+  exN2('git', ['add', '-A'], { cwd: root, stdio: 'pipe' });
+  exN2('git', ['commit', '-q', '-m', 'init'], { cwd: root, stdio: 'pipe' });
+  return { root, loreDir: lore, git };
+}
+
+test('planSync resolves Python and nested deep worklist metadata', () => {
+  const r = fzRepoDeepPython();
+  try {
+    const plan = pl(r.loreDir, { all: true });
+    const cli = plan.worklist.find(w => w.kind === 'deep' && w.id === 'cli');
+    const startup = plan.worklist.find(w => w.kind === 'deep' && w.id === 'startup_paths');
+    assert.deepEqual([cli.codeRoot, cli.sourceFile], ['mal_analyze', 'mal_analyze/cli.py']);
+    assert.deepEqual([startup.codeRoot, startup.sourceFile], [
+      'mal_analyze/native_enrichment',
+      'mal_analyze/native_enrichment/startup_paths.py',
+    ]);
+    assert.deepEqual(plan.configIssues, []);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync skips unresolved deep entries and reports configIssues', () => {
+  const r = fzRepoDeepPython();
+  try {
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze: [absent]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep'), false);
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-source-missing', deepRoot: 'mal_analyze', mod: 'absent',
+      expectedBase: 'mal_analyze/absent',
+    }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync skips ambiguous and invalid deep entries without blocking valid entries', () => {
+  const r = fzRepoDeepPython();
+  try {
+    wfN(jN(r.root, 'mal_analyze', 'cli.js'), 'export const CLI = 1;\n');
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [mal_analyze]\n    deep:\n      mal_analyze: [cli]\n      mal_analyze/native_enrichment: [startup_paths]\n      elsewhere: [ghost]\n');
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep' && w.id === 'cli'), false);
+    assert.ok(plan.worklist.some(w => w.kind === 'deep' && w.id === 'startup_paths'));
+    assert.deepEqual(plan.configIssues, [
+      { kind: 'deep-source-ambiguous', deepRoot: 'mal_analyze', mod: 'cli', candidates: ['mal_analyze/cli.js', 'mal_analyze/cli.py'] },
+      { kind: 'deep-root-invalid', deepRoot: 'elsewhere' },
+    ]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
 test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path）', () => {
   const r = fzRepoDeep();
   try {
@@ -870,6 +932,7 @@ test('planSync: deep 声明 → 列深度页工单（kind:deep, sourceFile, path
     assert.equal(wl.length, 2);
     const s = wl.find(w => w.id === 'sync');
     assert.equal(s.sourceFile, 'lib/sync.js');
+    assert.equal(s.codeRoot, 'lib');
     assert.equal(s.path, 'component/sync.md');
     assert.equal(s.reason, 'all');
   } finally { rmN(r.root, { recursive: true, force: true }); }
@@ -896,6 +959,48 @@ test('planSync 增量：深度页无指纹 → new 入；动其源文件 → cod
     assert.equal(deep.length, 1);
     assert.equal(deep[0].id, 'sync');
     assert.equal(deep[0].reason, 'code-changed');
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync Python source only: only the changed real source enters deep worklist', () => {
+  const r = fzRepoDeepPython();
+  try {
+    for (const id of ['cli', 'startup_paths']) {
+      wfN(jN(r.loreDir, 'wiki', 'component', `${id}.md`),
+        `---\ntitle: ${id}\nsummary: s\n---\n# component: ${id}\n\n## Current architecture\n\nv1\n`);
+    }
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    assert.equal(pl(r.loreDir).worklist.filter(w => w.kind === 'deep').length, 0);
+
+    wfN(jN(r.root, 'mal_analyze', 'cli.py'), 'CLI = 2\n');
+    exN2('git', ['commit', '-aqm', 'touch cli'], { cwd: r.root, stdio: 'pipe' });
+    const deep = pl(r.loreDir).worklist.filter(w => w.kind === 'deep');
+    assert.equal(deep.length, 1);
+    assert.deepEqual([deep[0].id, deep[0].reason, deep[0].sourceFile],
+      ['cli', 'code-changed', 'mal_analyze/cli.py']);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('finalize Python manifest stale follows the resolved source file', () => {
+  const r = fzRepoDeepPython();
+  try {
+    wfN(jN(r.loreDir, 'wiki', 'component', 'cli.md'),
+      '---\ntitle: cli\nsummary: s\n---\n# component: cli\n\n## Current architecture\n\nv1\n');
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+
+    wfN(jN(r.root, 'mal_analyze', 'native_enrichment', 'startup_paths.py'), 'PATHS = 2\n');
+    exN2('git', ['commit', '-aqm', 'touch startup paths'], { cwd: r.root, stdio: 'pipe' });
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    let manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+    let cli = manifest.axes.find(a => a.id === 'component').pages.find(p => p.id === 'cli');
+    assert.equal(cli.stale, 0);
+
+    wfN(jN(r.root, 'mal_analyze', 'cli.py'), 'CLI = 2\n');
+    exN2('git', ['commit', '-aqm', 'touch cli'], { cwd: r.root, stdio: 'pipe' });
+    fz(r.loreDir, '2026-06-08T00:00:00Z');
+    manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+    cli = manifest.axes.find(a => a.id === 'component').pages.find(p => p.id === 'cli');
+    assert.equal(cli.stale, 1);
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
 

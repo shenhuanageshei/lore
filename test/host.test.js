@@ -191,3 +191,66 @@ test('backupOnce: 只写一次', () => {
     assert.equal(readFileSync(p + '.lore.bak', 'utf8'), 'v1');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('mergeCodexMcp: EOF 裸节头（空节、无 body、无尾换行）→ 整节替换不产生重复节头', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-codex-'));
+  try {
+    const p = join(dir, 'config.toml');
+    writeFileSync(p, 'model = "gpt-5"\n\n[mcp_servers.lore]');         // 无尾换行
+    const r = mergeCodexMcp(p, 'D:/new/lib/mcp.js');
+    assert.equal(r.action, 'replaced');
+    const t = readFileSync(p, 'utf8');
+    assert.equal((t.match(/\[mcp_servers\.lore\]/g) ?? []).length, 1); // 同名节头恰 1 个（TOML 合法性）
+    assert.ok(t.includes('args = ["D:/new/lib/mcp.js"]'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('mergeCodexMcp: 文件不存在 → 无前导空行、action appended（顺带验父目录递归建）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-codex-'));
+  try {
+    const p = join(dir, 'sub', 'config.toml');                          // 父目录也不存在
+    const r = mergeCodexMcp(p, 'D:/lore/lib/mcp.js');
+    assert.equal(r.action, 'appended');
+    const t = readFileSync(p, 'utf8');
+    assert.ok(t.startsWith('[mcp_servers.lore]\ncommand = "node"'));   // 不以 \n\n 开头
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('mergeCodexMcp: CRLF 行尾 → lore 节整节替换、他节完好', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-codex-'));
+  try {
+    const p = join(dir, 'config.toml');
+    writeFileSync(p, 'model = "x"\r\n\r\n[mcp_servers.lore]\r\ncommand = "node"\r\nargs = ["old"]\r\n[mcp_servers.other]\r\ncommand = "y"\r\n');
+    const r = mergeCodexMcp(p, 'D:/new/lib/mcp.js');
+    assert.equal(r.action, 'replaced');
+    const t = readFileSync(p, 'utf8');
+    assert.equal((t.match(/\[mcp_servers\.lore\]/g) ?? []).length, 1);
+    assert.ok(t.includes('D:/new/lib/mcp.js') && !t.includes('"old"'));
+    assert.ok(t.includes('[mcp_servers.other]\r\ncommand = "y"\r\n')); // 他节逐字完好
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('removeOpencodeMcp: 坏 JSON → 返回 false 不 throw，stderr 提示手工检查', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-oc-bad-'));
+  try {
+    const p = join(dir, 'opencode.json');
+    writeFileSync(p, '{ not json');
+    const errs = [];
+    const orig = console.error;
+    console.error = (...a) => errs.push(a.join(' '));
+    try { assert.equal(removeOpencodeMcp(p), false); }
+    finally { console.error = orig; }
+    assert.ok(errs.some(e => e.includes('请手工检查')));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('mergeOpencodeMcp: 坏文件 throw 带手动指引，且坏文件逐字未变', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-oc-bad-'));
+  try {
+    const p = join(dir, 'opencode.json');
+    const bad = '{ not valid json ';
+    writeFileSync(p, bad);
+    assert.throws(() => mergeOpencodeMcp(p, 'x'), /请手动加入/);
+    assert.equal(readFileSync(p, 'utf8'), bad);                        // 内容逐字未变
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

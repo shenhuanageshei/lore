@@ -100,6 +100,31 @@ test('init 集成: 默认注入 CLAUDE.md 标记节 + .mcp.json；config residen
   }
 });
 
+test('residentSection: AGENTS.md 用多宿主 syncHint', () => {
+  const s = residentSection({ pages: 1, deepPages: 0, updated: '2026-07-19' }, 'AGENTS.md');
+  assert.ok(s.includes('/lore-sync') && s.includes('/prompts:lore-sync'));
+  const c = residentSection({ pages: 1, deepPages: 0, updated: '2026-07-19' }, 'CLAUDE.md');
+  assert.ok(c.includes('/lore:sync'));
+});
+
+test('installResident 多文件: CLAUDE.md + AGENTS.md 都写、幂等、refresh 两文件', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-res-'));
+  try {
+    installResident(dir, { pages: 3, deepPages: 1, updated: '2026-07-19' }, ['CLAUDE.md', 'AGENTS.md']);
+    for (const f of ['CLAUDE.md', 'AGENTS.md']) {
+      assert.ok(existsSync(join(dir, f)));
+      assert.match(readFileSync(join(dir, f), 'utf8'), /LORE_RESIDENT:START/);
+    }
+    installResident(dir, { pages: 3, deepPages: 1, updated: '2026-07-19' }, ['CLAUDE.md', 'AGENTS.md']);   // 幂等
+    const changed = refreshResident(dir, { pages: 9, deepPages: 1, updated: '2026-07-20' }, ['CLAUDE.md', 'AGENTS.md']);
+    assert.equal(changed, true);
+    assert.ok(readFileSync(join(dir, 'AGENTS.md'), 'utf8').includes('9 页'));
+    removeResident(dir, ['CLAUDE.md', 'AGENTS.md']);
+    assert.ok(!readFileSync(join(dir, 'CLAUDE.md'), 'utf8').includes('LORE_RESIDENT'));
+    assert.ok(!readFileSync(join(dir, 'AGENTS.md'), 'utf8').includes('LORE_RESIDENT'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('residentStats: 从 manifest 算 {pages, deepPages, updated}；无 manifest → 零值', () => {
   const root = tmp();
   try {

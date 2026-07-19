@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS, alignGitignore, alignGitattributes, GITIGNORE_LINES, alignAssets } from '../lib/migrate.js';
 import { writeEnabledHosts } from '../lib/host.js';
+import { installResident } from '../lib/resident.js';
 import { renderConfigYaml } from '../lib/init.js';
 import { finalizeSync } from '../lib/sync.js';
 
@@ -111,6 +112,31 @@ test('alignResidentAssets: CLAUDE.md 节文案/stats 过期 → refreshed（节�
     assert.ok(a.some(x => x.asset === 'claude-md' && x.action === 'refreshed'));
     assert.doesNotMatch(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /old body/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('alignResidentAssets: 启用 codex 后补写 AGENTS.md，且删除不复活', () => {
+  // repo：已 init 过（CLAUDE.md 有 resident 节、migrations 已记 resident:install）
+  const repo = mkdtempSync(join(tmpdir(), 'lore-repo-'));
+  const home = mkdtempSync(join(tmpdir(), 'lore-home-'));
+  try {
+    const loreDir = join(repo, '.lore');
+    mkdirSync(join(loreDir, '.state'), { recursive: true });
+    mkdirSync(join(loreDir, 'wiki'), { recursive: true });
+    installResident(repo, { pages: 1, deepPages: 0, updated: 'x' }, ['CLAUDE.md']);
+    const applied = new Set(['resident:install']);
+    writeEnabledHosts(['claude', 'codex'], join(home, '.lore', 'hosts.json'));
+    const rec = [];
+    const actions = alignResidentAssets(repo, loreDir, 'D:/lore/lib/mcp.js', applied, k => rec.push(k), { hostsPath: join(home, '.lore', 'hosts.json') });
+    assert.ok(actions.some(a => a.asset === 'agents-md' && a.action === 'installed'));
+    assert.ok(rec.includes('resident:install:AGENTS.md'));
+    // 用户删掉 AGENTS.md → 下轮不复活
+    rmSync(join(repo, 'AGENTS.md'));
+    const a2 = alignResidentAssets(repo, loreDir, 'D:/lore/lib/mcp.js', new Set([...applied, ...rec]), () => {}, { hostsPath: join(home, '.lore', 'hosts.json') });
+    assert.ok(!a2.some(a => a.asset === 'agents-md' && a.action === 'installed'));
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('alignConfig: 老 config 补全缺失块 —— 顶层 append + axes 二级锚定插入；已有行逐字节不变', () => {

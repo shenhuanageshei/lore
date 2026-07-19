@@ -255,7 +255,7 @@ test('GET /api/sync/status: B2 扩展形状（config + runner_running）', async
   const port = await listen(server);
   try {
     const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
-    assert.deepEqual(body.config, { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15 });
+    assert.deepEqual(body.config, { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15, backend: 'auto' });
     assert.equal(body.runner_running, false);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });

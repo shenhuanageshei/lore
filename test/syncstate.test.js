@@ -52,12 +52,12 @@ import { readSyncConfig, writeSyncConfig, writeAutoPending, readAutoPending, cle
 test('readSyncConfig: 默认值兜底 + B1 形状向后兼容 + 扩展字段', () => {
   const dir = tmp();
   try {
-    assert.deepEqual(readSyncConfig(dir), { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15, backend: 'auto' });
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'manual' }));            // B1 形状
     assert.equal(readSyncConfig(dir).mode, 'manual');
     assert.equal(readSyncConfig(dir).debounce_minutes, 10);
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2, future_field: 1 }));
-    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2, stale_threshold: 15 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:00', max_pages: 2, stale_threshold: 15, backend: 'auto' });
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', schedule: 'not-a-time' }));
     assert.equal(readSyncConfig(dir).schedule, null);            // 非法 schedule 回默认
     writeFileSync(join(dir, 'sync.json'), JSON.stringify({ mode: 'auto', stale_threshold: 'lots' }));
@@ -70,9 +70,9 @@ test('writeSyncConfig: 部分更新合并（mode 保留）+ 校验非法值拒�
   try {
     writeSyncMode(dir, 'auto');
     writeSyncConfig(dir, { debounce_minutes: 3, schedule: '03:30' });
-    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:30', max_pages: 5, stale_threshold: 15 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: '03:30', max_pages: 5, stale_threshold: 15, backend: 'auto' });
     writeSyncConfig(dir, { schedule: null, max_pages: 2, stale_threshold: 30 });            // schedule 可清空
-    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: null, max_pages: 2, stale_threshold: 30 });
+    assert.deepEqual(readSyncConfig(dir), { mode: 'auto', debounce_minutes: 3, schedule: null, max_pages: 2, stale_threshold: 30, backend: 'auto' });
     assert.throws(() => writeSyncConfig(dir, { debounce_minutes: -1 }), /invalid/);
     assert.throws(() => writeSyncConfig(dir, { stale_threshold: 0 }), /stale_threshold/);
     assert.throws(() => writeSyncConfig(dir, { schedule: '25:99' }), /invalid/);
@@ -190,5 +190,26 @@ test('readRewriteRequests: 缺文件 → []；坏行跳过好行保留', () => {
       '{"ts":"t1","page":"component/a.md"}\n{oops\n{"ts":"t2","page":"component/b.md"}\n{"nopage":1}\n');
     const list = readRewriteRequests(dir);
     assert.deepEqual(list.map(r => r.page), ['component/a.md', 'component/b.md']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('readSyncConfig: backend 默认 auto、非法值回 auto、合法值透传', () => {
+  const dir = tmp();
+  try {
+    assert.equal(readSyncConfig(dir).backend, 'auto');                       // 无 sync.json → auto
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ backend: 'codex' }));
+    assert.equal(readSyncConfig(dir).backend, 'codex');                      // 合法透传
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ backend: 'vim' }));
+    assert.equal(readSyncConfig(dir).backend, 'auto');                       // 非法回默认
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('writeSyncConfig: backend 合法写、非法 throw', () => {
+  const dir = tmp();
+  try {
+    writeSyncConfig(dir, { backend: 'opencode' });
+    assert.equal(readSyncConfig(dir).backend, 'opencode');                   // 落盘可读回
+    assert.throws(() => writeSyncConfig(dir, { backend: 'vim' }), /invalid backend/);
+    assert.equal(readSyncConfig(dir).backend, 'opencode');                   // 非法不落盘
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

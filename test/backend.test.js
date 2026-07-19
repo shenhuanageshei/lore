@@ -1,6 +1,9 @@
 // test/backend.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
 import { claudeBackend, codexBackend, opencodeBackend, backendFor, detectAvailableBackends, resolveBackendChain, BackendError } from '../lib/backend.js';
 
 const okExec = (stdout = 'v1.0.0') => (cmd, args, opts, cb) => cb(null, stdout, '');
@@ -65,4 +68,20 @@ test('resolveBackendChain: 配置指定短路；auto 按探测序', async () => 
   const auto = await resolveBackendChain('auto', { exec: okExec() });
   assert.deepEqual(auto.map(b => b.name), ['claude', 'codex', 'opencode']);
   assert.equal(backendFor('vim'), null);
+});
+
+test('codexBackend: --output-last-message 文件存在时优先于 stdout，且读后清理', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-codex-'));
+  try {
+    const exec = (cmd, args, opts, cb) => {
+      const outFile = args[args.indexOf('--output-last-message') + 1];
+      mkdirSync(dirname(outFile), { recursive: true });
+      writeFileSync(outFile, '---\ntitle: file\n---\nfrom-file');
+      cb(null, '---\ntitle: stdout\n---\nfrom-stdout', '');
+    };
+    const b = codexBackend({ exec });
+    const text = await b.rewritePage({ page: { path: 'component/x.md', axis: 'component' }, repoRoot: dir });
+    assert.equal(text, '---\ntitle: file\n---\nfrom-file');                          // 文件优先
+    assert.ok(!existsSync(join(dir, '.lore', '.state', 'codex-last-message.md')));    // 读后已清理
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

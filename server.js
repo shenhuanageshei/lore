@@ -158,9 +158,10 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
         if ('debounce_minutes' in body) patch.debounce_minutes = Number(body.debounce_minutes);
         if ('schedule' in body) patch.schedule = body.schedule === null || body.schedule === '' ? null : String(body.schedule);
         if ('max_pages' in body) patch.max_pages = Number(body.max_pages);
+        if ('backend' in body) patch.backend = String(body.backend);
         writeSyncConfig(join(root, '.state'), patch);      // 非法值 throw → 400
         return sendJson(res, 200, { ok: true, config: readSyncConfig(join(root, '.state')) });
-      } catch { return sendJson(res, 400, { error: 'invalid config (debounce 0-1440, schedule HH:MM|null, max_pages 1-50)' }); }
+      } catch { return sendJson(res, 400, { error: 'invalid config (debounce 0-1440, schedule HH:MM|null, max_pages 1-50, backend auto|claude|codex|opencode)' }); }
     }
 
     if (req.method === 'GET' && pathname === '/api/sync/runs') {

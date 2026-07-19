@@ -260,3 +260,26 @@ test('runAuto 扩轴: 非 component 页按 manifest stale≥阈值入单且 stal
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('runAuto: primary 不可用类错误 → fallback 接管并记录 backend 名', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    const primary = { name: 'claude', rewritePage: async () => { const e = new Error('claude-cli-missing'); e.unavailable = true; throw e; } };
+    const fallback = { name: 'codex', rewritePage: async () => FAKE_OK };
+    const res = await runAuto(lore, { backend: primary, fallbackBackends: [fallback], maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
+    assert.equal(res.pages[0].ok, true);
+    assert.equal(res.pages[0].backend, 'codex');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runAuto: 非不可用类错误（timeout）不 failover', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    let fallbackCalled = false;
+    const primary = { name: 'claude', rewritePage: async () => { throw new Error('timeout'); } };
+    const fallback = { name: 'codex', rewritePage: async () => { fallbackCalled = true; return FAKE_OK; } };
+    const res = await runAuto(lore, { backend: primary, fallbackBackends: [fallback], maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
+    assert.equal(res.pages[0].ok, false);
+    assert.equal(fallbackCalled, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

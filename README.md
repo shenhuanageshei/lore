@@ -39,6 +39,8 @@ lore 是**带 `func @ file` 锚点的导航层，不是源码替代**——agent
 
 opt-in，默认写本机 `.claude/settings.local.json`（`--project` 写团队共享）；`uninstall` 回落软档。
 
+注：中/强档为 Claude Code 专有（`UserPromptSubmit`）；codex / opencode 软档封顶——codex 无 prompt 钩子机制，opencode 的 `tui.prompt.append` 经 spike 证实非插件钩子（证据见 `lib/host.js` 注释）。
+
 ## 核心理念
 
 | 理念 | 含义 |
@@ -79,6 +81,17 @@ node lib/ask.js /path/to/your-repo/.lore "M3 的准确率为什么这么调"
 node lib/lint.js /path/to/your-repo/.lore
 ```
 
+非 Claude 宿主（codex / opencode）一次性机器层安装：
+
+```bash
+node lib/host.js install codex opencode   # 全局命令 + 全局 MCP 注册 + 记入机器启用清单 ~/.lore/hosts.json
+node lib/host.js status                   # 查状态；node lib/host.js uninstall <name>... 完整还原
+```
+
+- **全局命令**（由 `commands/*.md` 单一真源生成，带 lore 版本标记）：codex → `~/.codex/prompts/lore-*.md`（调 `/prompts:lore-*`）；opencode → `~/.config/opencode/commands/lore-*.md`（调 `/lore-*`）。
+- **全局 MCP 注册**：codex → `~/.codex/config.toml` `[mcp_servers.lore]`；opencode → `~/.config/opencode/opencode.json` `mcp.lore`。改全局配置前自动留 `*.lore.bak` 备份。
+- 启用后 `init` 的 repo 会同时注入 `AGENTS.md`（与 CLAUDE.md 同一 LORE_RESIDENT 机制）。
+
 > 实际使用走 slash 命令（`/lore:init`、`/lore:sync` …，定义在 `commands/`）；上面的 `node lib/*.js` 是其底层 CLI。
 
 ## 命令
@@ -96,7 +109,7 @@ node lib/lint.js /path/to/your-repo/.lore
 | `/lore:translate` | 双语 | 按需生成翻译 sidecar（语言切换器 + stale 检测） | agent |
 | `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
 | `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing / unfolded / **mermaid 语法五检**），不自动改 | 否 |
-| **auto 档**（壳里切） | 合成（自动） | commit 静默期后 runner 调只读 claude CLI 重写 stale 页，机械质量门过门才落盘，任务历史可查 | claude CLI |
+| **auto 档**（壳里切） | 合成（自动） | commit 静默期后 runner 调只读 claude CLI 重写 stale 页，机械质量门过门才落盘，任务历史可查 | claude/codex/opencode CLI（`.state/sync.json` 的 `backend` 可选：auto 探测（含 provider 检查）或显式指定；控制台有下拉） |
 
 ## 架构
 
@@ -120,7 +133,7 @@ node lib/lint.js /path/to/your-repo/.lore
 
 **三轴打标**：component = 变更路径前缀匹配 `code_roots`；theme = `title+why` 含 config `match:` 关键词（子串，大小写无关）；flow = 原子的 component ∈ config flow 的 `spans`。
 
-**引擎文件**（`lib/`，全零依赖）：`config` `journal` `mine` `hook` `note` `sync` `fold` `fingerprint` `manifest` `graph` `docs` `home` `i18n` `translate` `syncstate` `runner` `serve` `portal` `repos` `registry` `lint` `ask` `mcp` `init` + 根 `server.js`（静态壳 + 控制 API + auto ticker + 门户）。
+**引擎文件**（`lib/`，全零依赖）：`config` `journal` `mine` `hook` `note` `sync` `fold` `fingerprint` `manifest` `graph` `docs` `home` `i18n` `translate` `syncstate` `runner` `serve` `portal` `repos` `registry` `lint` `ask` `mcp` `init` `host` `backend` + 根 `server.js`（静态壳 + 控制 API + auto ticker + 门户）。
 
 ## 不变量（测试显式守）
 

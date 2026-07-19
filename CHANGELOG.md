@@ -3,6 +3,13 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.9.0] — 2026-07-19
+
+- 多宿主兼容：Codex + opencode 全面对齐（`lib/host.js` 能力矩阵 + `node lib/host.js install codex opencode` 机器层安装）
+- AGENTS.md 注入（与 CLAUDE.md 同 LORE_RESIDENT 机制）；codex/opencode 全局命令 + 全局 MCP 注册（改前自动 .lore.bak 备份）
+- auto 档多后端：claude/codex/opencode 三后端 + provider 感知探测 + 不可用类 failover；`.state/sync.json` 增 `backend` 配置，控制台加下拉
+- opencode/codex prompt-hook 软档封顶（无 UserPromptSubmit 等价机制）
+
 ## [0.8.2] — 2026-06-24
 
 - **runner 重写页面 LLM 尝试 Write 工具而非输出 stdout**：LLM 调 Write 被 `--allowedTools Read,Grep,Glob` 拒绝后 stdout 只剩 "awaiting permission" 消息，质量门 `frontmatter missing title/summary` 全挂（analyst/theme/flow 页 100% 失败，只有偶然输出格式正确的 cli-local-agent-flow 幸存）——加 `--disallowedTools Write,Edit,Bash` 显式封杀 + prompt TAIL 强制指令「绝不调用写盘工具」。

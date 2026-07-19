@@ -77,11 +77,12 @@ import { execFileSync } from 'node:child_process';
 test('init 集成: 默认注入 CLAUDE.md 标记节 + .mcp.json；config resident:false 跳过', () => {
   const root = tmp();
   const root2 = tmp();
+  const home = tmp();                              // 隔离机器层：无 hosts.json → 默认 claude（不读真机 ~/.lore）
   try {
     execFileSync('git', ['init', '-q'], { cwd: root });
     mkdirSync(join(root, 'lib'), { recursive: true });
     writeFileSync(join(root, 'lib', 'a.js'), 'export const x=1;');
-    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site'), home });
     assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /LORE_RESIDENT:START/);
     const mcp = JSON.parse(readFileSync(join(root, '.mcp.json'), 'utf8'));
     assert.match(mcp.mcpServers.lore.args[0], /mcp\.js$/);
@@ -91,12 +92,13 @@ test('init 集成: 默认注入 CLAUDE.md 标记节 + .mcp.json；config residen
     writeFileSync(join(root2, '.lore', 'config.yml'), 'resident: false\naxes:\n  component:\n    code_roots: [lib]\n');
     mkdirSync(join(root2, 'lib'), { recursive: true });
     writeFileSync(join(root2, 'lib', 'a.js'), 'export const x=1;');
-    init({ repoRoot: root2, srcSiteDir: join(process.cwd(), 'site') });
+    init({ repoRoot: root2, srcSiteDir: join(process.cwd(), 'site'), home });
     assert.equal(existsSync(join(root2, 'CLAUDE.md')), false);
     assert.equal(existsSync(join(root2, '.mcp.json')), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(root2, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
   }
 });
 
@@ -116,6 +118,9 @@ test('installResident 多文件: CLAUDE.md + AGENTS.md 都写、幂等、refresh
       assert.match(readFileSync(join(dir, f), 'utf8'), /LORE_RESIDENT:START/);
     }
     installResident(dir, { pages: 3, deepPages: 1, updated: '2026-07-19' }, ['CLAUDE.md', 'AGENTS.md']);   // 幂等
+    for (const f of ['CLAUDE.md', 'AGENTS.md']) {
+      assert.equal((readFileSync(join(dir, f), 'utf8').match(/LORE_RESIDENT:START/g)).length, 1);   // 不重复注入
+    }
     const changed = refreshResident(dir, { pages: 9, deepPages: 1, updated: '2026-07-20' }, ['CLAUDE.md', 'AGENTS.md']);
     assert.equal(changed, true);
     assert.ok(readFileSync(join(dir, 'AGENTS.md'), 'utf8').includes('9 页'));

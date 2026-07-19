@@ -79,23 +79,25 @@ test('alignResidentAssets: 首装两资产+记 resident:install；删除后 appl
     mkdirSync(join(lore, '.state'), { recursive: true });
     const applied = new Set();
     const rec = id => applied.add(id);
+    // hostsPath 指向 tmp 下不存在路径 → readEnabledHosts 缺文件回落 ['claude']（隔离真机 ~/.lore/hosts.json，断言无需改）
+    const noHosts = { hostsPath: join(root, 'nonexistent-hosts.json') };
     // 首装：CLAUDE.md 节 + .mcp.json lore 条目都缺 → 都装 + 记
-    const a1 = alignResidentAssets(root, lore, 'D:/engine/lib/mcp.js', applied, rec);
+    const a1 = alignResidentAssets(root, lore, 'D:/engine/lib/mcp.js', applied, rec, noHosts);
     assert.ok(a1.some(x => x.asset === 'claude-md' && x.action === 'installed'));
     assert.ok(a1.some(x => x.asset === 'mcp-json' && x.action === 'installed'));
     assert.ok(applied.has('resident:install'));
     assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /LORE_RESIDENT:START/);
     // 幂等：再跑零动作（节在 → refresh 无内容变化；条目在且路径同 → 不动）
-    assert.deepEqual(alignResidentAssets(root, lore, 'D:/engine/lib/mcp.js', applied, rec), []);
+    assert.deepEqual(alignResidentAssets(root, lore, 'D:/engine/lib/mcp.js', applied, rec, noHosts), []);
     // 引擎挪位置 → mcp-json refreshed
-    const a2 = alignResidentAssets(root, lore, 'D:/engine2/lib/mcp.js', applied, rec);
+    const a2 = alignResidentAssets(root, lore, 'D:/engine2/lib/mcp.js', applied, rec, noHosts);
     assert.deepEqual(a2, [{ asset: 'mcp-json', action: 'refreshed' }]);
     const mcp = JSON.parse(readFileSync(join(root, '.mcp.json'), 'utf8'));
     assert.deepEqual(mcp.mcpServers.lore.args, ['D:/engine2/lib/mcp.js']);
     // 用户删节 + 删条目，applied 已记 → 不复活
     rmSync(join(root, 'CLAUDE.md'));
     writeFileSync(join(root, '.mcp.json'), JSON.stringify({ mcpServers: { other: { command: 'x' } } }));
-    assert.deepEqual(alignResidentAssets(root, lore, 'D:/engine2/lib/mcp.js', applied, rec), []);
+    assert.deepEqual(alignResidentAssets(root, lore, 'D:/engine2/lib/mcp.js', applied, rec, noHosts), []);
     assert.equal(existsSync(join(root, 'CLAUDE.md')), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -108,7 +110,7 @@ test('alignResidentAssets: CLAUDE.md 节文案/stats 过期 → refreshed（节�
     const applied = new Set(['resident:install']);
     writeFileSync(join(root, 'CLAUDE.md'),
       '<!-- LORE_RESIDENT:START -->\nold body\n<!-- LORE_RESIDENT:END -->\n');
-    const a = alignResidentAssets(root, lore, 'D:/e/mcp.js', applied, () => {});
+    const a = alignResidentAssets(root, lore, 'D:/e/mcp.js', applied, () => {}, { hostsPath: join(root, 'nonexistent-hosts.json') });
     assert.ok(a.some(x => x.asset === 'claude-md' && x.action === 'refreshed'));
     assert.doesNotMatch(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /old body/);
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -133,6 +135,29 @@ test('alignResidentAssets: 启用 codex 后补写 AGENTS.md，且删除不复活
     rmSync(join(repo, 'AGENTS.md'));
     const a2 = alignResidentAssets(repo, loreDir, 'D:/lore/lib/mcp.js', new Set([...applied, ...rec]), () => {}, { hostsPath: join(home, '.lore', 'hosts.json') });
     assert.ok(!a2.some(a => a.asset === 'agents-md' && a.action === 'installed'));
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('alignResidentAssets: 纯 codex 启用 → 只装 AGENTS.md，mcp-json 不管、不记旧键', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'lore-repo-'));
+  const home = mkdtempSync(join(tmpdir(), 'lore-home-'));
+  try {
+    const loreDir = join(repo, '.lore');
+    mkdirSync(join(loreDir, '.state'), { recursive: true });
+    mkdirSync(join(loreDir, 'wiki'), { recursive: true });
+    writeEnabledHosts(['codex'], join(home, '.lore', 'hosts.json'));
+    const applied = new Set();
+    const rec = [];
+    const actions = alignResidentAssets(repo, loreDir, 'D:/lore/lib/mcp.js', applied, k => rec.push(k), { hostsPath: join(home, '.lore', 'hosts.json') });
+    assert.ok(actions.some(a => a.asset === 'agents-md' && a.action === 'installed'));
+    assert.ok(!actions.some(a => a.asset === 'claude-md' || a.asset === 'mcp-json'));
+    assert.ok(rec.includes('resident:install:AGENTS.md'));
+    assert.ok(!rec.includes('resident:install'));                      // AGENTS.md 首装不记 CLAUDE.md 旧键
+    assert.equal(existsSync(join(repo, '.mcp.json')), false);          // mcp-json 只归 claude 管
+    assert.equal(existsSync(join(repo, 'CLAUDE.md')), false);
   } finally {
     rmSync(repo, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
@@ -271,7 +296,7 @@ test('alignAssets 集成: 全新 git repo 一把对齐全部资产；再跑零�
       writeFileSync(join(lore, 'config.yml'), OLD_CONFIG);            // 老 config
       const home = tmp();                                             // 机器层宿主资产隔离进 tmp，不碰真实 home
       try {
-        writeEnabledHosts(['codex'], join(home, '.lore', 'hosts.json'));
+        writeEnabledHosts(['claude', 'codex'], join(home, '.lore', 'hosts.json'));
         const opts = { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js', installHook: true, home };
         const a1 = alignAssets(root, lore, opts);
         const assets = a1.map(x => x.asset);

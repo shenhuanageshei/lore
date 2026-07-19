@@ -109,7 +109,7 @@ node lib/host.js status                   # 查状态；node lib/host.js uninsta
 | `/lore:translate` | 双语 | 按需生成翻译 sidecar（语言切换器 + stale 检测） | agent |
 | `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
 | `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing / unfolded / **mermaid 语法五检**），不自动改 | 否 |
-| **auto 档**（壳里切） | 合成（自动） | commit 静默期后 runner 调只读 claude CLI 重写 stale 页，机械质量门过门才落盘，任务历史可查 | claude/codex/opencode CLI（`.state/sync.json` 的 `backend` 可选：auto 探测（含 provider 检查）或显式指定；控制台有下拉） |
+| **auto 档**（壳里切） | 合成（自动） | commit 静默期后 runner 调只读 LLM CLI 重写 stale 页（后端链 failover），机械质量门过门才落盘，任务历史可查 | claude/codex/opencode CLI（`.state/sync.json` 的 `backend` 可选：auto 探测（含 provider 检查）或显式指定；控制台有下拉） |
 
 ## 架构
 

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HOSTS, readEnabledHosts, writeEnabledHosts, instructionFilesFor, defaultHostsPath, renderCommandFor, installHostCommands, uninstallHostCommands, alignHostAssets, engineRoot, engineVersion } from '../lib/host.js';
+import { HOSTS, readEnabledHosts, writeEnabledHosts, instructionFilesFor, defaultHostsPath, renderCommandFor, installHostCommands, uninstallHostCommands, alignHostAssets, engineRoot, engineVersion, backupOnce, mergeCodexMcp, removeCodexMcp, stripJsonc, mergeOpencodeMcp, removeOpencodeMcp } from '../lib/host.js';
 
 test('readEnabledHosts: 文件缺省 → ["claude"]（零变化不变量）', () => {
   assert.deepEqual(readEnabledHosts(join(tmpdir(), 'nonexistent-hosts.json')), ['claude']);
@@ -120,4 +120,74 @@ test('engineVersion: bogus root → "0"；正常 root → package.json version',
   assert.equal(engineVersion(join(tmpdir(), 'lore-bogus-root-no-such')), '0');
   const pkg = JSON.parse(readFileSync(join(engineRoot(), 'package.json'), 'utf8'));
   assert.equal(engineVersion(), pkg.version);
+});
+
+test('mergeCodexMcp: 空文件追加节、已有节整节替换、他节不动', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-codex-'));
+  try {
+    const p = join(dir, 'config.toml');
+    writeFileSync(p, 'model = "gpt-5"\n\n[mcp_servers.other]\ncommand = "x"\n');
+    const r1 = mergeCodexMcp(p, 'D:/lore/lib/mcp.js');
+    assert.equal(r1.action, 'appended');
+    const t1 = readFileSync(p, 'utf8');
+    assert.ok(t1.includes('[mcp_servers.lore]\ncommand = "node"\nargs = ["D:/lore/lib/mcp.js"]'));
+    assert.ok(t1.includes('[mcp_servers.other]'));                     // 他节不动
+    assert.ok(existsSync(p + '.lore.bak'));                            // 备份
+    const r2 = mergeCodexMcp(p, 'E:/moved/lib/mcp.js');                // 路径变 → 整节替换
+    assert.equal(r2.action, 'replaced');
+    const t2 = readFileSync(p, 'utf8');
+    assert.ok(t2.includes('E:/moved/lib/mcp.js') && !t2.includes('D:/lore/lib/mcp.js'));
+    assert.equal((t2.match(/\[mcp_servers\.lore\]/g) ?? []).length, 1);
+    removeCodexMcp(p);
+    assert.ok(!readFileSync(p, 'utf8').includes('mcp_servers.lore'));
+    assert.ok(readFileSync(p, 'utf8').includes('[mcp_servers.other]'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('stripJsonc: 去行注释/块注释/尾逗号，字符串内不动', () => {
+  const src = `{
+  // 行注释
+  "a": "http://x",   /* 块注释 */
+  "b": "不是注释 //",
+  "list": [1, 2,],
+}`;
+  const cfg = JSON.parse(stripJsonc(src));
+  assert.equal(cfg.a, 'http://x');
+  assert.equal(cfg.b, '不是注释 //');
+  assert.deepEqual(cfg.list, [1, 2]);
+});
+
+test('mergeOpencodeMcp: JSON merge 不覆盖他 server；jsonc 也能合', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-oc-'));
+  try {
+    const p = join(dir, 'opencode.json');
+    writeFileSync(p, JSON.stringify({ mcp: { other: { type: 'local', command: ['x'] } }, model: 'm1' }));
+    mergeOpencodeMcp(p, 'D:/lore/lib/mcp.js');
+    const cfg = JSON.parse(readFileSync(p, 'utf8'));
+    assert.deepEqual(cfg.mcp.lore, { type: 'local', command: ['node', 'D:/lore/lib/mcp.js'], enabled: true });
+    assert.ok(cfg.mcp.other && cfg.model === 'm1');                    // 他配置不动
+    assert.ok(existsSync(p + '.lore.bak'));
+    const pc = join(dir, 'opencode.jsonc');
+    writeFileSync(pc, '{ // c\n "mcp": {},\n}');
+    mergeOpencodeMcp(pc, 'D:/lore/lib/mcp.js');
+    assert.ok(JSON.parse(readFileSync(pc, 'utf8')).mcp.lore);
+    removeOpencodeMcp(p);
+    const after = JSON.parse(readFileSync(p, 'utf8'));
+    assert.ok(!after.mcp.lore);                                        // lore 条目移除
+    assert.ok(after.mcp.other);                                        // 他 server 不动（计划文本此处断言 !mcp 与「不覆盖他 server」矛盾，按设计意图修正）
+    removeOpencodeMcp(pc);
+    assert.ok(!JSON.parse(readFileSync(pc, 'utf8')).mcp);              // mcp 空 → 整体删除
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('backupOnce: 只写一次', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-bak-'));
+  try {
+    const p = join(dir, 'f.json');
+    writeFileSync(p, 'v1');
+    backupOnce(p);
+    writeFileSync(p, 'v2');
+    backupOnce(p);
+    assert.equal(readFileSync(p + '.lore.bak', 'utf8'), 'v1');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -42,6 +42,7 @@ test('instructionFilesFor: codex+opencode 共享 AGENTS.md 去重', () => {
 test('HOSTS 矩阵完整性：三宿主、promptHook 声明', () => {
   assert.deepEqual(Object.keys(HOSTS).sort(), ['claude', 'codex', 'opencode']);
   assert.equal(HOSTS.codex.promptHook, null);          // codex 无机制 → 软档封顶
+  assert.equal(HOSTS.opencode.promptHook, null);       // tui.prompt.append 契约不可证实（spike 落定）→ 软档封顶
   assert.equal(HOSTS.claude.commands, null);           // claude 插件自带，不生成
 });
 

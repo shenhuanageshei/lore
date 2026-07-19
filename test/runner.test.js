@@ -281,5 +281,16 @@ test('runAuto: 非不可用类错误（timeout）不 failover', async () => {
     const res = await runAuto(lore, { backend: primary, fallbackBackends: [fallback], maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
     assert.equal(res.pages[0].ok, false);
     assert.equal(fallbackCalled, false);
+    assert.match(res.pages[0].reason, /timeout/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runAuto: 全链不可用 → 单条 fail 且 reason 带全链 tried', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    const mk = name => ({ name, rewritePage: async () => { const e = new Error(`${name}-cli-missing`); e.unavailable = true; throw e; } });
+    const res = await runAuto(lore, { backend: mk('claude'), fallbackBackends: [mk('codex')], maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
+    assert.equal(res.pages[0].ok, false);
+    assert.match(res.pages[0].reason, /全后端不可用\[claude→codex\]/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

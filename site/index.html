@@ -570,7 +570,7 @@ function renderConsolePage() {
           max_pages: Number(document.getElementById('cfg-maxpages').value),
           backend: document.getElementById('cfg-backend').value,
         }) });
-      msg.textContent = r.ok ? '✓ 已保存' : '✗ 参数不合法（静默 0-1440 / HH:MM / 1-50 页）';
+      msg.textContent = r.ok ? '✓ 已保存' : '✗ 参数不合法（静默 0-1440 / HH:MM / 1-50 页 / 后端 auto|claude|codex|opencode）';
     } catch { msg.textContent = '✗ 保存失败'; }
     cs.disabled = false;
     await fetchSyncStatus(); renderSyncLight();            // 读回真值（面板摘要同步刷新）

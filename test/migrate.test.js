@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { readMigrations, appendMigration, alignShell, SHELL_FILES, alignHookStub, renderHookStub, HOOK_MARKER, alignResidentAssets, alignConfig, CONFIG_BLOCKS, alignGitignore, alignGitattributes, GITIGNORE_LINES, alignAssets } from '../lib/migrate.js';
+import { writeEnabledHosts } from '../lib/host.js';
 import { renderConfigYaml } from '../lib/init.js';
 import { finalizeSync } from '../lib/sync.js';
 
@@ -242,17 +243,24 @@ test('alignAssets 集成: 全新 git repo 一把对齐全部资产；再跑零�
       const lore = join(root, '.lore');
       mkdirSync(lore, { recursive: true });
       writeFileSync(join(lore, 'config.yml'), OLD_CONFIG);            // 老 config
-      const opts = { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js', installHook: true };
-      const a1 = alignAssets(root, lore, opts);
-      const assets = a1.map(x => x.asset);
-      assert.ok(assets.some(x => x.startsWith('shell:')));
-      assert.ok(assets.includes('hook-stub'));
-      assert.ok(assets.some(x => x.startsWith('config:+')));
-      assert.ok(assets.some(x => x.startsWith('gitignore:')));
-      assert.ok(assets.includes('gitattributes'));
-      assert.ok(assets.includes('claude-md') && assets.includes('mcp-json'));
-      assert.ok(!a1.some(x => x.action === 'error'));
-      assert.deepEqual(alignAssets(root, lore, opts), []);            // 幂等
+      const home = tmp();                                             // 机器层宿主资产隔离进 tmp，不碰真实 home
+      try {
+        writeEnabledHosts(['codex'], join(home, '.lore', 'hosts.json'));
+        const opts = { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js', installHook: true, home };
+        const a1 = alignAssets(root, lore, opts);
+        const assets = a1.map(x => x.asset);
+        assert.ok(assets.some(x => x.startsWith('shell:')));
+        assert.ok(assets.includes('hook-stub'));
+        assert.ok(assets.some(x => x.startsWith('config:+')));
+        assert.ok(assets.some(x => x.startsWith('gitignore:')));
+        assert.ok(assets.includes('gitattributes'));
+        assert.ok(assets.includes('claude-md') && assets.includes('mcp-json'));
+        assert.ok(!a1.some(x => x.action === 'error'));
+        // 隔离生效：启用 codex → 命令写进 tmp home（断言只碰 tmp home；真实 home 结构性不受影响）
+        assert.ok(assets.includes('host:codex'));
+        assert.ok(existsSync(join(home, '.codex', 'prompts', 'lore-sync.md')));
+        assert.deepEqual(alignAssets(root, lore, opts), []);            // 幂等
+      } finally { rmSync(home, { recursive: true, force: true }); }
     } finally { rmSync(eng, { recursive: true, force: true }); }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -267,10 +275,14 @@ test('alignAssets: resident:false config → 不装 CLAUDE.md/.mcp.json，其余
     const eng = tmp();
     try {
       writeFileSync(join(eng, 'index.html'), '<html/>');
-      const a = alignAssets(root, lore, { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js' });
-      assert.ok(!a.some(x => x.asset === 'claude-md' || x.asset === 'mcp-json'));
-      assert.equal(existsSync(join(root, 'CLAUDE.md')), false);
-      assert.ok(a.some(x => x.asset.startsWith('gitignore:')));
+      const home = tmp();                                             // 无 hosts.json → 默认 claude → 零宿主命令资产
+      try {
+        const a = alignAssets(root, lore, { engineSiteDir: eng, hookJsPath: 'D:/e/hook.js', mcpJsPath: 'D:/e/mcp.js', home });
+        assert.ok(!a.some(x => x.asset === 'claude-md' || x.asset === 'mcp-json'));
+        assert.ok(!a.some(x => x.asset.startsWith('host:')));
+        assert.equal(existsSync(join(root, 'CLAUDE.md')), false);
+        assert.ok(a.some(x => x.asset.startsWith('gitignore:')));
+      } finally { rmSync(home, { recursive: true, force: true }); }
     } finally { rmSync(eng, { recursive: true, force: true }); }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

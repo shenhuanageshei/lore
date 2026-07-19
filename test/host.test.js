@@ -59,6 +59,7 @@ test('renderCommandFor: 占位符替换 + 版本标记 + 三宿主 frontmatter �
   assert.ok(!oc.text.includes('${CLAUDE_PLUGIN_ROOT}'));
   assert.match(oc.text, /^---\r?\ndescription:/m);                       // opencode 保留 frontmatter
   const cx = renderCommandFor('codex', 'sync.md', src, { root, version: '9.9.9' });
+  assert.match(cx.text, /^<!-- lore:v9\.9\.9 host:codex /);              // codex 也带 marker（uninstall 靠它识别）
   assert.ok(!/^---\r?\ndescription:/m.test(cx.text));                    // codex 剥 frontmatter
   // 防漂移：opencode 输出 = 标记 + 源文（替换占位符后）逐字相同
   assert.equal(oc.text, `<!-- lore:v9.9.9 host:opencode src:sync.md — 自动生成，勿手改 -->\n` + src.replaceAll('${CLAUDE_PLUGIN_ROOT}', root.replace(/\\/g, '/')));
@@ -88,6 +89,7 @@ test('uninstallHostCommands: 只删带 lore 标记的文件', () => {
     assert.equal(removed.length, 9);
     assert.ok(existsSync(foreign));
     assert.ok(!existsSync(join(home, '.codex', 'prompts', 'lore-sync.md')));
+    assert.deepEqual(uninstallHostCommands('claude', { home }), []);     // 无 commands 的宿主早退
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
 

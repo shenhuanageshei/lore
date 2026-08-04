@@ -880,6 +880,82 @@ function fzRepoDeepPython() {
   return { root, loreDir: lore, git };
 }
 
+// 同名不同扩展的真实案例：scripts/e2e_smoke.py + e2e_smoke.sh（钉 .sh），scripts/abc.py（裸名唯一）
+function fzRepoDeepPin() {
+  const root = mkN(jN(tmpN(), 'lore-deep-pin-'));
+  const git = (...a) => exN2('git', a, { cwd: root, stdio: 'pipe' }).toString().trim();
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  mdN(jN(root, 'scripts'), { recursive: true });
+  wfN(jN(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+  wfN(jN(root, 'scripts', 'e2e_smoke.sh'), 'exec python e2e_smoke.py\n');
+  wfN(jN(root, 'scripts', 'abc.py'), 'ABC = 1\n');
+  const lore = jN(root, '.lore');
+  mdN(jN(lore, 'wiki', 'component'), { recursive: true });
+  mdN(jN(lore, 'journal'), { recursive: true });
+  mdN(jN(lore, '.state'), { recursive: true });
+  wfN(jN(lore, 'config.yml'),
+    'axes:\n  component:\n    code_roots: [scripts]\n    deep:\n      scripts: [e2e_smoke.sh, abc]\n');
+  exN2('git', ['add', '-A'], { cwd: root, stdio: 'pipe' });
+  exN2('git', ['commit', '-q', '-m', 'init'], { cwd: root, stdio: 'pipe' });
+  return { root, loreDir: lore, git, sha: () => git('rev-parse', '--short', 'HEAD') };
+}
+
+test('planSync: explicit pin → worklist id is base name, sourceFile pinned', () => {
+  const r = fzRepoDeepPin();
+  try {
+    const plan = pl(r.loreDir, { all: true });
+    const e2e = plan.worklist.find(w => w.kind === 'deep' && w.id === 'e2e_smoke');
+    const abc = plan.worklist.find(w => w.kind === 'deep' && w.id === 'abc');
+    assert.deepEqual([e2e.sourceFile, e2e.path], ['scripts/e2e_smoke.sh', 'component/e2e_smoke.md']);
+    assert.deepEqual([abc.sourceFile, abc.codeRoot], ['scripts/abc.py', 'scripts']);   // 裸名回归
+    assert.deepEqual(plan.configIssues, []);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync: explicit pin missing → issue with expected, no worklist item, no bare fallback', () => {
+  const r = fzRepoDeepPin();
+  try {
+    rmN(jN(r.root, 'scripts', 'e2e_smoke.sh'), { force: true });
+    const plan = pl(r.loreDir, { all: true });
+    assert.equal(plan.worklist.some(w => w.kind === 'deep' && w.id === 'e2e_smoke'), false);
+    assert.ok(plan.worklist.some(w => w.kind === 'deep' && w.id === 'abc'));   // 其余条目不受影响
+    assert.deepEqual(plan.configIssues, [{
+      kind: 'deep-source-missing', deepRoot: 'scripts', mod: 'e2e_smoke.sh',
+      explicit: true, expected: 'scripts/e2e_smoke.sh',
+    }]);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync: pinned deep entries → component order by base id (not raw entry)', () => {
+  const r = fzRepoDeepPin();
+  try {
+    for (const id of ['scripts', 'e2e_smoke', 'abc']) {
+      wfN(jN(r.loreDir, 'wiki', 'component', `${id}.md`),
+        `---\ntitle: ${id}\nsummary: s\n---\n# component: ${id}\n\n## Current architecture\n\nv1\n`);
+    }
+    fz(r.loreDir, '2026-08-03T00:00:00Z');
+    const manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+    const ids = manifest.axes.find(a => a.id === 'component').pages.map(p => p.id);
+    // config order: [e2e_smoke.sh, abc] → 基名序 [scripts(鸟瞰), e2e_smoke, abc]；
+    // 未归一化时 e2e_smoke 排不到 order 里会退字母序 → ['scripts', 'abc', 'e2e_smoke']
+    assert.deepEqual(ids, ['scripts', 'e2e_smoke', 'abc']);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync: explicit pin inside a group → pageGroups keyed by base id', () => {
+  const r = fzRepoDeepPin();
+  try {
+    wfN(jN(r.loreDir, 'config.yml'),
+      'axes:\n  component:\n    code_roots: [scripts]\n    deep:\n      scripts:\n        入口: [e2e_smoke.sh]\n');
+    wfN(jN(r.loreDir, 'wiki', 'component', 'e2e_smoke.md'),
+      '---\ntitle: e2e_smoke\nsummary: s\n---\n# component: e2e_smoke\n\n## Current architecture\n\nv1\n');
+    fz(r.loreDir, '2026-08-03T00:00:00Z');
+    const manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+    const page = manifest.axes.find(a => a.id === 'component').pages.find(p => p.id === 'e2e_smoke');
+    assert.equal(page.group, '入口');
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
 test('planSync resolves Python and nested deep worklist metadata', () => {
   const r = fzRepoDeepPython();
   try {

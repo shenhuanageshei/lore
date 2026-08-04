@@ -187,7 +187,22 @@ test('resolveConfiguredDeep: bare + explicit same base file → collision issue,
       scripts: { order: ['e2e_smoke', 'e2e_smoke.py'], groups: [] },
     }), {
       entries: [{ deepRoot: 'scripts', entry: 'e2e_smoke', mod: 'e2e_smoke', sourceFile: 'scripts/e2e_smoke.py' }],
-      issues: [{ kind: 'deep-source-collision', deepRoot: 'scripts', mod: 'e2e_smoke', conflictEntry: 'e2e_smoke.py' }],
+      issues: [{ kind: 'deep-source-collision', deepRoot: 'scripts', mod: 'e2e_smoke', entry: 'e2e_smoke', conflictEntry: 'e2e_smoke.py' }],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredDeep: two explicit pins same base → collision preserves both raw entries', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), 'exec python e2e_smoke.py\n');
+    assert.deepEqual(resolveConfiguredDeep(root, ['scripts'], {
+      scripts: { order: ['e2e_smoke.py', 'e2e_smoke.sh'], groups: [] },
+    }), {
+      entries: [{ deepRoot: 'scripts', entry: 'e2e_smoke.py', mod: 'e2e_smoke', sourceFile: 'scripts/e2e_smoke.py' }],
+      issues: [{ kind: 'deep-source-collision', deepRoot: 'scripts', mod: 'e2e_smoke', entry: 'e2e_smoke.py', conflictEntry: 'e2e_smoke.sh' }],
     });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -222,16 +237,16 @@ export function resolveConfiguredDeep(repoRoot, codeRoots, deep) {
       issues.push({ kind: 'deep-root-invalid', deepRoot });
       continue;
     }
-    const seen = new Set();
+    const seen = new Map();                  // id → winner raw entry（碰撞时回填 winner 原文）
     for (const entry of order) {
       const { id } = parseDeepEntry(entry);
       const result = resolveDeepSource(repoRoot, deepRoot, entry);
       if (result.status === 'ok') {
         if (seen.has(id)) {
-          issues.push({ kind: 'deep-source-collision', deepRoot, mod: id, conflictEntry: entry });
+          issues.push({ kind: 'deep-source-collision', deepRoot, mod: id, entry: seen.get(id), conflictEntry: entry });
           continue;
         }
-        seen.add(id);
+        seen.set(id, entry);
         entries.push({ deepRoot, entry, mod: id, sourceFile: result.sourceFile });
       } else if (result.status === 'missing') {
         if (result.expected) issues.push({ kind: 'deep-source-missing', deepRoot, mod: entry, explicit: true, expected: result.expected });
@@ -315,15 +330,16 @@ test('legalIds normalizes explicit file entries to base ids', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('lintDeepConfig: bare + explicit same base file → collision-source diagnostic', () => {
+test('lintDeepConfig: two explicit pins same base → collision-source diagnostic renders both raw entries', () => {
   const root = tmpDir();
   try {
     mkdirSync(join(root, 'pkg'), { recursive: true });
     writeFileSync(join(root, 'pkg', 'entry.py'), '');
+    writeFileSync(join(root, 'pkg', 'entry.sh'), '');
     assert.deepEqual(lintDeepConfig(root, ['pkg'], {
-      pkg: { order: ['entry', 'entry.py'], groups: [] },
+      pkg: { order: ['entry.py', 'entry.sh'], groups: [] },
     }), [
-      { kind: 'collision-source', deepRoot: 'pkg', mod: 'entry', conflictEntry: 'entry.py', message: 'deep pkg: "entry" and "entry.py" resolve to same page id — keep one' },
+      { kind: 'collision-source', deepRoot: 'pkg', mod: 'entry', conflictEntry: 'entry.sh', message: 'deep pkg: "entry.py" and "entry.sh" resolve to same page id — keep one' },
     ]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -406,7 +422,7 @@ export function lintDeepConfig(repoRoot, codeRoots, deep = {}) {
     return {
       kind: 'collision-source', deepRoot: issue.deepRoot, mod: issue.mod,
       conflictEntry: issue.conflictEntry,
-      message: `deep ${issue.deepRoot}: "${issue.mod}" and "${issue.conflictEntry}" resolve to same page id — keep one`,
+      message: `deep ${issue.deepRoot}: "${issue.entry}" and "${issue.conflictEntry}" resolve to same page id — keep one`,
     };
   });
 }

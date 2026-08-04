@@ -158,4 +158,4 @@ flowchart TD
 
 **两层粒度**：
 - **鸟瞰页**（`component/<code_root>`，如 `lib`）：只要**概览档** —— 系统定位 + 模块间架构图 + 模块清单（每条 `[[深度页]]` cross-link）。不要求 9 节机制档。
-- **深度页**（`component/<子模块>`，如 `sync`）：**完整两档**。由 config `axes.component.deep.<root>: [子模块…]` 声明、`plan` 列出（`kind:'deep'`）。**深度页不放 `## Decision history` token**（决策史汇总在鸟瞰页；文件级分流见 ROADMAP 未来项）。
+- **深度页**（`component/<子模块>`，如 `sync`）：**完整两档**。由 config `axes.component.deep.<root>: [子模块…]` 声明、`plan` 列出（`kind:'deep'`）。**深度页不放 `## Decision history` token**（决策史汇总在鸟瞰页；文件级分流见 ROADMAP 未来项）。深度页条目可写 `<name>.<ext>`（如 `e2e_smoke.sh`）钉住具体文件，消解同名不同扩展（`.py`+`.sh`、`.ts`+`.js`）的歧义——页 id 恒为基名（`component/e2e_smoke.md`），裸名条目行为不变；钉住的文件缺失时 lint 报 `missing-source (pinned file)`，不静默回退。

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CODE_EXT, parseDeepEntry, resolveDeepSource } from '../lib/source.js';
+import { CODE_EXT, parseDeepEntry, resolveConfiguredDeep, resolveDeepSource } from '../lib/source.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-source-')); }
 
@@ -81,4 +81,62 @@ test('parseDeepEntry: bare → identity, explicit file → base id, edge cases',
   assert.deepEqual(parseDeepEntry('a.b.js'), { id: 'a.b', explicit: true });
   assert.deepEqual(parseDeepEntry('.py'), { id: '.py', explicit: false });   // 全扩展名 → extname('') → 裸名
   assert.deepEqual(parseDeepEntry('e2e_smoke.PY'), { id: 'e2e_smoke.PY', explicit: false });  // 大写扩展名不在 CODE_EXT
+});
+
+test('resolveConfiguredDeep: explicit pin → canonical mod + entry field, no issues', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), 'exec python e2e_smoke.py\n');
+    assert.deepEqual(resolveConfiguredDeep(root, ['scripts'], {
+      scripts: { order: ['e2e_smoke.sh'], groups: [] },
+    }), {
+      entries: [{ deepRoot: 'scripts', entry: 'e2e_smoke.sh', mod: 'e2e_smoke', sourceFile: 'scripts/e2e_smoke.sh' }],
+      issues: [],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredDeep: bare + explicit same base file → collision issue, first wins', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');   // 只有这一个文件
+    assert.deepEqual(resolveConfiguredDeep(root, ['scripts'], {
+      scripts: { order: ['e2e_smoke', 'e2e_smoke.py'], groups: [] },
+    }), {
+      entries: [{ deepRoot: 'scripts', entry: 'e2e_smoke', mod: 'e2e_smoke', sourceFile: 'scripts/e2e_smoke.py' }],
+      issues: [{ kind: 'deep-source-collision', deepRoot: 'scripts', mod: 'e2e_smoke', entry: 'e2e_smoke', conflictEntry: 'e2e_smoke.py' }],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredDeep: two explicit pins same base → collision preserves both raw entries', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), 'exec python e2e_smoke.py\n');
+    assert.deepEqual(resolveConfiguredDeep(root, ['scripts'], {
+      scripts: { order: ['e2e_smoke.py', 'e2e_smoke.sh'], groups: [] },
+    }), {
+      entries: [{ deepRoot: 'scripts', entry: 'e2e_smoke.py', mod: 'e2e_smoke', sourceFile: 'scripts/e2e_smoke.py' }],
+      issues: [{ kind: 'deep-source-collision', deepRoot: 'scripts', mod: 'e2e_smoke', entry: 'e2e_smoke.py', conflictEntry: 'e2e_smoke.sh' }],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredDeep: explicit missing → issue with explicit flag + expected', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+    assert.deepEqual(resolveConfiguredDeep(root, ['scripts'], {
+      scripts: { order: ['e2e_smoke.sh'], groups: [] },
+    }), {
+      entries: [],
+      issues: [{ kind: 'deep-source-missing', deepRoot: 'scripts', mod: 'e2e_smoke.sh', explicit: true, expected: 'scripts/e2e_smoke.sh' }],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

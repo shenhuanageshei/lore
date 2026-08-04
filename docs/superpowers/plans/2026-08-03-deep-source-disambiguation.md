@@ -323,8 +323,8 @@ test('legalIds normalizes explicit file entries to base ids', () => {
     writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), '');
     const deep = { scripts: { order: ['e2e_smoke.sh'], groups: [] } };
     assert.deepEqual(lintOrphans(['e2e_smoke'], ['scripts'], deep, root), []);   // 页 id 是基名 → 不孤儿
-    assert.deepEqual(lintMissing(['e2e_smoke'], ['scripts'], deep, root), []);   // 不报缺
-    assert.deepEqual(lintMissing([], ['scripts'], deep, root), ['e2e_smoke']);   // 页真缺时按基名报
+    assert.deepEqual(lintMissing(['scripts', 'e2e_smoke'], ['scripts'], deep, root), []);   // 基名页 + code_root 页都在 → 不报缺
+    assert.deepEqual(lintMissing(['scripts'], ['scripts'], deep, root), ['e2e_smoke']);   // 页真缺时按基名报
     // 纯配置分支（无 repoRoot，不碰 fs）
     assert.deepEqual(lintOrphans(['e2e_smoke'], ['scripts'], deep), []);
   } finally { rmSync(root, { recursive: true, force: true }); }

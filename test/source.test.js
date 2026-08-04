@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CODE_EXT, resolveDeepSource } from '../lib/source.js';
+import { CODE_EXT, parseDeepEntry, resolveDeepSource } from '../lib/source.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-source-')); }
 
@@ -48,4 +48,37 @@ test('resolveDeepSource reports sorted candidates for ambiguous supported files'
       status: 'ambiguous', candidates: ['lib/sync.js', 'lib/sync.ts'],
     });
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveDeepSource: explicit pin resolves the exact file among same-base siblings', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), 'exec python e2e_smoke.py\n');
+    assert.deepEqual(resolveDeepSource(root, 'scripts', 'e2e_smoke.sh'), {
+      status: 'ok', sourceFile: 'scripts/e2e_smoke.sh',
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveDeepSource: explicit pin missing → missing with expected path (no bare fallback)', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), 'DRIVER = 1\n');
+    assert.deepEqual(resolveDeepSource(root, 'scripts', 'e2e_smoke.sh'), {
+      status: 'missing', candidates: [], expected: 'scripts/e2e_smoke.sh',
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('parseDeepEntry: bare → identity, explicit file → base id, edge cases', () => {
+  assert.deepEqual(parseDeepEntry('e2e_smoke'), { id: 'e2e_smoke', explicit: false });
+  assert.deepEqual(parseDeepEntry('e2e_smoke.sh'), { id: 'e2e_smoke', explicit: true });
+  assert.deepEqual(parseDeepEntry('e2e_smoke.py'), { id: 'e2e_smoke', explicit: true });
+  assert.deepEqual(parseDeepEntry('sync.tsx'), { id: 'sync', explicit: true });
+  assert.deepEqual(parseDeepEntry('a.b.js'), { id: 'a.b', explicit: true });
+  assert.deepEqual(parseDeepEntry('.py'), { id: '.py', explicit: false });   // 全扩展名 → extname('') → 裸名
+  assert.deepEqual(parseDeepEntry('e2e_smoke.PY'), { id: 'e2e_smoke.PY', explicit: false });  // 大写扩展名不在 CODE_EXT
 });

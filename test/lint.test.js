@@ -283,10 +283,11 @@ test('lintDeepConfig: reports missing and ambiguous direct sources', () => {
     writeFileSync(join(root, 'pkg', 'entry.py'), '');
     writeFileSync(join(root, 'pkg', 'entry.js'), '');
     assert.deepEqual(lintDeepConfig(root, ['pkg'], {
-      pkg: { order: ['absent', 'entry'], groups: [] },
+      pkg: { order: ['absent', 'entry', 'missing.sh'], groups: [] },
     }), [
       { kind: 'missing-source', deepRoot: 'pkg', mod: 'absent', message: 'no supported source file found for pkg/absent' },
-      { kind: 'ambiguous-source', deepRoot: 'pkg', mod: 'entry', candidates: ['pkg/entry.js', 'pkg/entry.py'], message: 'multiple supported source files found for pkg/entry' },
+      { kind: 'ambiguous-source', deepRoot: 'pkg', mod: 'entry', candidates: ['pkg/entry.js', 'pkg/entry.py'], message: 'multiple supported source files found for pkg/entry — pin one: entry.js / entry.py' },
+      { kind: 'missing-source', deepRoot: 'pkg', mod: 'missing.sh', expected: 'pkg/missing.sh', message: 'no supported source file found for pkg/missing.sh (pinned file)' },
     ]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -302,6 +303,49 @@ test('valid deep roots keep configured module ids legal when source resolution f
     mkdirSync(join(root, 'pkg'), { recursive: true });
     const deep = { pkg: { order: ['absent'], groups: [] } };
     assert.deepEqual(lintOrphans(['absent'], ['pkg'], deep, root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('legalIds normalizes explicit file entries to base ids', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.py'), '');
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), '');
+    const deep = { scripts: { order: ['e2e_smoke.sh'], groups: [] } };
+    assert.deepEqual(lintOrphans(['e2e_smoke'], ['scripts'], deep, root), []);   // 页 id 是基名 → 不孤儿
+    assert.deepEqual(lintMissing(['scripts', 'e2e_smoke'], ['scripts'], deep, root), []);   // 基名页 + code_root 页都在 → 不报缺
+    assert.deepEqual(lintMissing(['scripts'], ['scripts'], deep, root), ['e2e_smoke']);   // 页真缺时按基名报
+    // 纯配置分支（无 repoRoot，不碰 fs）
+    assert.deepEqual(lintOrphans(['e2e_smoke'], ['scripts'], deep), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintDeepConfig: two explicit pins same base → collision-source diagnostic renders both raw entries', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    writeFileSync(join(root, 'pkg', 'entry.py'), '');
+    writeFileSync(join(root, 'pkg', 'entry.sh'), '');
+    assert.deepEqual(lintDeepConfig(root, ['pkg'], {
+      pkg: { order: ['entry.py', 'entry.sh'], groups: [] },
+    }), [
+      { kind: 'collision-source', deepRoot: 'pkg', mod: 'entry', conflictEntry: 'entry.sh', message: 'deep pkg: "entry.py" and "entry.sh" resolve to same page id — keep one' },
+    ]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintMissingMechanism checks the base-id page for explicit entries', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'wiki', 'component'), { recursive: true });
+    const deep = { scripts: { order: ['e2e_smoke.sh'], groups: [] } };
+    writeFileSync(join(root, 'wiki', 'component', 'e2e_smoke.md'),
+      '---\ntitle: e2e_smoke\nsummary: s\n---\n# component: e2e_smoke\n\n## 机制详解\n\nok\n');
+    assert.deepEqual(lintMissingMechanism(join(root, 'wiki'), deep), []);
+    writeFileSync(join(root, 'wiki', 'component', 'e2e_smoke.md'),
+      '---\ntitle: e2e_smoke\nsummary: s\n---\n# component: e2e_smoke\n\nprose\n');
+    assert.deepEqual(lintMissingMechanism(join(root, 'wiki'), deep), ['component/e2e_smoke.md']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -330,7 +330,7 @@ test('lintDeepConfig: two explicit pins same base → collision-source diagnosti
     assert.deepEqual(lintDeepConfig(root, ['pkg'], {
       pkg: { order: ['entry.py', 'entry.sh'], groups: [] },
     }), [
-      { kind: 'collision-source', deepRoot: 'pkg', mod: 'entry', conflictEntry: 'entry.sh', message: 'deep pkg: "entry.py" and "entry.sh" resolve to same page id — keep one' },
+      { kind: 'collision-source', deepRoot: 'pkg', mod: 'entry', conflictEntry: 'entry.sh', message: '"entry.py" and "entry.sh" resolve to same page id — keep one' },
     ]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

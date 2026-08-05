@@ -140,3 +140,27 @@ test('resolveConfiguredDeep: explicit missing → issue with explicit flag + exp
     });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('resolveConfiguredDeep: duplicate identical entry → silently deduped (no self-collision)', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'scripts', 'e2e_smoke.sh'), 'exec python e2e_smoke.py\n');
+    assert.deepEqual(resolveConfiguredDeep(root, ['scripts'], {
+      scripts: { order: ['e2e_smoke.sh', 'e2e_smoke.sh'], groups: [] },
+    }), {
+      entries: [{ deepRoot: 'scripts', entry: 'e2e_smoke.sh', mod: 'e2e_smoke', sourceFile: 'scripts/e2e_smoke.sh' }],
+      issues: [],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveDeepSource: explicit pin whose name is a directory → missing (isFile guard)', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'scripts', 'e2e_smoke.sh'), { recursive: true });   // 目录名叫 e2e_smoke.sh
+    assert.deepEqual(resolveDeepSource(root, 'scripts', 'e2e_smoke.sh'), {
+      status: 'missing', candidates: [], expected: 'scripts/e2e_smoke.sh',
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

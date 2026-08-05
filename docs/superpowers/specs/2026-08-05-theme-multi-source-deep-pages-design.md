@@ -319,3 +319,70 @@ The feature is complete only when:
 ## Implementation Handoff
 
 The implementation session should use this document as the requirements source, then create a separate detailed plan. It must inspect the latest `lib/config.js`, `lib/source.js`, `lib/sync.js`, `lib/manifest.js`, `lib/graph.js`, `lib/lint.js`, site navigation, MCP handlers, and their tests before assigning tasks, because the current Lore worktree contains active deep-source-disambiguation changes that may alter shared source-resolution contracts.
+
+## Amendments (2026-08-06)
+
+A design review closed eight gaps. The approved resolutions below amend the sections above; where they conflict with earlier text, the amendments win.
+
+### 1. Child decision history is source-scoped
+
+A theme-deep child's Decision history is materialized from its parent's journal atoms, filtered to atoms whose commit touched the child's resolved source files:
+
+```js
+parentAtoms = allAtoms.filter(a => a.facets?.theme?.includes(parent));
+childAtoms = parentAtoms.filter(a => (a.refs?.files ?? []).some(f => childSources.includes(f)));
+```
+
+`atoms`/`commits` frontmatter counts equal the filtered set. An empty result materializes the existing "no journal atoms" placeholder. Manual note atoms (no `refs.files`) are excluded by construction.
+
+This requires no new git calls: mined atoms already carry `refs.files` (from `git log --name-only` at mine time), and the filter consumes the exact same resolved source list as planning/finalize — no re-resolution. Known limitation: `--name-only` reflects paths as of each commit, so pre-rename commits are not matched. Accepted for v1.
+
+### 2. `parseConfigDocsAxis` is scoped to the `axes.docs` block
+
+The theme-deep block introduces `sources:` keys, which the current first-match regex in `parseConfigDocsAxis` would hijack (a multi-line child record line begins with `sources:`). Fix: locate the `docs:` sub-block under `axes:` and match `sources:`/`docs_glob:` only inside it — the same block-scoping discipline as `parseConfigLanguage`. Update the "no other block uses sources:" assumption comment in `lib/config.js`.
+
+Child records are serialized in canonical one-line form `- { id: ..., sources: [a, b] }` (line starts with `- {`, never matches the docs signal). The parser still tolerates multi-line records. Regression test: a theme-deep block before `axes.docs` (or with no docs block) leaves the docs axis correct or absent.
+
+### 3. Glob expansion uses git pathspecs, not a JS glob library
+
+Zero-dep lore has no glob library. Expand configured globs with one git call:
+
+```
+git ls-files --cached --others --exclude-standard ':(glob)<pattern>'
+```
+
+This is gitignore-aware for free: ignored `.lore`/`.git`/dependency caches are excluded by git itself, consistent with the existing `execFileSync('git')` pattern. Literal sources stay fs-existence based (validation rule 6) and may be untracked; globs are git-resolved (source trees are tracked, and staleness is git-driven anyway). A non-git repo resolves a glob to `invalid`. Existing budget limits (files per glob, total per sync plan) remain hard bounds.
+
+### 4. Legacy `--` theme IDs: non-blocking warning
+
+A top-level theme id containing `--` emits informational `theme-id-reserved-separator` (does not affect lint `clean`, preserving backward compatibility). Real canonical-id collisions remain the hard `theme-deep-id-collision` diagnostic (validation rule 2); remediation is to rename the legacy theme or choose a different child id.
+
+### 5. Orphan policy decided
+
+Apply the preferred policy: remove a generated page only when its manifest entry proves `kind: 'deep'` + a `parent` — and remove its translation sidecars (`<child>.<lang>.md`) alongside. A handwritten page occupying a child path is kept, excluded from navigation, and fails lint until explicitly cleaned. Fingerprint GC already drops removed pages.
+
+### 6. Lint diagnostics added
+
+Add to the diagnostic list:
+
+- `theme-deep-diagram-missing` — a child lacks a mermaid architecture diagram. Children are mechanism-grade and require the diagram, mirroring component deep pages; overview pages are exempt. Reuses the `lintMissingDiagram` template. This amends the Page Content Contract to include a mermaid architecture diagram.
+- `theme-id-reserved-separator` — informational, non-blocking (see amendment 4).
+
+### 7. Consistency corrections
+
+- Resolver vocabularies: document in `lib/source.js` that `resolveThemeDeepSources` (ok/missing/invalid/outside-repo) complements `resolveDeepSource` (ok/missing/ambiguous); the input domains differ, the error-shape discipline is shared.
+- Sync planning: parent theme overviews are unconditionally queued today (themes always enter the worklist), so the earlier "unless the parent is independently stale" phrasing is corrected: parent rewrite cadence is unchanged (always queued); child staleness is tracked independently per source and neither drives the other.
+
+### 8. Test and acceptance additions
+
+Tests:
+- Docs-parser regression: theme-deep block before `axes.docs`, or no docs block.
+- Glob: gitignore-aware expansion; `.lore`/`.git` excluded; budget overflow fails.
+- Child decision history: source-filtered, including empty result.
+- Orphan: managed child removed deterministically; handwritten page kept + lint failure + excluded from navigation.
+- `theme-id-reserved-separator` does not affect `clean`.
+- Child missing-diagram diagnostic.
+
+Acceptance:
+- A fixture with a `theme.deep` block leaves docs-axis behavior unchanged.
+- Child decision history is strictly source-filtered.

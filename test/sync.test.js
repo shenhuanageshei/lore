@@ -1481,3 +1481,24 @@ test('finalizeSync: managed theme-deep orphan removed with translation sidecar (
     assert.equal(existsSync(jN(wd, 'theme', 'sidecar-config-decryption--discovery-association.en.md')), false);
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
+
+test('buildIndex nests theme children under parents with group labels', () => {
+  const out = buildIndex({
+    theme: [
+      { id: 'p', title: 'P' },
+      { id: 'p--c1', title: 'C1', parent: 'p', kind: 'deep', group: 'g1' },
+      { id: 'p--c2', title: 'C2', parent: 'p', kind: 'deep', group: 'g1' },
+      { id: 'p--c3', title: 'C3', parent: 'p', kind: 'deep', group: 'g2' },
+    ],
+  });
+  assert.match(out, /## Theme/);
+  assert.match(out, /- \[\[p\]\]/);
+  assert.match(out, /  - g1/);
+  assert.match(out, /    - \[\[p--c1\]\]/);
+  assert.match(out, /    - \[\[p--c2\]\]/);
+  assert.match(out, /  - g2/);
+  assert.match(out, /    - \[\[p--c3\]\]/);
+  // 无 parent 的普通主题页保持平铺
+  const flat = buildIndex({ theme: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }] });
+  assert.match(flat, /- \[\[a\]\]\n- \[\[b\]\]/);
+});

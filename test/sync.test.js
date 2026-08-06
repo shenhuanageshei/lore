@@ -1362,3 +1362,71 @@ test('renderDecisionHistory: 旧原子 why 首行是 trailer → 渲染跳过噪
   ]);
   assert.equal(pure, '- **docs: z** (bbb1234, 2026-06-09)');
 });
+
+// --- theme-deep pages (multi-source children; Task 4 planSync, fixture reused by Task 6) ---
+// theme-deep fixture（Task 6 用例复用）：父主题 + 1 分组 1 子（源 2 文件）；
+// language zh/en —— en 是翻译 sidecar 语言（孤儿测试要删 .en.md）
+function fzRepoThemeDeep() {
+  const root = mkN(tmpN() + 'lore-theme-deep-');
+  const git = (...a) => exN2('git', a, { cwd: root, stdio: 'pipe' }).toString().trim();
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  mdN(jN(root, 'sidecar'), { recursive: true });
+  wfN(jN(root, 'sidecar', 'probe.py'), 'PROBE = 1\n');
+  wfN(jN(root, 'sidecar', 'assoc.py'), 'ASSOC = 1\n');
+  mdN(jN(root, 'server'), { recursive: true });
+  wfN(jN(root, 'server', 'finalize.py'), 'FINAL = 1\n');
+  const lore = jN(root, '.lore');
+  mdN(jN(lore, 'wiki', 'theme'), { recursive: true });
+  mdN(jN(lore, 'journal'), { recursive: true });
+  mdN(jN(lore, '.state'), { recursive: true });
+  wfN(jN(lore, 'config.yml'),
+    'language:\n  default: zh\n  available: [zh, en]\naxes:\n  theme:\n    values:\n      - { id: sidecar-config-decryption, desc: d, match: [sidecar] }\n    deep:\n      sidecar-config-decryption:\n        发现与关联:\n          - { id: discovery-association, sources: [sidecar/probe.py, sidecar/assoc.py] }\n');
+  exN2('git', ['add', '-A'], { cwd: root, stdio: 'pipe' });
+  exN2('git', ['commit', '-qm', 'init'], { cwd: root, stdio: 'pipe' });
+  return { root, loreDir: lore, git };
+}
+
+test('planSync: theme-deep child work item with canonical id, sources, missing-page reason', () => {
+  const r = fzRepoThemeDeep();
+  try {
+    const plan = pl(r.loreDir, { all: true });
+    const child = plan.worklist.find(w => w.kind === 'deep' && w.axis === 'theme');
+    assert.deepEqual(child, {
+      axis: 'theme', id: 'sidecar-config-decryption--discovery-association', kind: 'deep',
+      parent: 'sidecar-config-decryption', group: '发现与关联',
+      sourceFiles: ['sidecar/assoc.py', 'sidecar/probe.py'],
+      path: 'theme/sidecar-config-decryption--discovery-association.md',
+      priorExists: false, stale: null, reason: 'all',
+    });
+    assert.deepEqual(plan.configIssues, []);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('planSync: incremental — one changed source queues only the affected child', () => {
+  const r = fzRepoThemeDeep();
+  try {
+    const lore = r.loreDir;
+    const themeDir = jN(lore, 'wiki', 'theme');
+    // 两个子页都先落盘（第二次 finalize 后都有指纹）
+    wfN(jN(themeDir, 'sidecar-config-decryption--discovery-association.md'),
+      '---\ntitle: DA\nsummary: s\n---\n# theme-deep: discovery-association\n\n## 机制详解\n\nv1\n');
+    wfN(jN(themeDir, 'sidecar-config-decryption--canonical-propagation.md'),
+      '---\ntitle: CP\nsummary: s\n---\n# theme-deep: canonical-propagation\n\n## 机制详解\n\nv1\n');
+    // 加第二个子（源 server/finalize.py）
+    const cfg = rdN(jN(lore, 'config.yml'), 'utf8');
+    wfN(jN(lore, 'config.yml'), cfg + '        执行与传播:\n          - { id: canonical-propagation, sources: [server/finalize.py] }\n');
+    const plan1 = pl(lore);                       // 首次：两子都 new
+    assert.ok(plan1.worklist.some(w => w.kind === 'deep' && w.id === 'sidecar-config-decryption--discovery-association'));
+    fz(lore, '2026-08-05T00:00:00Z');             // finalize 建立两子指纹
+    // 只改 probe.py
+    wfN(jN(r.root, 'sidecar', 'probe.py'), 'PROBE = 2\n');
+    exN2('git', ['add', '-A'], { cwd: r.root, stdio: 'pipe' });
+    exN2('git', ['commit', '-qm', 'change probe'], { cwd: r.root, stdio: 'pipe' });
+    const plan2 = pl(lore);
+    const da = plan2.worklist.find(w => w.kind === 'deep' && w.id === 'sidecar-config-decryption--discovery-association');
+    const cp = plan2.worklist.find(w => w.kind === 'deep' && w.id === 'sidecar-config-decryption--canonical-propagation');
+    assert.equal(da.reason, 'source-changed');
+    assert.ok((da.stale ?? 0) >= 1);
+    assert.equal(cp, undefined);                  // 兄弟子源没变 → 不排队（fresh）
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});

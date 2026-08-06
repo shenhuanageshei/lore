@@ -368,3 +368,17 @@ test('resolveThemeDeepSources: aggregate child budget overflow → invalid (sum 
     assert.match(r.reason, /child expanded to 300 files/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('resolveConfiguredDeep: empty-order root → no-op (no spurious deep-root-invalid)', () => {
+  // parseConfigDeep 全局扫 `deep:` 会把 axes.theme.deep 的父主题行扫成空 order 根
+  // （theme.deep 子记录是 `- { id }` 行，parseConfigDeep 不解析）→ 空 order = 无可解析模块，
+  // 根校验无意义（theme 父不是 code_root），绝不能误报 deep-root-invalid。
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'sidecar'), { recursive: true });
+    writeFileSync(join(root, 'sidecar', 'probe.py'), 'x');
+    assert.deepEqual(resolveConfiguredDeep(root, [], {
+      'sidecar-config-decryption': { order: [], groups: [] },
+    }), { entries: [], issues: [] });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

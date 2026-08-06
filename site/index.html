@@ -339,7 +339,7 @@ function buildSidebar() {
   };
   const themeHtml = (ax) => buildThemeRows(ax.pages).map(row => {
     const kids = row.groups.map(g =>
-      `<div class="grp">▸ ${g.group}</div>${g.rows.map(k => linkHtml(ax, k)).join('')}`
+      (g.group ? `<div class="grp">▸ ${g.group}</div>` : '') + g.rows.map(k => linkHtml(ax, k)).join('')
     ).join('');
     return linkHtml(ax, row.page) + (kids ? `<div class="theme-children">${kids}</div>` : '');
   }).join('');

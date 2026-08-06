@@ -356,3 +356,14 @@ test('buildThemeRows nests children under parents with group order', () => {
   assert.deepEqual(p.groups[0].rows.map(r => r.id), ['p--c1', 'p--c2']);
   assert.deepEqual(p.groups[1].rows.map(r => r.id), ['p--c3']);
 });
+
+test('buildThemeRows buckets an ungrouped child under an empty group name', () => {
+  const rows = buildThemeRows([
+    { id: 'p', title: 'P' },
+    { id: 'p--c1', title: 'C1', parent: 'p' },          // 无 group
+    { id: 'p--c2', title: 'C2', parent: 'p', group: 'g1' },
+  ]);
+  const p = rows.find(r => r.page.id === 'p');
+  assert.deepEqual(p.groups.map(g => g.group), ['', 'g1']);   // 空组在前（无组子页），具名组在后
+  assert.deepEqual(p.groups[0].rows.map(r => r.id), ['p--c1']);
+});

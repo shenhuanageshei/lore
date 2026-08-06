@@ -1430,3 +1430,54 @@ test('planSync: incremental — one changed source queues only the affected chil
     assert.equal(cp, undefined);                  // 兄弟子源没变 → 不排队（fresh）
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
+
+test('finalizeSync: theme-deep child decision history is source-filtered (Amendment 1)', () => {
+  const r = fzRepoThemeDeep();
+  try {
+    const lore = r.loreDir;
+    const git = r.git;
+    // 三个真实可达 commit 原子：init（触达 probe+assoc）、probe change（触达 probe）、unrelated（只触达别处）
+    const sha1 = git('rev-parse', 'HEAD');
+    wfN(jN(r.root, 'sidecar', 'probe.py'), 'PROBE = 2\n');
+    exN2('git', ['add', '-A'], { cwd: r.root, stdio: 'pipe' });
+    exN2('git', ['commit', '-qm', 'probe change'], { cwd: r.root, stdio: 'pipe' });
+    const sha2 = git('rev-parse', 'HEAD');
+    wfN(jN(r.root, 'unrelated.txt'), 'x\n');
+    exN2('git', ['add', '-A'], { cwd: r.root, stdio: 'pipe' });
+    exN2('git', ['commit', '-qm', 'unrelated'], { cwd: r.root, stdio: 'pipe' });
+    const sha3 = git('rev-parse', 'HEAD');
+    const atoms = [
+      { id: `commit:${sha1}`, ts: '2026-08-04T00:00:00Z', kind: 'commit', commit: sha1, title: 'init', why: 'seed', facets: { theme: ['sidecar-config-decryption'], component: [], flow: [] }, refs: { files: ['sidecar/probe.py', 'sidecar/assoc.py'], pitfall: null, related: [] } },
+      { id: `commit:${sha2}`, ts: '2026-08-05T00:00:00Z', kind: 'commit', commit: sha2, title: 'probe change', why: 'touched probe', facets: { theme: ['sidecar-config-decryption'], component: [], flow: [] }, refs: { files: ['sidecar/probe.py'], pitfall: null, related: [] } },
+      { id: `commit:${sha3}`, ts: '2026-08-05T01:00:00Z', kind: 'commit', commit: sha3, title: 'unrelated', why: 'not sidecar', facets: { theme: ['sidecar-config-decryption'], component: [], flow: [] }, refs: { files: ['unrelated.txt'], pitfall: null, related: [] } },
+    ];
+    for (const a of atoms) appendAtom(jN(lore, 'journal'), a);
+    // 父页 + 子页（含 Decision history token，foldJournal 才物化）
+    wfN(jN(lore, 'wiki', 'theme', 'sidecar-config-decryption.md'), '---\ntitle: SCD\nsummary: s\n---\n# theme: sidecar-config-decryption\n');
+    wfN(jN(lore, 'wiki', 'theme', 'sidecar-config-decryption--discovery-association.md'),
+      '---\ntitle: DA\nsummary: s\n---\n# theme-deep: discovery-association\n\n## 机制详解\n\nv1\n\n## Decision history\n\n{{LORE_JOURNAL}}\n');
+    fz(lore, '2026-08-05T02:00:00Z');
+    const childText = rdN(jN(lore, 'wiki', 'theme', 'sidecar-config-decryption--discovery-association.md'), 'utf8');
+    assert.match(childText, /probe change/);          // 触达 probe 的原子在
+    assert.doesNotMatch(childText, /unrelated/);      // 无关原子被过滤
+    assert.match(childText, /seed/);                  // 触达 probe/assoc 的 init 原子在
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+test('finalizeSync: managed theme-deep orphan removed with translation sidecar (Amendment 5)', () => {
+  const r = fzRepoThemeDeep();
+  try {
+    const lore = r.loreDir;
+    const wd = jN(lore, 'wiki');
+    const childRel = 'theme/sidecar-config-decryption--discovery-association.md';
+    wfN(jN(wd, childRel), '---\ntitle: DA\nsummary: s\n---\n# x\n\n## 机制详解\n\nv1\n');
+    wfN(jN(wd, 'theme', 'sidecar-config-decryption--discovery-association.en.md'), '---\ntitle: DA\nsummary: s\ntranslation_source_hash: x\n---\n# x\n');
+    fz(lore, '2026-08-05T00:00:00Z');                 // 第一轮：manifest 建立 kind:deep 证明（Task 5 已实现）
+    // 第二轮：config 移除该子 → 受管孤儿应被删（含 .en.md sidecar；zh 默认 en 非默认）
+    const cfg = rdN(jN(lore, 'config.yml'), 'utf8');
+    wfN(jN(lore, 'config.yml'), cfg.replace(/    deep:[\s\S]*$/, ''));
+    fz(lore, '2026-08-05T01:00:00Z');
+    assert.equal(existsSync(jN(wd, childRel)), false);
+    assert.equal(existsSync(jN(wd, 'theme', 'sidecar-config-decryption--discovery-association.en.md')), false);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});

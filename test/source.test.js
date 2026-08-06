@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CODE_EXT, parseDeepEntry, resolveConfiguredDeep, resolveDeepSource, resolveThemeDeepSource, resolveThemeDeepSources, resolveConfiguredThemeDeep } from '../lib/source.js';
@@ -324,4 +324,47 @@ test('resolveConfiguredThemeDeep: symlink/junction outside repo → outside-repo
     const r = resolveThemeDeepSource(root, 'pkg/link/pkg/x.py');
     assert.equal(r.status, 'outside-repo');
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: glob preserves non-ASCII filenames (core.quotePath=false)', () => {
+  const root = gitRepoWith({ 'pkg/文档.py': 'x', 'pkg/b.py': 'x' });
+  try {
+    const r = resolveThemeDeepSource(root, 'pkg/**');
+    assert.equal(r.status, 'ok');
+    assert.deepEqual(r.sourceFiles, ['pkg/b.py', 'pkg/文档.py']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: glob containing an escaping symlink → outside-repo', (t) => {
+  const root = tmpRepo();
+  const outside = tmpRepo();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    writeFileSync(join(root, 'pkg', 'a.py'), 'x');
+    writeFileSync(join(outside, 'evil.py'), 'x');
+    try {
+      symlinkSync(join(outside, 'evil.py'), join(root, 'pkg', 'evil.py'), 'file');
+    } catch { t.skip('file symlink unavailable'); return; }
+    // git must track the symlink as a symlink for the escape to be visible
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    execFileSync('git', ['config', 'core.symlinks', 'true'], { cwd: root });
+    execFileSync('git', ['add', '-A'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+    const r = resolveThemeDeepSource(root, 'pkg/**');
+    assert.equal(r.status, 'outside-repo');
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSources: aggregate child budget overflow → invalid (sum across entries)', () => {
+  const many = {};
+  for (let k = 0; k < 150; k++) { many[`d1/f${k}.py`] = 'x'; many[`d2/f${k}.py`] = 'x'; }
+  const root = gitRepoWith(many);
+  try {
+    const r = resolveThemeDeepSources(root, ['d1/**', 'd2/**']);
+    assert.equal(r.status, 'invalid');
+    assert.equal(r.entry, '');
+    assert.match(r.reason, /child expanded to 300 files/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

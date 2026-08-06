@@ -102,7 +102,7 @@ node lib/host.js status                   # 查状态；node lib/host.js uninsta
 | **post-commit hook** | 捕获①（自动） | 每 commit 一条 commit 骨架原子（component facet 路径推导） | 否 |
 | `/lore:mine` | 捕获③（回填） | `git log` 全历史 → commit 原子（按 sha 去重，幂等） | 否 |
 | `/lore:note` | 捕获②（人工 why） | agent 决策当下记 `kind:decision` 原子（why + facets） | agent |
-| `/lore:sync` | 合成 | component/theme/flow 三轴页（agent 写架构 prose；Node 折 journal + INDEX + manifest） | 混合 |
+| `/lore:sync` | 合成 | component/theme/flow 三轴页（agent 写架构 prose；Node 折 journal + INDEX + manifest）；theme 多源子页按源增量 | 混合 |
 | `/lore:serve` | 浏览 + 控制 | 本地 server + 浏览器壳（侧栏分组/搜索/多主题/mermaid lightbox）+ **同步控制台**（档位切换/立即刷新/重写排队/auto 参数） | 否 |
 | `/lore:portal` | 浏览（聚合） | 单机常驻门户（7842）聚合本机所有 lore 仓库：切仓下拉、跨仓搜索、控制台可操作（API 按 repo 转发）、接管各仓 auto 调度；`autostart` 子命令开机自启（Windows） | 否 |
 | **migrate**（自动） | 迁移 | 引擎升级后 repo 内资产自动收敛（壳 / hook stub / config 补缺块 / resident），每次 finalize 触发，`node lib/migrate.js <repo>` 可手动 | 否 |
@@ -116,13 +116,14 @@ node lib/host.js status                   # 查状态；node lib/host.js uninsta
 ```
 目标仓库/
 ├── .lore/                       # facts-only 进库：journal+config 跟踪；wiki/site/.state gitignored
-│   ├── config.yml               # 唯一存放本 repo 特定信息处（axes / code_roots / theme.match / flow.spans / journal）——进库
+│   ├── config.yml               # 唯一存放本 repo 特定信息处（axes / code_roots / theme.match / theme.deep / flow.spans / journal）——进库
 │   ├── journal/YYYY/MM/*.ndjson # append-only 决策原子（耐久知识层）——进库，merge=union 多机不冲突
 │   ├── wiki/                    # 合成的物化视图（生成物，clone 后 /lore:sync 再生）——gitignored
 │   │   ├── INDEX.md             # 全轴目录（人读）
 │   │   ├── .manifest.json       # 机读投影（壳 + ask 消费）
 │   │   ├── component/<id>.md    # 轴：代码结构
 │   │   ├── theme/<id>.md        # 轴：横切主线（关键词 match 打标）
+│   │   ├── theme/<id>--<child>.md # 主题多源子页（axes.theme.deep 声明，源级陈旧度 + 源过滤决策史 + 机制级质量门）
 │   │   └── flow/<id>.md         # 轴：数据流（component ∈ spans 打标）
 │   ├── site/index.html          # 浏览器壳（引擎领地，对齐器自动刷新）——gitignored
 │   └── .state/                  # 引擎缓存 + serve.pid + migrations.json（gitignored）

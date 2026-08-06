@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CODE_EXT, parseDeepEntry, resolveConfiguredDeep, resolveDeepSource } from '../lib/source.js';
+import { CODE_EXT, parseDeepEntry, resolveConfiguredDeep, resolveDeepSource, resolveThemeDeepSource, resolveThemeDeepSources, resolveConfiguredThemeDeep } from '../lib/source.js';
+import { parseConfigThemeDeep } from '../lib/config.js';
 
 function tmpRepo() { return mkdtempSync(join(tmpdir(), 'lore-source-')); }
 
@@ -163,4 +165,163 @@ test('resolveDeepSource: explicit pin whose name is a directory → missing (isF
       status: 'missing', candidates: [], expected: 'scripts/e2e_smoke.sh',
     });
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: literal file resolves to slash-normalized repo path', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'mal_analyze', 'sidecar'), { recursive: true });
+    writeFileSync(join(root, 'mal_analyze', 'sidecar', 'probe.py'), 'x');
+    assert.deepEqual(resolveThemeDeepSource(root, 'mal_analyze/sidecar/probe.py'), {
+      status: 'ok', sourceFiles: ['mal_analyze/sidecar/probe.py'],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: literal missing → missing with matches []', () => {
+  const root = tmpRepo();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    assert.deepEqual(resolveThemeDeepSource(root, 'pkg/nope.py'), { status: 'missing', matches: [] });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: absolute / drive / .. paths → invalid', () => {
+  const root = tmpRepo();
+  try {
+    for (const entry of ['C:/x/y.py', '/etc/passwd', '../outside.py', 'a/../../b.py']) {
+      assert.equal(resolveThemeDeepSource(root, entry).status, 'invalid', entry);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// git 仓库：glob 展开尊重 .gitignore；零匹配 → missing
+function gitRepoWith(files, ignoreLines = []) {
+  const root = tmpRepo();
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  for (const [rel, body] of Object.entries(files)) {
+    mkdirSync(join(root, rel.split('/').slice(0, -1).join('/')), { recursive: true });
+    writeFileSync(join(root, rel), body);
+  }
+  if (ignoreLines.length) writeFileSync(join(root, '.gitignore'), ignoreLines.join('\n') + '\n');
+  execFileSync('git', ['add', '-A'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return root;
+}
+
+test('resolveThemeDeepSource: glob expands via git, excludes gitignored files', () => {
+  const root = gitRepoWith({
+    'server/analyst/a.py': 'x',
+    'server/analyst/b.py': 'x',
+    'server/analyst/nested/c.py': 'x',
+    'server/analyst/ignored.py': 'x',
+  }, ['server/analyst/ignored.py']);
+  try {
+    const r = resolveThemeDeepSource(root, 'server/analyst/**');
+    assert.equal(r.status, 'ok');
+    assert.deepEqual(r.sourceFiles, ['server/analyst/a.py', 'server/analyst/b.py', 'server/analyst/nested/c.py']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: glob no match → missing', () => {
+  const root = gitRepoWith({ 'f.txt': 'x' });
+  try {
+    assert.deepEqual(resolveThemeDeepSource(root, 'server/**'), { status: 'missing', matches: [] });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSource: glob budget overflow → invalid (configuration diagnostic)', () => {
+  const many = {};
+  for (let k = 0; k < 250; k++) many[`gen/f${k}.py`] = 'x';
+  const root = gitRepoWith(many);
+  try {
+    const r = resolveThemeDeepSource(root, 'gen/**');
+    assert.equal(r.status, 'invalid');
+    assert.match(r.reason, /expanded to 250 files/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSources: aggregates, dedupes, sorts across entries', () => {
+  const root = gitRepoWith({ 'pkg/a.py': 'x', 'pkg/b.py': 'x' });
+  try {
+    assert.deepEqual(resolveThemeDeepSources(root, ['pkg/b.py', 'pkg/a.py', 'pkg/b.py']), {
+      status: 'ok', sourceFiles: ['pkg/a.py', 'pkg/b.py'],
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveThemeDeepSources: first failing entry short-circuits', () => {
+  const root = gitRepoWith({ 'pkg/a.py': 'x' });
+  try {
+    const r = resolveThemeDeepSources(root, ['pkg/a.py', 'pkg/missing.py']);
+    assert.equal(r.status, 'missing');
+    assert.equal(r.entry, 'pkg/missing.py');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredThemeDeep: valid config → children with deduped sorted sourceFiles', () => {
+  const root = gitRepoWith({ 'sidecar/probe.py': 'x', 'sidecar/assoc.py': 'x' });
+  try {
+    const themes = [{ id: 'sidecar-config-decryption', match: [] }];
+    const themeDeep = parseConfigThemeDeep(`axes:
+  theme:
+    deep:
+      sidecar-config-decryption:
+        发现与关联:
+          - { id: discovery-association, sources: [sidecar/assoc.py, sidecar/probe.py] }
+`);
+    const r = resolveConfiguredThemeDeep(root, themes, themeDeep);
+    assert.deepEqual(r.children, [{
+      parent: 'sidecar-config-decryption', id: 'discovery-association', group: '发现与关联',
+      sources: ['sidecar/assoc.py', 'sidecar/probe.py'], sourceFiles: ['sidecar/assoc.py', 'sidecar/probe.py'],
+    }]);
+    assert.deepEqual(r.issues, []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredThemeDeep: missing parent / duplicate child / empty sources / shared source', () => {
+  const root = gitRepoWith({ 'a.py': 'x', 'b.py': 'x' });
+  try {
+    const themes = [{ id: 'p', match: [] }];
+    const themeDeep = parseConfigThemeDeep(`axes:
+  theme:
+    deep:
+      p:
+        g:
+          - { id: c1, sources: [a.py] }
+          - { id: c1, sources: [b.py] }
+          - { id: c2, sources: [] }
+          - { id: c3, sources: [a.py] }
+      ghost:
+        g:
+          - { id: c4, sources: [a.py] }
+`);
+    const r = resolveConfiguredThemeDeep(root, themes, themeDeep);
+    assert.deepEqual(r.children.map(c => c.id), ['c1', 'c3']);        // c2 空 sources、c4 父缺失 → 不进 children；c1/c3 共享 a.py 都保留
+    const kinds = r.issues.map(i => i.kind);
+    assert.ok(kinds.includes('theme-deep-id-collision'));
+    assert.ok(kinds.includes('theme-deep-sources-empty'));
+    assert.ok(kinds.includes('theme-deep-parent-missing'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveConfiguredThemeDeep: symlink/junction outside repo → outside-repo', (t) => {
+  const root = tmpRepo();
+  const outside = tmpRepo();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    mkdirSync(join(outside, 'pkg'), { recursive: true });
+    writeFileSync(join(outside, 'pkg', 'x.py'), 'x');
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('cmd', ['/c', 'mklink', '/J', join(root, 'pkg', 'link'), outside], { stdio: 'pipe' });
+      } else {
+        execFileSync('ln', ['-s', outside, join(root, 'pkg', 'link')], { stdio: 'pipe' });
+      }
+    } catch { t.skip('symlink/junction unavailable'); return; }
+    const r = resolveThemeDeepSource(root, 'pkg/link/pkg/x.py');
+    assert.equal(r.status, 'outside-repo');
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
 });

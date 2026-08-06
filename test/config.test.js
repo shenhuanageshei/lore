@@ -82,6 +82,35 @@ test('parseConfigDocsAxis returns null for empty sources list', () => {
   assert.equal(parseConfigDocsAxis(`axes:\n  docs:\n    sources: []\n`), null);
 });
 
+test('parseConfigDocsAxis ignores theme.deep sources (docs block scoping)', () => {
+  const cfg = `axes:
+  theme:
+    deep:
+      sidecar-config-decryption:
+        发现与关联:
+          - { id: discovery-association,
+              sources: [mal_analyze/sidecar/probe.py,
+                        mal_analyze/sidecar/associations.py] }
+  docs:
+    sources: [docs, changelog, claude_md_pitfalls]
+    docs_glob: docs/**/*.md
+`;
+  const r = parseConfigDocsAxis(cfg);
+  assert.deepEqual(r.sources, ['docs', 'changelog', 'claude_md_pitfalls']);
+  assert.equal(r.docsGlob, 'docs/**/*.md');
+});
+
+test('parseConfigDocsAxis returns null when only theme.deep has sources (no docs block)', () => {
+  const cfg = `axes:
+  theme:
+    deep:
+      sidecar-config-decryption:
+        发现与关联:
+          - { id: discovery-association, sources: [a.py, b.py] }
+`;
+  assert.equal(parseConfigDocsAxis(cfg), null);
+});
+
 import { parseConfigLanguage } from '../lib/config.js';
 
 test('parseConfigLanguage: defaults to English when block is absent', () => {

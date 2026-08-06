@@ -104,6 +104,7 @@
   .dot.component { background: var(--comp); }
   .dot.flow { background: var(--flow); }
   .dot.theme { background: var(--theme); }
+  .theme-children { padding-left: 12px; border-left: 2px solid var(--border); margin: 2px 0 6px; }
   .dot.docs { background: var(--docs); }
   .dot.index { background: var(--fg-dim); }
   .dot.HOME { background: var(--accent); }
@@ -244,6 +245,7 @@ import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
   baseFromPathname, buildConsoleModel, pollDecide, buildDocsRows, buildCrossRepoIndex,
+  buildThemeRows,
 } from './shell.mjs';
 
 // per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
@@ -335,8 +337,15 @@ function buildSidebar() {
       </div>`;
     }).join('');
   };
+  const themeHtml = (ax) => buildThemeRows(ax.pages).map(row => {
+    const kids = row.groups.map(g =>
+      `<div class="grp">▸ ${g.group}</div>${g.rows.map(k => linkHtml(ax, k)).join('')}`
+    ).join('');
+    return linkHtml(ax, row.page) + (kids ? `<div class="theme-children">${kids}</div>` : '');
+  }).join('');
   const pagesHtml = (ax) => {
     if (ax.id === 'docs') return docsHtml(ax);
+    if (ax.id === 'theme') return themeHtml(ax);
     if (ax.id !== 'component') return ax.pages.map(p => linkHtml(ax, p)).join('');
     let out = '', lastGroup = null;                          // component 轴：按连续 group 插小标题
     for (const p of ax.pages) {

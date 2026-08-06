@@ -39,7 +39,7 @@ test('renderMarkdown handles tables without a trailing pipe', () => {
 });
 
 import {
-  buildPageIndex, preprocessWikilinks, buildNavModel, matchesSearch, buildMeta,
+  buildPageIndex, preprocessWikilinks, buildNavModel, matchesSearch, buildMeta, buildThemeRows,
 } from '../site/shell.mjs';
 
 const MANIFEST = {
@@ -339,4 +339,20 @@ test('buildDocsRows: paired_plan 指向不存在的页 → 当孤页；缺 group
   assert.equal(groups[0].rows[0].planPage, null);          // ghost 找不到 → 孤页
   assert.equal(groups[1].group, '项目状态');                // 缺 group 兜底
   assert.equal(groups[1].collapsed, false);
+});
+
+test('buildThemeRows nests children under parents with group order', () => {
+  const pages = [
+    { id: 'p', title: 'P' },
+    { id: 'p--c1', title: 'C1', parent: 'p', group: 'g1' },
+    { id: 'p--c2', title: 'C2', parent: 'p', group: 'g1' },
+    { id: 'p--c3', title: 'C3', parent: 'p', group: 'g2' },
+    { id: 'other', title: 'O' },
+  ];
+  const rows = buildThemeRows(pages);
+  assert.deepEqual(rows.map(r => r.page.id), ['p', 'other']);
+  const p = rows.find(r => r.page.id === 'p');
+  assert.deepEqual(p.groups.map(g => g.group), ['g1', 'g2']);
+  assert.deepEqual(p.groups[0].rows.map(r => r.id), ['p--c1', 'p--c2']);
+  assert.deepEqual(p.groups[1].rows.map(r => r.id), ['p--c3']);
 });

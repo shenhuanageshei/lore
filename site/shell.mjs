@@ -226,3 +226,24 @@ export function buildDocsRows(pages) {
   }
   return groups;
 }
+
+// theme 轴侧栏模型：鸟瞰页顶层 + 子页按父分组/顺序嵌套（manifest 排序单一来源；组名作子块头）。
+export function buildThemeRows(pages) {
+  const parents = pages.filter(p => !p.parent);
+  const children = pages.filter(p => p.parent);
+  const byParent = new Map();
+  for (const c of children) {
+    if (!byParent.has(c.parent)) byParent.set(c.parent, []);
+    byParent.get(c.parent).push(c);
+  }
+  return parents.map(p => ({
+    page: p,
+    groups: (byParent.get(p.id) ?? []).reduce((acc, k) => {
+      const g = k.group || '';
+      const last = acc[acc.length - 1];
+      if (!last || last.group !== g) acc.push({ group: g, rows: [] });
+      acc[acc.length - 1].rows.push(k);
+      return acc;
+    }, []),
+  }));
+}

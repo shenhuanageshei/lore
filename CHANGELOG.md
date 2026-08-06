@@ -3,6 +3,14 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.10.0] — 2026-08-06
+
+- **主题多源深度页**（`axes.theme.deep`）：父主题下按分组声明多源子页（`theme/<parent>--<child>`，规范 id `parent--child`）。子页独立源级陈旧度、按 commit 触达源文件的决策史过滤、机制级质量门（`## 机制详解` + mermaid 架构图 + 父子双向链接 lint）；manifest / 图谱 contains 边 / INDEX 嵌套 / 侧栏嵌套 / MCP 元数据全链路可见。
+- **docs 解析器块级作用域修复**：`parseConfigDocsAxis` 只认 `axes.docs` 子块——theme-deep 子记录的 `sources:` 不再劫持 docs 轴。
+- **零依赖 glob 源解析**：`git ls-files :(glob)`（gitignore 感知、`-c core.quotePath=false` 保非 ASCII 文件名、symlink/junction 逃逸拒绝、预算常量 200/200/1000 fail-closed）。
+- **受管孤儿删除**：配置移除子页 → 受管页 + 翻译 sidecar 自动删除；手写页保留但排除出导航并报 `theme-deep-orphan`。
+- 顶层主题 id 含保留分隔符 `--` → 非阻断 `theme-id-reserved-separator` 警告。
+
 ## [0.9.0] — 2026-07-19
 
 - 多宿主兼容：Codex + opencode 全面对齐（`lib/host.js` 能力矩阵 + `node lib/host.js install codex opencode` 机器层安装）

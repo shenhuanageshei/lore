@@ -1,6 +1,6 @@
 {
   "name": "lore",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Repo living-docs / decision-history framework — capture (hook/mine/note) → synthesize (3-axis wiki) → consume (ask/serve)",
   "author": { "name": "lore" },
   "mcpServers": {

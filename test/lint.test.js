@@ -495,3 +495,32 @@ test('lintThemeDeepPages: mechanism, diagram, links, missing page, orphan, separ
     assert.equal(byKind('theme-deep-parent-link-missing').some(d => d.child === 'good'), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('lint: separator-only warning keeps clean true but surfaces themeDeepWarnings', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'theme'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  theme:\n    values:\n      - { id: legacy--theme, desc: d, match: [x] }\n');
+    writeFileSync(join(lore, 'wiki', 'theme', 'legacy--theme.md'), '---\ntitle: L\nsummary: s\n---\n# x\n');
+    const r = lint({ loreDir: lore });
+    assert.equal(r.clean, true);                                   // separator 是非阻断警告
+    assert.equal(r.themeDeep.length, 0);
+    assert.equal(r.themeDeepWarnings.length, 1);
+    assert.equal(r.themeDeepWarnings[0].kind, 'theme-id-reserved-separator');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI: separator-only warning prints even on a clean repo (not swallowed by else branch)', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'theme'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  theme:\n    values:\n      - { id: legacy--theme, desc: d, match: [x] }\n');
+    writeFileSync(join(lore, 'wiki', 'theme', 'legacy--theme.md'), '---\ntitle: L\nsummary: s\n---\n# x\n');
+    const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
+    assert.match(out, /clean/);                      // 仍报 clean（警告不阻断）
+    assert.match(out, /theme-deep-warning \(1\)/);   // 但警告必须被打印
+    assert.match(out, /legacy--theme/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

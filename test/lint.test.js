@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig, lintThemeDeepConfig, lintThemeDeepPages } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -82,7 +82,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], missingMechanism: [], deepConfig: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], missingMechanism: [], deepConfig: [], themeDeep: [], themeDeepWarnings: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -432,4 +432,66 @@ test('lintMissingMechanism: 深度页缺「## 机制详解」→ 报；有档不
     const out = lintMissingMechanism(wiki, deep);
     assert.deepEqual(out, ['component/runner.md']);   // sync 有档、runner 缺档、lib 非深度页不查
   } finally { rmSync(lore, { recursive: true, force: true }); }
+});
+
+test('lintThemeDeepConfig maps resolution issues to actionable diagnostics', () => {
+  const root = tmpDir();
+  try {
+    mkdirSync(join(root, 'pkg'), { recursive: true });
+    writeFileSync(join(root, 'pkg', 'a.py'), 'x');
+    const themes = [{ id: 'p', match: [] }];
+    const themeDeep = { parents: ['p', 'ghost'], children: [
+      { parent: 'p', id: 'c1', group: '', sources: ['pkg/a.py'] },
+      { parent: 'p', id: 'c1', group: '', sources: ['pkg/b.py'] },        // 父内重复
+      { parent: 'p', id: 'c2', group: '', sources: [] },                  // 空 sources
+      { parent: 'p', id: 'c3', group: '', sources: ['pkg/missing.py'] },  // 源缺失
+      { parent: 'ghost', id: 'c4', group: '', sources: ['pkg/a.py'] },    // 父缺失
+    ] };
+    const diag = lintThemeDeepConfig(root, themes, themeDeep);
+    const kinds = diag.map(d => d.kind);
+    assert.ok(kinds.includes('theme-deep-id-collision'));
+    assert.ok(kinds.includes('theme-deep-sources-empty'));
+    assert.ok(kinds.includes('theme-deep-source-missing'));
+    assert.ok(kinds.includes('theme-deep-parent-missing'));
+    const missing = diag.find(d => d.kind === 'theme-deep-source-missing');
+    assert.equal(missing.entry, 'pkg/missing.py');
+    assert.match(missing.message, /no source file matched/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintThemeDeepPages: mechanism, diagram, links, missing page, orphan, separator warning', () => {
+  const root = tmpDir();
+  try {
+    const themeDir = join(root, 'wiki', 'theme');
+    mkdirSync(themeDir, { recursive: true });
+    // 合法子页：机制 + 图 + 父链接齐全
+    writeFileSync(join(themeDir, 'p--good.md'),
+      '---\ntitle: G\nsummary: s\n---\n# x\n\n[[p]]\n\n## 机制详解\n\nok\n\n```mermaid\nflowchart LR\n  a-->b\n```\n');
+    // 缺机制 + 缺图 + 缺父链接
+    writeFileSync(join(themeDir, 'p--bad.md'), '---\ntitle: B\nsummary: s\n---\n# x\n\nprose\n');
+    // 父页缺子链接
+    writeFileSync(join(themeDir, 'p.md'), '---\ntitle: P\nsummary: s\n---\n# x\n');
+    // 孤儿子路径 + 历史 `--` 顶层主题
+    writeFileSync(join(themeDir, 'p--ghost.md'), '---\ntitle: G2\nsummary: s\n---\n# x\n');
+    writeFileSync(join(themeDir, 'legacy--theme.md'), '---\ntitle: L\nsummary: s\n---\n# x\n');
+    const children = [
+      { parent: 'p', id: 'good', group: 'g1', sourceFiles: ['a.py'] },
+      { parent: 'p', id: 'bad', group: 'g1', sourceFiles: ['b.py'] },
+      { parent: 'p', id: 'missing', group: 'g1', sourceFiles: ['c.py'] },
+    ];
+    const themes = [{ id: 'p', match: [] }, { id: 'legacy--theme', match: [] }];
+    const diag = lintThemeDeepPages(join(root, 'wiki'), children, themes);
+    const byKind = k => diag.filter(d => d.kind === k);
+    assert.equal(byKind('theme-deep-mechanism-missing').some(d => d.child === 'bad'), true);
+    assert.equal(byKind('theme-deep-diagram-missing').some(d => d.child === 'bad'), true);
+    assert.equal(byKind('theme-deep-parent-link-missing').some(d => d.child === 'bad'), true);
+    assert.equal(byKind('theme-deep-child-link-missing').some(d => d.child === 'good'), true);
+    assert.equal(byKind('theme-deep-page-missing').some(d => d.child === 'missing'), true);
+    assert.equal(byKind('theme-deep-orphan').some(d => d.child === 'p--ghost'), true);
+    assert.equal(byKind('theme-id-reserved-separator').some(d => d.parent === 'legacy--theme'), true);
+    // good 页零诊断
+    assert.equal(byKind('theme-deep-mechanism-missing').some(d => d.child === 'good'), false);
+    assert.equal(byKind('theme-deep-diagram-missing').some(d => d.child === 'good'), false);
+    assert.equal(byKind('theme-deep-parent-link-missing').some(d => d.child === 'good'), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

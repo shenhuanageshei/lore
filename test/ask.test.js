@@ -112,3 +112,20 @@ test('searchPages: 节级命中（heading 含词）→ 带 section 字段，分�
   assert.equal(pageHit[0].section, undefined);       // 页级命中无 section
   assert.equal(searchPages(manifest, 'fp')[0].id, 'fp');   // 英文 slug 可搜
 });
+
+test('searchPages includes parent/kind metadata for theme-deep children', () => {
+  const manifest = {
+    axes: [{
+      id: 'theme', pages: [
+        { id: 'p', title: 'P', summary: 'decrypt parent', path: 'theme/p.md', sections: [] },
+        { id: 'p--c1', title: 'C1', summary: 'decrypt child', path: 'theme/p--c1.md', sections: [], kind: 'deep', parent: 'p' },
+      ],
+    }],
+  };
+  const hits = searchPages(manifest, 'decrypt');
+  const c1 = hits.find(h => h.id === 'p--c1');
+  assert.equal(c1.parent, 'p');
+  assert.equal(c1.kind, 'deep');
+  const p = hits.find(h => h.id === 'p');
+  assert.equal(p.parent, undefined);
+});

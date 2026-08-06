@@ -130,3 +130,29 @@ test('mcp: lore_ask 无 manifest（fresh clone）→ 返回 /lore:sync 引导', 
     assert.match(payload.notice, /lore:sync/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('lore_ask returns parent/kind metadata for theme-deep children', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-mcp-theme-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+    const lore = join(root, '.lore');
+    mkdirSync(join(lore, 'wiki', 'theme'), { recursive: true });
+    mkdirSync(join(lore, '.state'), { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'axes:\n  theme:\n    values:\n      - { id: p, desc: d, match: [x] }\n    deep:\n      p:\n        g1:\n          - { id: c1, sources: [a.py] }\n');
+    writeFileSync(join(root, 'a.py'), 'x');
+    writeFileSync(join(lore, 'wiki', 'theme', 'p.md'), '---\ntitle: P\nsummary: s\n---\n# x\n');
+    writeFileSync(join(lore, 'wiki', 'theme', 'p--c1.md'), '---\ntitle: P-C1\nsummary: decrypt stuff\n---\n# x\n');
+    execFileSync('git', ['add', '-A'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+    const replies = await rpc(root, [
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'lore_ask', arguments: { query: 'decrypt' } } },
+    ]);
+    const text = JSON.parse(replies[0].result.content[0].text);
+    const hit = (text ?? []).find(h => h.id === 'page:theme/p--c1');
+    assert.equal(hit.parent, 'p');
+    assert.equal(hit.kind, 'deep');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

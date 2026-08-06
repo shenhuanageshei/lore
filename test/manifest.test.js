@@ -430,3 +430,80 @@ test('pageEntry: sections 节索引进 manifest（##/### + ①-⑧）', () => {
     assert.equal(typeof page.sections[0].line, 'number');
   } finally { rmSync(wiki, { recursive: true, force: true }); }
 });
+
+function themeFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'lore-manifest-theme-'));
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: root });
+  const lore = join(root, '.lore');
+  mkdirSync(join(lore, 'wiki', 'theme'), { recursive: true });
+  mkdirSync(join(lore, '.state'), { recursive: true });
+  writeFileSync(join(lore, 'config.yml'), 'axes:\n  theme:\n    values:\n      - { id: p, desc: d, match: [x] }\n    deep:\n      p:\n        g1:\n          - { id: c1, sources: [a.py] }\n');
+  writeFileSync(join(root, 'a.py'), 'x');
+  writeFileSync(join(lore, 'wiki', 'theme', 'p.md'), '---\ntitle: P\nsummary: s\n---\n# theme: p\n');
+  writeFileSync(join(lore, 'wiki', 'theme', 'p--c1.md'), '---\ntitle: P-C1\nsummary: s\n---\n# theme-deep: p--c1\n');
+  execFileSync('git', ['add', '-A'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: root });
+  return { root, lore };
+}
+
+test('emitManifest: theme child page emits kind/parent/group/sources; ordinary pages omit', () => {
+  const { root, lore } = themeFixture();
+  try {
+    const manifest = emitManifest({
+      wikiDir: join(lore, 'wiki'),
+      currentSha: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim(),
+      countCommitsSince: () => 0,
+      now: 'NOW',
+      axes: [{ id: 'theme', label: 'Theme' }],
+      staleScopes: {}, componentOrder: [], pageGroups: {},
+      themeOrder: ['p', 'p--c1'], themeDeepMeta: { 'p--c1': { parent: 'p', group: 'g1', sources: ['a.py'] } }, themeDeepActive: true,
+    });
+    const pages = manifest.axes[0].pages;
+    assert.deepEqual(pages.map(p => p.id), ['p', 'p--c1']);        // 父先子后（themeOrder 序）
+    const child = pages.find(p => p.id === 'p--c1');
+    assert.equal(child.kind, 'deep');
+    assert.equal(child.parent, 'p');
+    assert.equal(child.group, 'g1');
+    assert.deepEqual(child.sources, ['a.py']);
+    const parent = pages.find(p => p.id === 'p');
+    assert.equal(parent.kind, undefined);
+    assert.equal(parent.parent, undefined);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('emitManifest: orphan child path excluded from theme nav when theme-deep active', () => {
+  const { root, lore } = themeFixture();
+  try {
+    writeFileSync(join(lore, 'wiki', 'theme', 'p--ghost.md'), '---\ntitle: G\nsummary: s\n---\n# x\n');
+    const manifest = emitManifest({
+      wikiDir: join(lore, 'wiki'),
+      currentSha: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim(),
+      countCommitsSince: () => 0,
+      now: 'NOW',
+      axes: [{ id: 'theme', label: 'Theme' }],
+      staleScopes: {}, componentOrder: [], pageGroups: {},
+      themeOrder: ['p', 'p--c1'], themeDeepMeta: { 'p--c1': { parent: 'p', group: 'g1', sources: ['a.py'] } }, themeDeepActive: true,
+    });
+    const ids = manifest.axes[0].pages.map(p => p.id);
+    assert.deepEqual(ids, ['p', 'p--c1']);
+    assert.ok(!ids.includes('p--ghost'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('emitManifest: theme-deep inactive → theme pages alphabetical, no exclusion (backward compat)', () => {
+  const { root, lore } = themeFixture();
+  try {
+    const manifest = emitManifest({
+      wikiDir: join(lore, 'wiki'),
+      currentSha: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim(),
+      countCommitsSince: () => 0,
+      now: 'NOW',
+      axes: [{ id: 'theme', label: 'Theme' }],
+      staleScopes: {}, componentOrder: [], pageGroups: {},
+    });
+    const ids = manifest.axes[0].pages.map(p => p.id);
+    assert.deepEqual(ids, ['p--c1', 'p']);      // 字母序：'-'(0x2D) < '.'(0x2E) → 'p--c1' 在前
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

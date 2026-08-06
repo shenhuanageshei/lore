@@ -1,7 +1,7 @@
 // test/config.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseConfigCodeRoots } from '../lib/config.js';
+import { parseConfigCodeRoots, parseConfigDocsAxis, parseConfigThemeDeep } from '../lib/config.js';
 
 test('parseConfigCodeRoots: single-line list', () => {
   assert.deepEqual(parseConfigCodeRoots('axes:\n  component:\n    code_roots: [lib, site]\n'), ['lib', 'site']);
@@ -38,7 +38,6 @@ test('parseConfigThemes: ignores flow items (spans, no match)', () => {
 });
 
 import { parseConfigFlows } from '../lib/config.js';
-import { parseConfigDocsAxis } from '../lib/config.js';
 
 test('parseConfigFlows: commented example → []', () => {
   assert.deepEqual(parseConfigFlows('  flow:\n    values: []\n    # - { id: article-pipeline, spans: [lib] }\n'), []);
@@ -187,4 +186,64 @@ test('parseConfigDeep: 分组停在更浅 key（不漏到同级轴）', () => {
 test('parseConfigDeep: dequotes + 空组忽略', () => {
   const cfg = '    deep:\n      lib:\n        捕获: ["hook", \'mine\']\n        空组: []\n';
   assert.deepEqual(parseConfigDeep(cfg), { lib: { order: ['hook', 'mine'], groups: [{ name: '捕获', mods: ['hook', 'mine'] }] } });
+});
+
+test('parseConfigThemeDeep parses one-line child records preserving groups and order', () => {
+  const cfg = `axes:
+  theme:
+    values:
+      - { id: sidecar-config-decryption, desc: d, match: [sidecar] }
+    deep:
+      sidecar-config-decryption:
+        发现与关联:
+          - { id: discovery-association, sources: [probe.py, associations.py] }
+        执行与传播:
+          - { id: crypto-execution, sources: [executor.py] }
+          - { id: canonical-propagation, sources: [finalize.py] }
+`;
+  const r = parseConfigThemeDeep(cfg);
+  assert.deepEqual(r.parents, ['sidecar-config-decryption']);
+  assert.deepEqual(r.children, [
+    { parent: 'sidecar-config-decryption', id: 'discovery-association', group: '发现与关联', sources: ['probe.py', 'associations.py'] },
+    { parent: 'sidecar-config-decryption', id: 'crypto-execution', group: '执行与传播', sources: ['executor.py'] },
+    { parent: 'sidecar-config-decryption', id: 'canonical-propagation', group: '执行与传播', sources: ['finalize.py'] },
+  ]);
+});
+
+test('parseConfigThemeDeep tolerates multi-line child records', () => {
+  const cfg = `axes:
+  theme:
+    deep:
+      parent-1:
+        g1:
+          - { id: c1,
+              sources: [a.py,
+                        b.py] }
+`;
+  const r = parseConfigThemeDeep(cfg);
+  assert.deepEqual(r.children, [{ parent: 'parent-1', id: 'c1', group: 'g1', sources: ['a.py', 'b.py'] }]);
+});
+
+test('parseConfigThemeDeep multiple parents stay isolated', () => {
+  const cfg = `axes:
+  theme:
+    deep:
+      p1:
+        组1:
+          - { id: c1, sources: [a.py] }
+      p2:
+        组A:
+          - { id: c2, sources: [b.py] }
+`;
+  const r = parseConfigThemeDeep(cfg);
+  assert.deepEqual(r.parents, ['p1', 'p2']);
+  assert.deepEqual(r.children, [
+    { parent: 'p1', id: 'c1', group: '组1', sources: ['a.py'] },
+    { parent: 'p2', id: 'c2', group: '组A', sources: ['b.py'] },
+  ]);
+});
+
+test('parseConfigThemeDeep returns empty when no theme.deep block', () => {
+  assert.deepEqual(parseConfigThemeDeep('axes:\n  theme:\n    values: []\n'), { parents: [], children: [] });
+  assert.deepEqual(parseConfigThemeDeep(''), { parents: [], children: [] });
 });

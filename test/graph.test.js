@@ -89,3 +89,28 @@ test('resolvePagePath: page id → path; plain path passthrough; unknown page id
   assert.equal(resolvePagePath(graph, 'component/lib.md'), 'component/lib.md');
   assert.equal(resolvePagePath(graph, 'page:component/ghost'), null);
 });
+
+test('buildGraph: theme parent → child adds contains edge (both traversal directions)', () => {
+  const manifest = mf([
+    { id: 'theme', pages: [
+      { id: 'p', title: 'P', path: 'theme/p.md' },
+      { id: 'p--c1', title: 'C1', parent: 'p', kind: 'deep', path: 'theme/p--c1.md' },
+      { id: 'p--ghost', title: 'G', parent: 'p', kind: 'deep', path: 'theme/p--ghost.md' },
+    ] },
+    { id: 'component', pages: [{ id: 'lib', title: 'Lib', path: 'component/lib.md' }] },
+  ]);
+  const g = buildGraph([], manifest, 'NOW');
+  const contains = g.edges.filter(e => e.type === 'contains');
+  assert.deepEqual(contains, [
+    { from: 'page:theme/p', to: 'page:theme/p--c1', type: 'contains' },
+    { from: 'page:theme/p', to: 'page:theme/p--ghost', type: 'contains' },
+  ]);
+  // neighbors 双向：父→子（out），子→父（in）
+  const childNeighbors = neighbors(g, 'page:theme/p--c1');
+  assert.ok(childNeighbors.some(n => n.id === 'page:theme/p' && n.dir === 'in' && n.edge === 'contains'));
+  const parentNeighbors = neighbors(g, 'page:theme/p');
+  assert.ok(parentNeighbors.some(n => n.id === 'page:theme/p--c1' && n.dir === 'out' && n.edge === 'contains'));
+  // 悬挂边（父页不存在）丢弃
+  const g2 = buildGraph([], mf([{ id: 'theme', pages: [{ id: 'orphan--c', title: 'C', parent: 'orphan', path: 'theme/orphan--c.md' }] }]), 'NOW');
+  assert.equal(g2.edges.filter(e => e.type === 'contains').length, 0);
+});

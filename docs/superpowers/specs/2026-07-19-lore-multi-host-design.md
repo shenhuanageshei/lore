@@ -74,7 +74,7 @@ lore 与 Claude Code 的耦合面共 5 处：
 
 - `claudeBackend()`：现状原样搬迁。
 - `codexBackend()`：`codex exec "<prompt>" -C <repoRoot> --sandbox read-only --output-last-message <.state/tmp 文件>`——`--sandbox read-only` 内核级强制只读（比工具白名单更硬）；`--output-last-message` 直接拿最终消息，比解 stdout 干净，读完即删。错误分类对齐现状：ENOENT→`codex-cli-missing`、killed→`timeout`、其余带 stderr 截 300。
-- `opencodeBackend()`：`opencode run "<prompt>"`（cwd=repoRoot）。只读双保险：① `OPENCODE_CONFIG` 指向 lore 自带 runner 配置（`permission: {edit:deny, write:deny, bash:deny}`，合并语义实现期 spike）；② prompt TAIL「绝不调用写盘工具」原样保留。stdout 取首个 frontmatter `---` 起（同 claude 提取法）。最坏情况（LLM 违规写盘）与 claude 后端加 `--disallowedTools` 前同级，质量门语义不变。
+- `opencodeBackend()`：`opencode run "<prompt>"`（cwd=repoRoot）。只读双保险：① `OPENCODE_CONFIG` 指向 lore 自带 runner 配置（`permission: {edit:deny, write:deny, bash:deny}`，合并语义实现期 spike）；② prompt TAIL「绝不调用写盘工具」原样保留。**实现落定（2026-07-19）：① 未采用**——`OPENCODE_CONFIG` 合并语义不可靠，opencode 后端实际只读约束 = ② prompt 指令 + 质量门（见 `lib/backend.js` opencodeBackend 注释与 ROADMAP「自动重写 B2」）。stdout 取首个 frontmatter `---` 起（同 claude 提取法）。最坏情况（LLM 违规写盘）与 claude 后端加 `--disallowedTools` 前同级，质量门语义不变。
 - **选择**（配置优先 + 探测兜底）：`.state/sync.json` 增 `backend: auto|claude|codex|opencode`，默认 `auto`；控制台加下拉 + 显示当前生效后端。`auto` 按 `claude→codex→opencode` 探测（claude 无廉价 auth 探针只验 binary；codex 验 `login status`；opencode 验 provider 已配置），探测全 best-effort 永不抛。
 - **运行时 failover**：仅「后端不可用类」错误（cli-missing/auth/provider）当页换下一个可用后端重试一次；timeout/质量门失败不 failover。每页实际后端记入 `auto-runs.ndjson`，控制台可见。
 

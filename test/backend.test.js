@@ -25,9 +25,36 @@ test('claudeBackend: argv 白名单 + 从首个 frontmatter 截取 + ENOENT→un
   const allowedIdx = seen.args.indexOf('--allowedTools');
   assert.deepEqual(seen.args.slice(allowedIdx, allowedIdx + 2), ['--allowedTools', 'Read,Grep,Glob']);
   assert.equal(seen.args[seen.args.indexOf('--disallowedTools') + 1], 'Write,Edit,Bash');
+  assert.equal(seen.opts.cwd, '/r');
+  assert.equal(seen.opts.timeout, 1_200_000);
   assert.equal(text, '---\ntitle: t\n---\nbody');
   await assert.rejects(claudeBackend({ exec: missingExec() }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
     e => e instanceof BackendError && e.unavailable === true && /claude-cli-missing/.test(e.message));
+});
+
+test('classify: killed → timeout（不可 failover）；maxBuffer 溢出不误报 timeout', async () => {
+  const killedExec = (cmd, args, opts, cb) => { const e = new Error('Command failed'); e.killed = true; cb(e, '', ''); };
+  await assert.rejects(claudeBackend({ exec: killedExec }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
+    e => e instanceof BackendError && /timeout/.test(e.message) && e.unavailable === false);
+  const bufExec = (cmd, args, opts, cb) => {
+    const e = new Error('Command failed'); e.killed = true; e.code = 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'; cb(e, '', '');
+  };
+  await assert.rejects(claudeBackend({ exec: bufExec }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
+    e => e instanceof BackendError && /maxBuffer/.test(e.message) && !/timeout/.test(e.message) && e.unavailable === false);
+});
+
+test('codexBackend: 错误路径同样清理 last-message 残留', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lore-codex-err-'));
+  try {
+    const failing = (cmd, args, opts, cb) => {
+      const outFile = args[args.indexOf('--output-last-message') + 1];
+      mkdirSync(dirname(outFile), { recursive: true });
+      writeFileSync(outFile, 'stale-from-previous-run');
+      cb(new Error('exit 1'), '', 'boom');
+    };
+    await assert.rejects(codexBackend({ exec: failing }).rewritePage({ page: { path: 'x' }, repoRoot: dir }));
+    assert.ok(!existsSync(join(dir, '.lore', '.state', 'codex-last-message.md')));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('codexBackend: --sandbox read-only 必含 + last-message 文件优先 + auth 错误→unavailable', async () => {

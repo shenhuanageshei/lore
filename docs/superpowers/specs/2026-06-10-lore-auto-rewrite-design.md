@@ -20,7 +20,7 @@ B1 落地后控制面完整，但 prose 重写仍要人触发：notify 档只能
 | 后端分期 | runner 抽象 **backend 接口**（可插拔位）；B2 只实现 **claude-cli**（即插即用、质量同会话）。裸 Anthropic API / codex 下轮按接口补（key 管理/无工具凑上下文是独立难题） |
 | 质量门（B1 预锁） | 全机械：frontmatter 完整（title/summary）、`{{LORE_JOURNAL}}` token 或哨兵区未破坏、`mermaidIssues` 零（复用 lint 第五检）、非空且 ≥ 旧文 1/3（防截断）。过门写盘；不过丢弃 + 记失败历史，页保持原样 |
 | 防叠跑 | `.state/runner.pid` 锁：runner 在跑时 ticker 跳过（LLM 重写不幂等，必须防叠）。stale pid（进程已死）视为无锁 |
-| 预算阀 | 单次 run 最多 `max_pages`（默认 5）页；单页超时 10 分钟 kill。失败不重试（记历史，下轮再说） |
+| 预算阀 | 单次 run 最多 `max_pages`（默认 5）页；单页超时 10 分钟 kill。失败不重试（记历史，下轮再说）。**superseded（2026-06-14，commit `fix(runner,syncstate): per-page rewrite timeout 600s→1200s`）**：单页默认超时抬到 20 分钟（`backend.js` `timeoutMs=1_200_000`），`RUNNER_STALE_MS` 联动 180min——原 10 分钟卡在实测耗时中位数外侧（见 `lib/syncstate.js` 注释与 wiki `component/runner`） |
 | 配置 | `.state/sync.json` 向后兼容扩展：`{ mode, debounce_minutes?, schedule?, max_pages? }`。`MODES` 加 `'auto'`（B1 的 throw/400 解除）。B2 不做配置编辑 UI——参数手编或默认（YAGNI） |
 | schedule 语义 | `"HH:MM"`（本地时）。ticker 判「到点且今天没跑过」（比对 auto-runs 最后一条的日期）。null/缺省 = 不定时 |
 | 任务历史 | `.state/auto-runs.ndjson` 每 run 一条：`{ts, pages:[{page, ok, reason?, ms}], total_ms}`。console「任务历史」区从 🔒 占位变真表格 |

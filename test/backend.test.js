@@ -94,6 +94,9 @@ test('detectAvailableBackends: binary 缺/provider 挂都跳过', async () => {
   };
   assert.deepEqual(await detectAvailableBackends({ exec: noCodexLogin }), ['claude', 'opencode']);
   assert.deepEqual(await detectAvailableBackends({ exec: missingExec() }), []);
+  let seenTimeout = 0;
+  await detectAvailableBackends({ exec: (cmd, args, opts, cb) => { seenTimeout = opts.timeout; cb(null, 'v1', ''); } });
+  assert.ok(seenTimeout >= 20000, `探测预算需容 CLI 冷启动（实测 7.5s），实为 ${seenTimeout}`);
 });
 
 test('resolveBackendChain: 配置指定短路；auto 按探测序', async () => {

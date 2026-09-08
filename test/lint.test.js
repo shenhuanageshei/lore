@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig, lintThemeDeepConfig, lintThemeDeepPages } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig, lintThemeDeepConfig, lintThemeDeepPages, componentScopes } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -20,16 +20,34 @@ test('lintMissing: code_root last-segments with no page', () => {
   assert.deepEqual(lintMissing(['lib', 'pkg'], ['lib', 'src/pkg']), []);
 });
 
-test('lintStale: pages whose code_sha != current → behind via countSince', () => {
+test('lintStale: 按页源范围计数；源未动过的页不算 stale；无 scope 兜底全仓', () => {
   const pages = [
     { id: 'a', code_sha: 'old1234' },
-    { id: 'b', code_sha: 'cur5678' },   // == current → not stale
-    { id: 'c', code_sha: '' },           // no sha → skipped
+    { id: 'b', code_sha: 'cur5678' },   // 自身源范围 0 提交 → 不算 stale
+    { id: 'c', code_sha: '' },           // 未 finalize → 跳过
   ];
-  const countSince = sha => (sha === 'old1234' ? 3 : 0);
-  assert.deepEqual(lintStale(pages, 'cur5678', countSince), [
+  const scopes = new Map([['a', ['lib/a.js']], ['b', ['lib/b.js']]]);
+  const countSince = (sha, paths) => (sha === 'old1234' && paths?.[0] === 'lib/a.js' ? 3 : 0);
+  assert.deepEqual(lintStale(pages, scopes, countSince), [
     { page: 'a', code_sha: 'old1234', behind: 3 },
   ]);
+  // 孤儿页（不在 scopes 内）→ pathspec 缺省 = 全仓口径
+  const global = (sha, paths) => (paths === undefined ? 2 : 0);
+  assert.deepEqual(lintStale([{ id: 'gone', code_sha: 'old1234' }], scopes, global), [
+    { page: 'gone', code_sha: 'old1234', behind: 2 },
+  ]);
+});
+
+test('componentScopes: 鸟瞰页 = 整个 code_root；深度页 = resolver 找到的源文件', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const a = 1;');
+    writeFileSync(join(root, 'lib', 'b.js'), 'export const b = 2;');
+    const scopes = componentScopes(['lib'], { lib: { order: ['a'] } }, root);
+    assert.deepEqual(scopes.get('lib'), ['lib']);            // 鸟瞰页看整个 lib/
+    assert.deepEqual(scopes.get('a'), ['lib/a.js']);         // 深度页只看自己的源文件
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 function gitRepo() {
@@ -54,8 +72,9 @@ test('lint orchestrator reports stale + orphan + missing', () => {
     const lore = join(root, '.lore');
     mkdirSync(lore, { recursive: true });
     const sha1 = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
-    // a second commit so HEAD advances past sha1 (sha1 is now 1 behind)
-    writeFileSync(join(root, 'g.txt'), 'y');
+    // a second commit that TOUCHES lib/ so HEAD advances past sha1 (scoped: root-level files no longer count)
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'x.js'), 'export const z = 3;');
     execFileSync('git', ['add', '.'], { cwd: root });
     execFileSync('git', ['commit', '-qm', 'c2'], { cwd: root });
 
@@ -136,6 +155,36 @@ test('integration: sync then a new commit makes the page stale → lint reports 
     const r = lint({ loreDir: lore });
     assert.deepEqual(r.stale.map(s => s.page), ['lib']);
     assert.ok(r.stale[0].behind >= 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('integration: 只动 lib/ 的提交 → 只有 lib 页 stale（site 页不再被全仓口径误报）', () => {
+  const root = gitRepo();
+  try {
+    mkdirSync(join(root, 'lib'), { recursive: true });
+    mkdirSync(join(root, 'site'), { recursive: true });
+    writeFileSync(join(root, 'lib', 'a.js'), 'export const x = 1;');
+    writeFileSync(join(root, 'site', 'index.html'), '<html></html>');
+    init({ repoRoot: root, srcSiteDir: join(process.cwd(), 'site') });
+    rmSync(join(root, '.git', 'hooks', 'post-commit'), { force: true });   // 同下：避免 detached finalize 与 rmSync 竞态
+    const lore = join(root, '.lore');
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib, site]\n');   // 确定性：不依赖 init 自动发现
+    const compDir = join(lore, 'wiki', 'component');
+    mkdirSync(compDir, { recursive: true });
+    const body = id => `---\ntitle: ${id}\nsummary: c\n---\n# component: ${id}\n\n## Current architecture\n\nx\n\n## Decision history\n\n{{LORE_JOURNAL}}\n`;
+    writeFileSync(join(compDir, 'lib.md'), body('Lib'));
+    writeFileSync(join(compDir, 'site.md'), body('Site'));
+    // 先把基线（lib/a.js + site/index.html + .lore）提交掉，再盖章——否则下一个提交会把这两个
+    // 未跟踪源文件一起带进去，site 页也会「合法地」变 stale，测不出误报。
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: root });
+    execFileSync('node', ['lib/sync.js', 'finalize', lore], { cwd: process.cwd() });
+    assert.equal(lint({ loreDir: lore }).stale.length, 0);
+    writeFileSync(join(root, 'lib', 'b.js'), 'export const y = 2;');   // 只动 lib/
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-qm', 'lib change'], { cwd: root });
+    const r = lint({ loreDir: lore });
+    assert.deepEqual(r.stale.map(s => s.page), ['lib']);   // site 页源未动 → 不报
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

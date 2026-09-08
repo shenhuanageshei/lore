@@ -166,6 +166,7 @@ test('runAuto: 质量门不过 → 页面原样 + reason 入历史', async () =>
     const res = await runAuto(lore, { backend, maxPages: 5, spawnFn: noopSpawn, now: () => new Date() });
     assert.equal(res.pages[0].ok, false);
     assert.match(res.pages[0].reason, /frontmatter/);
+    assert.match(res.pages[0].reason, /head: garbage no frontmatter/);   // 诊断带新页开头片段
     assert.match(rf(join(lore, 'wiki', 'component', 'lib.md'), 'utf8'), /旧正文/);   // 没动
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

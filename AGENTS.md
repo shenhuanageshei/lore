@@ -13,15 +13,15 @@
 
 **问题**：runner 重写页面 LLM 调 Write 工具而非输出 stdout——`--allowedTools Read,Grep,Glob` 拒绝后 stdout 只剩 "awaiting permission" 消息，质量门 `frontmatter missing title/summary` 全挂（analyst/theme/flow 100% 失败，仅个别偶然输出格式正确的页面幸存）。
 **修复**：`--disallowedTools Write,Edit,Bash` 显式封杀 + prompt TAIL 强制指令「绝不调用写盘工具」。
-**预防**：runner 的 claude 调用必须同时设 allowedTools（白名单）和 disallowedTools（显式封杀 Write/Edit/Bash）——`--allowedTools` 只声明允许列表，不保证 LLM 不尝试其他工具（非交互模式下工具调用失败 ≠ 不调用）。
+**预防**：runner 的 Codex 调用必须同时设 allowedTools（白名单）和 disallowedTools（显式封杀 Write/Edit/Bash）——`--allowedTools` 只声明允许列表，不保证 LLM 不尝试其他工具（非交互模式下工具调用失败 ≠ 不调用）。
 
 **问题**：runner 让 LLM 回吐整页导致 3/5 页 600s 超时，且 token 态新页 vs 物化态旧页比长度被防截断误杀（96K vs 5K 被拒）——决策史物化哨兵区可达 95K。
 **修复**：重写一律 token 态（prompt 要求输出单行 `{{LORE_JOURNAL}}`，finalize 重新物化）；质量门防截断比较前两边剥哨兵区归一。
 **预防**：物化哨兵区绝不过 LLM 往返——任何让模型搬运物化区的指令都是性能与正确性双杀。
 
-**问题**：auto 档 ticker 触发的 runner 每页 20s 后非零退出（`claude exit: Command failed`），同样调用在正常 shell 里成功。
+**问题**：auto 档 ticker 触发的 runner 每页 20s 后非零退出（`Codex exit: Command failed`），同样调用在正常 shell 里成功。
 **修复**：portal 改用 detached 方式启动（`node lib/portal.js start` 或开机自启），不用 IDE preview 面板托管。
-**预防**：ticker/runner 宿主必须是正常 shell 起的进程——preview 托管进程的环境里 claude CLI 起不来。
+**预防**：ticker/runner 宿主必须是正常 shell 起的进程——preview 托管进程的环境里 Codex CLI 起不来。
 
 **问题**：失败页留在重写队列 → 队列时间戳恒旧 → ticker 每分钟重启一整轮失败 run（实测 5 分钟 3 轮重试风暴）。
 **修复**：`shouldRunAuto` 加轮间冷却——上次 run 距今 < debounce 一律不触发。

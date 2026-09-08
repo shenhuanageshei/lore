@@ -15,8 +15,16 @@ test('claudeBackend: argv 白名单 + 从首个 frontmatter 截取 + ENOENT→un
   const b = claudeBackend({ exec });
   const text = await b.rewritePage({ page: { path: 'component/x.md', axis: 'component' }, repoRoot: '/r' });
   assert.equal(seen.cmd, 'claude');
-  assert.deepEqual(seen.args.slice(1, 3), ['--allowedTools', 'Read,Grep,Glob']);
-  assert.ok(seen.args.includes('--disallowedTools'));
+  assert.equal(seen.args[0], '-p');
+  // prompt 必须排在可变参数（--allowedTools/--disallowedTools <tools...>）之前——
+  // 否则被当成工具名吞掉（claude 2.1.191 实测报 "Input must be provided..."，auto 档每页必失败）。
+  const promptIdx = seen.args.findIndex(a => typeof a === 'string' && a.includes('component/x.md'));
+  assert.ok(promptIdx > 0, 'prompt 应在 argv 中');
+  assert.ok(promptIdx < seen.args.indexOf('--allowedTools'), 'prompt 必须在 --allowedTools 之前');
+  assert.ok(promptIdx < seen.args.indexOf('--disallowedTools'), 'prompt 必须在 --disallowedTools 之前');
+  const allowedIdx = seen.args.indexOf('--allowedTools');
+  assert.deepEqual(seen.args.slice(allowedIdx, allowedIdx + 2), ['--allowedTools', 'Read,Grep,Glob']);
+  assert.equal(seen.args[seen.args.indexOf('--disallowedTools') + 1], 'Write,Edit,Bash');
   assert.equal(text, '---\ntitle: t\n---\nbody');
   await assert.rejects(claudeBackend({ exec: missingExec() }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
     e => e instanceof BackendError && e.unavailable === true && /claude-cli-missing/.test(e.message));

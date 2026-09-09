@@ -1,7 +1,7 @@
 <!-- LORE_RESIDENT:START -->
 ## lore wiki（本仓库的活文档）
 
-本 repo 由 lore 维护多轴 wiki（96 页 · 8 个组件深度页 · 最后更新 2026-09-09）。
+本 repo 由 lore 维护多轴 wiki（97 页 · 8 个组件深度页 · 最后更新 2026-09-09）。
 **理解架构/查模块/查决策时，先用 wiki 建框架、再按锚点下钻源码——别一上来全文 grep。**
 - **建框架**：`lore_ask "<关键词>"`（返回命中节切片，含内容）→ `lore_page view=agent`（跳概览+决策史，只看机制骨架，省约 60% token）。无 MCP 时跑 `node <lore>/lib/ask.js .lore "<关键词>"` 或读 `.lore/wiki/INDEX.md` 定位。
 - **精准下钻**：wiki 页内锚点写作 `func @ file`——顺锚点直接 Read 那个函数/文件，不要全文 grep（wiki 是带导航的源码地图）。

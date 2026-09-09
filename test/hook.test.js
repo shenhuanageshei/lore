@@ -7,6 +7,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { captureHead } from '../lib/hook.js';
 import { readAllAtoms } from '../lib/journal.js';
+import { validateAtom } from '../lib/atom.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-hook-')); }
@@ -56,6 +57,20 @@ test('captureHead: trailer-only commit body → 原子不写 why 键；真实 bo
     const second = readAllAtoms(journalDir).find(a => a.title === 'feat: u');
     assert.equal(second.why, 'real rationale');
     assert.doesNotMatch(second.why, /Co-Authored-By|Signed-off-by|Generated with/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------- S1：hook 入口经 lib/journal.js 校验闸门 ----------
+test('captureHead 落盘原子过校验且 status:draft（机器来源诚实，不变量⑦）', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'feat: y\n\nreal rationale\nCo-Authored-By: Bot <b@x.com>');
+    const journalDir = join(root, '.lore', 'journal');
+    assert.equal(captureHead({ repoRoot: root, journalDir, codeRoots: ['lib'] }).added, 1);
+    const atom = readAllAtoms(journalDir)[0];
+    assert.equal(atom.status, 'draft');                              // source:'hook' 缺 status → 落盘 draft
+    assert.equal(atom.why, 'real rationale');                        // 写入侧 trailer 闭合（经校验落盘）
+    assert.equal(validateAtom(atom).ok, true, JSON.stringify(validateAtom(atom).errors));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

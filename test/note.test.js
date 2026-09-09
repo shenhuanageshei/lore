@@ -5,8 +5,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { noteAtom } from '../lib/note.js';
-import { readAllAtoms } from '../lib/journal.js';
+import { appendNote, noteAtom } from '../lib/note.js';
+import { AtomRejected, readAllAtoms } from '../lib/journal.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-note-')); }
@@ -102,7 +102,7 @@ test('CLI: node lib/note.js --draft --anchors → 原子 status:draft + 源码�
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('lore note --draft（统一 CLI）：status:draft 落库；默认不加 status；未 init → exit 1 不写散文件', () => {
+test('lore note --draft（统一 CLI）：status:draft 落库；默认（无 --draft）落盘同样是 draft；未 init → exit 1 不写散文件', () => {
   const root = tmpDir();
   try {
     // 未 init → 明确报错，不静默写散文件
@@ -130,11 +130,52 @@ test('lore note --draft（统一 CLI）：status:draft 落库；默认不加 sta
     assert.deepEqual(draft.refs.anchors, ['runAuto @ lib/runner.js:77']);
     assert.equal(validateAtom(draft).ok, true);
     const plain = atoms.find(a => a.title === 'plain');
-    assert.equal('status' in plain, false);                 // 默认行为不变
+    // S1：写入经 lib/journal.js 的校验闸门 → 机器来源（source:'agent'）缺 status 落盘为 draft（不变量⑦）。
+    // noteAtom 本身仍不写 status 键（纯形状不变，见上面「noteAtom 默认不加 status」），补 draft 发生在落盘时。
+    assert.equal(plain.status, 'draft');
+    assert.equal(validateAtom(plain).ok, true);
     // 缺 --title → 用法错误 exit 1
     const bad = [];
     assert.equal(cliMain(['note', '--why', 'w', '--root', root], { cwd: process.cwd(), out: s => bad.push(s), err: s => bad.push(s) }), 1);
     assert.match(bad.join('\n'), /note requires --title/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------- S1：写入路径接线（note 入口经 lib/journal.js 校验闸门） ----------
+test('appendNote 经校验落盘：返回值 = 盘上那条（status:draft）；why 已剥 trailer', () => {
+  const root = tmpDir();
+  try {
+    const returned = appendNote(root, { title: '选 X 弃 Y', why: 'real why\nCo-Authored-By: Bot <b@x>', component: ['lib'] });
+    assert.equal(returned.status, 'draft');                        // 机器来源缺 status → draft
+    const [stored] = readAllAtoms(join(root, '.lore', 'journal'));
+    assert.deepEqual(stored, returned);                            // 返回值就是落盘原子
+    assert.equal(stored.why, 'real why');                          // 写入侧 trailer 闭合（显式回归断言）
+    assert.doesNotMatch(stored.why, /Co-Authored-By/);
+    assert.equal(validateAtom(stored).ok, true);
+    const noWhy = appendNote(root, { title: 'trailer only', why: 'Generated with Codex' });
+    assert.equal('why' in readAllAtoms(join(root, '.lore', 'journal')).find(a => a.id === noWhy.id), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('appendNote 非法原子（缺 title）→ AtomRejected 可读错误，不落半行', () => {
+  const root = tmpDir();
+  try {
+    assert.throws(() => appendNote(root, { title: '', why: 'w' }), (e) => {
+      assert.ok(e instanceof AtomRejected);
+      assert.match(e.message, /title: missing-title/);
+      return true;
+    });
+    assert.equal(existsSync(join(root, '.lore', 'journal')), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI: node lib/note.js 落盘原子 status:draft（机器来源诚实）+ 过校验', () => {
+  const root = tmpDir();
+  try {
+    execFileSync('node', ['lib/note.js', root, '--title', 'plain cli', '--why', 'w'], { cwd: process.cwd() });
+    const [a] = readAllAtoms(join(root, '.lore', 'journal'));
+    assert.equal(a.status, 'draft');
+    assert.equal(validateAtom(a).ok, true, JSON.stringify(validateAtom(a).errors));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

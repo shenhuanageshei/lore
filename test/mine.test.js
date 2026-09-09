@@ -121,6 +121,28 @@ test('mine appends new atoms; re-run is idempotent (dedup by id)', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// ---------- S1：mine 入口经 lib/journal.js 校验闸门 ----------
+test('mine 落盘原子过校验且 status:draft（commit 与 pitfall 两口径，机器来源诚实）', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'feat: y\n\nreal rationale\nCo-Authored-By: Bot <b@x.com>');
+    commitFile(root, 'lib/b.js', 'y', 'feat: trailer only\n\n🤖 Generated with [Claude Code](https://x)');
+    writeFileSync(join(root, 'CLAUDE.md'), '**问题**：p\n**修复**：f\n**预防**：v\n');
+    const journalDir = join(root, '.lore', 'journal');
+    const res = mine({ repoRoot: root, journalDir, codeRoots: ['lib'], mines: ['commits', 'claude_md_pitfalls'] });
+    assert.equal(res.added, 3);
+    const atoms = readAllAtoms(journalDir);
+    assert.equal(atoms.length, 3);
+    for (const a of atoms) {
+      assert.equal(validateAtom(a).ok, true, `${a.id}: ${JSON.stringify(validateAtom(a).errors)}`);
+      assert.equal(a.status, 'draft', a.id);                          // 机器来源缺 status → draft
+    }
+    const withWhy = atoms.find(a => a.title === 'feat: y');
+    assert.equal(withWhy.why, 'real rationale');                      // 写入侧 trailer 闭合
+    assert.equal('why' in atoms.find(a => a.title === 'feat: trailer only'), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('commitAtom: source param overrides default', () => {
   const raw = { sha: 'abc', ts: '2026-06-01T08:00:00Z', subject: 's', body: '', files: [] };
   assert.equal(commitAtom(raw, []).source, 'miner:commits');         // default unchanged

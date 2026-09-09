@@ -73,6 +73,11 @@ test('本仓库：原子 ~490 / decision 1 / trailer-only 127 量级；hook 指�
   const txt = formatReport(r);
   assert.match(txt, /lore doctor — /);
   assert.match(txt, /trailer-only \d+/);
+  // S2 噪音分布（降权强度）——本仓库 trailer-only 127 条全部 high（设计 §3.4 只降权不删除）
+  assert.match(txt, /noise\s+high \d+ · low \d+ · none \d+/);
+  assert.ok(r.capture.noise.high >= 100, 'noise.high=' + r.capture.noise.high);
+  assert.equal(r.capture.noise.high + r.capture.noise.low + r.capture.noise.none, r.capture.atoms);
+  assert.ok(r.capture.noise.high >= r.capture.trailerOnly, 'trailer-only 必须全部落在 high 里');
   assert.match(txt, /pitfall \d+（kind=pitfall）/, '两口径分列：按 kind 的踩坑数');
   assert.match(txt, /refs\.pitfall \d+/, '旧口径 refs.pitfall 仍单列');
   assert.match(txt, /decision \/ \d+ commits/);
@@ -118,9 +123,13 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     assert.deepEqual(Object.keys(doc.repo), ['root', 'isGit', 'head', 'version', 'commits']);
     assert.deepEqual(Object.keys(doc.hook), ['status', 'ok', 'hookPath', 'target', 'expected']);
     // 键集只增不改：pitfalls / window 是新增，既有键名/语义一律不动
+    // S2 新增 noise（键集只增不改：既有键名/语义一律不动）
     assert.deepEqual(Object.keys(doc.capture),
-      ['atoms', 'badLines', 'decisions', 'pitfalls', 'trailerOnly', 'refsPitfall', 'commits', 'captureRate',
+      ['atoms', 'badLines', 'decisions', 'pitfalls', 'trailerOnly', 'noise', 'refsPitfall', 'commits', 'captureRate',
         'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays']);
+    assert.deepEqual(Object.keys(doc.capture.noise), ['high', 'low', 'none']);   // 分布契约只有这三个键
+    // 夹具里只有 a1 是 trailer-only → high；其余五条干净 → none
+    assert.deepEqual(doc.capture.noise, { high: 1, low: 0, none: 5 });
     assert.deepEqual(Object.keys(doc.capture.window), ['size', 'commits', 'decisions', 'startTs', 'rate', 'ratePct']);
     assert.equal(doc.repo.root, resolve(dir));       // --json 后跟 --root 未被吞掉
     assert.equal(doc.capture.atoms, 6);
@@ -216,6 +225,9 @@ test('计数口径：trailer-only / decision / refs.pitfall / 坏行 / lastHook 
     assert.equal(s.lastHookTs, '2026-09-02T00:00:00Z'); // 只看 source=hook
     assert.equal(s.lastAtomTs, '2026-09-09T00:00:00Z');
     assert.equal(s.lastSource, 'miner:commits');
+    // S2：噪音分布与 trailerOnly 同源（a1 是夹具里唯一的 trailer-only）
+    assert.deepEqual(s.noise, { high: 1, low: 0, none: 5 });
+    assert.equal(s.noiseReasons['trailer-only'], 1);
 
     const r = diagnose(dir, { now: new Date('2026-09-05T00:00:00Z') });
     assert.equal(r.capture.gapDays, 3);                 // 2026-09-02 → 09-05

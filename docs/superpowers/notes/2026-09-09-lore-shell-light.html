@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>lore 壳 · 浅色版原型（2026-09-09）</title>
+<style> body { margin:0; padding:28px 20px 80px; background:#E8EBF0; } .wrap { max-width:1440px; margin:0 auto; } </style></head>
+<body><div class="wrap">
+<div id="v6">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  #v6 { --bg:#F4F6F9; --pan:#FFFFFF; --pan2:#F8FAFC; --pan3:#EEF2F7; --bd:#E2E7EE; --bd2:#CFD7E2;
+        --fg:#0F1319; --mut:#5B6473; --dim:#6B7280; --acc:#5B5BD6; --acc2:#0E7490; --amber:#B45309; --ok:#15803D; --bad:#DC2626;
+        position:relative; border:1px solid var(--bd2); border-radius:16px; overflow:hidden; background:var(--bg); color:var(--fg);
+        font-family:Inter,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; font-size:13.5px; line-height:1.66;
+        box-shadow:0 1px 2px rgba(16,24,40,.05), 0 24px 48px -28px rgba(16,24,40,.22); }
+  #v6 * { box-sizing:border-box; }
+  #v6 .wash { position:absolute; left:50%; top:-200px; width:820px; height:380px; transform:translateX(-50%); pointer-events:none;
+              background:radial-gradient(ellipse at center, color-mix(in srgb,var(--acc) 16%,transparent), transparent 70%); filter:blur(40px); }
+  #v6 .beam { position:absolute; inset:0 0 auto 0; height:2px; background:linear-gradient(90deg,transparent,var(--acc) 25%,var(--acc2) 70%,transparent); }
+
+  #v6 .top { position:relative; display:flex; align-items:center; gap:16px; padding:11px 18px; flex-wrap:wrap;
+             border-bottom:1px solid var(--bd); background:color-mix(in srgb,var(--pan) 86%,transparent); backdrop-filter:blur(16px) saturate(160%); }
+  #v6 .fkeys { display:flex; gap:3px; }
+  #v6 .fkeys b { display:inline-flex; align-items:center; gap:6px; font:500 11px/1 "JetBrains Mono",monospace; padding:6px 9px; border-radius:7px;
+                 border:1px solid var(--bd); background:var(--pan); color:var(--mut); box-shadow:0 1px 1px rgba(16,24,40,.03);
+                 transition:all .18s cubic-bezier(.16,1,.3,1); }
+  #v6 .fkeys b i { color:var(--acc); font-style:normal; }
+  #v6 .fkeys b:hover { border-color:var(--bd2); color:var(--fg); transform:translateY(-1px); box-shadow:0 4px 10px -6px rgba(16,24,40,.25); }
+  #v6 .brand { display:flex; align-items:center; gap:9px; font-weight:650; letter-spacing:-.02em; }
+  #v6 .mark { width:24px; height:24px; border-radius:8px; display:grid; place-items:center; font-size:11px; font-weight:700; color:#fff;
+              background:linear-gradient(140deg,var(--acc),var(--acc2)); box-shadow:0 6px 16px -8px var(--acc); }
+  #v6 .brand em { font-style:normal; font-weight:400; font-size:11.5px; color:var(--dim); font-family:"JetBrains Mono",monospace; }
+  #v6 .sbox { flex:1; min-width:150px; max-width:360px; display:flex; align-items:center; gap:9px; padding:7px 12px; border-radius:9px;
+              border:1px solid var(--bd); background:var(--pan); color:var(--dim); font-size:12px; box-shadow:0 1px 1px rgba(16,24,40,.03) inset; }
+  #v6 .sbox kbd { margin-left:auto; font:500 10px/1 "JetBrains Mono",monospace; border:1px solid var(--bd); border-radius:5px; padding:2px 5px; color:var(--mut); background:var(--pan2); }
+  #v6 .btn { font:500 11.5px/1 Inter,sans-serif; padding:7px 12px; border-radius:8px; border:1px solid var(--bd2); background:var(--pan);
+             color:var(--fg); cursor:pointer; box-shadow:0 1px 1px rgba(16,24,40,.04); transition:all .18s cubic-bezier(.16,1,.3,1); }
+  #v6 .btn:hover { border-color:var(--acc); color:var(--acc); }
+  #v6 .btn:active { transform:scale(.975); }
+  #v6 .btn.p { background:linear-gradient(140deg,var(--acc),color-mix(in srgb,var(--acc2) 45%,var(--acc))); border-color:transparent; color:#fff;
+               box-shadow:0 8px 20px -10px color-mix(in srgb,var(--acc) 60%,transparent); }
+  #v6 .btn.p:hover { color:#fff; transform:translateY(-1px); }
+
+  #v6 .main { display:grid; grid-template-columns:242px minmax(0,1fr) 268px; }
+  @media (max-width:1080px){ #v6 .main { grid-template-columns:224px minmax(0,1fr); } #v6 .insp { display:none; } }
+  @media (max-width:760px){ #v6 .main { grid-template-columns:1fr; } #v6 .nav { display:none; } }
+  #v6 .nav { border-right:1px solid var(--bd); padding:16px 10px; background:var(--pan2); }
+  #v6 .gh { font:600 9.5px/1 "JetBrains Mono",monospace; letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin:14px 9px 7px; }
+  #v6 .gh:first-child { margin-top:0; }
+  #v6 .ni { position:relative; display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:transparent; border:none;
+            border-radius:9px; padding:7px 10px; font:400 12.5px/1.4 Inter,sans-serif; color:var(--fg); cursor:pointer; transition:all .16s ease; }
+  #v6 .ni:hover { background:var(--pan3); }
+  #v6 .ni.on { background:color-mix(in srgb,var(--acc) 10%,transparent); color:var(--acc); font-weight:500; }
+  #v6 .ni.on::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:var(--acc); }
+  #v6 .ni .m { margin-left:auto; font:500 10px/1 "JetBrains Mono",monospace; color:var(--mut); background:var(--pan3); border-radius:5px; padding:2px 5px; }
+  #v6 .ni.on .m { background:color-mix(in srgb,var(--acc) 16%,transparent); color:var(--acc); }
+
+  #v6 .doc { padding:34px 42px 46px; max-width:76ch; margin:0 auto; background:var(--pan); border-left:1px solid var(--bd); border-right:1px solid var(--bd); }
+  @media (max-width:760px){ #v6 .doc { padding:22px 18px 30px; border:none; } }
+  #v6 .crumb { display:flex; align-items:center; gap:8px; font:400 11px/1 "JetBrains Mono",monospace; letter-spacing:.06em; color:var(--dim); margin-bottom:12px; }
+  #v6 h1 { margin:0; font-size:clamp(23px,2.6vw,29px); line-height:1.2; letter-spacing:-.03em; font-weight:680; }
+  #v6 .sub { margin:11px 0 0; color:var(--mut); font-size:14px; max-width:70ch; }
+  #v6 .meta { display:flex; gap:7px; flex-wrap:wrap; margin-top:16px; }
+  #v6 .chip { font:500 10.5px/1 "JetBrains Mono",monospace; letter-spacing:.04em; padding:4px 9px; border-radius:999px; border:1px solid var(--bd); background:var(--pan2); color:var(--mut); }
+  #v6 .chip.w { color:var(--amber); border-color:color-mix(in srgb,var(--amber) 30%,transparent); background:color-mix(in srgb,var(--amber) 8%,transparent); }
+  #v6 .chip.a { color:var(--acc2); border-color:color-mix(in srgb,var(--acc2) 28%,transparent); background:color-mix(in srgb,var(--acc2) 8%,transparent); }
+  #v6 .call { position:relative; display:grid; grid-template-columns:auto 1fr; gap:12px; padding:14px 16px; border-radius:12px; margin:20px 0; overflow:hidden;
+              border:1px solid color-mix(in srgb,var(--acc) 20%,var(--bd));
+              background:linear-gradient(100deg, color-mix(in srgb,var(--acc) 7%,transparent), color-mix(in srgb,var(--acc2) 4%,transparent)); }
+  #v6 .call::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg,var(--acc),var(--acc2)); }
+  #v6 .call i { width:19px; height:19px; border-radius:6px; display:grid; place-items:center; font:700 10px/1 Inter,sans-serif; font-style:normal; color:#fff;
+                background:linear-gradient(140deg,var(--acc),var(--acc2)); }
+  #v6 .call p { margin:0; font-size:13px; }
+  #v6 h2 { display:flex; align-items:center; gap:10px; margin:34px 0 12px; font-size:13px; font-weight:600; }
+  #v6 h2 .no { font:600 10px/1 "JetBrains Mono",monospace; letter-spacing:.12em; color:var(--acc); }
+  #v6 h2::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,var(--bd),transparent); }
+  #v6 p { margin:0 0 12px; }
+  #v6 .flow { display:flex; gap:8px; flex-wrap:wrap; align-items:stretch; }
+  #v6 .bx { flex:1; min-width:104px; padding:11px 13px; border-radius:11px; border:1px solid var(--bd); background:var(--pan2);
+            box-shadow:0 1px 2px rgba(16,24,40,.04); transition:all .2s cubic-bezier(.16,1,.3,1); }
+  #v6 .bx:hover { border-color:var(--bd2); transform:translateY(-1px); box-shadow:0 8px 18px -12px rgba(16,24,40,.3); }
+  #v6 .bx b { display:block; font-size:12.5px; font-weight:600; }
+  #v6 .bx span { font-size:11px; color:var(--mut); }
+  #v6 .ar { align-self:center; color:var(--dim); font-family:"JetBrains Mono",monospace; font-size:11px; }
+  #v6 details { border:1px solid var(--bd); border-radius:11px; background:var(--pan2); padding:12px 15px; margin-bottom:9px; }
+  #v6 details[open] { border-color:var(--bd2); background:var(--pan); box-shadow:0 1px 2px rgba(16,24,40,.04); }
+  #v6 details summary { cursor:pointer; font-size:12.5px; font-weight:600; }
+  #v6 details .dc { margin-top:9px; font-size:12.5px; color:var(--mut); }
+  #v6 .mk { display:inline-grid; place-items:center; width:15px; height:15px; margin-left:5px; border-radius:50%; vertical-align:super;
+            font:600 9.5px/1 "JetBrains Mono",monospace; color:var(--acc2); border:1px solid color-mix(in srgb,var(--acc2) 40%,transparent);
+            background:color-mix(in srgb,var(--acc2) 10%,transparent); cursor:pointer; transition:all .2s ease; }
+  #v6 .mk:hover { background:var(--acc2); color:#fff; }
+  #v6 .log { border:1px solid var(--bd); border-radius:12px; overflow:hidden; background:var(--pan); box-shadow:0 1px 2px rgba(16,24,40,.04); }
+  #v6 .log .r { display:grid; grid-template-columns:88px 92px 1fr; gap:14px; padding:11px 14px; border-top:1px solid var(--bd); font-size:12.5px; }
+  #v6 .log .r:first-child { border-top:none; }
+  #v6 .log .r:hover { background:color-mix(in srgb,var(--acc) 4%,transparent); }
+  #v6 .log .r.h { background:var(--pan3); font:600 9.5px/1 "JetBrains Mono",monospace; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+  #v6 .log .r .v { font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--acc); }
+  #v6 .log .r .d { font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--mut); }
+  #v6 code { font-family:"JetBrains Mono",monospace; font-size:11.5px; background:color-mix(in srgb,var(--acc) 8%,transparent);
+             border:1px solid color-mix(in srgb,var(--acc) 16%,transparent); border-radius:5px; padding:1px 6px; }
+
+  #v6 .insp { border-left:1px solid var(--bd); padding:20px 16px; background:var(--pan2); display:grid; gap:12px; align-content:start; }
+  #v6 .pc { border:1px solid var(--bd); border-radius:12px; background:var(--pan); padding:13px 14px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+  #v6 .pc h4 { margin:0 0 9px; font:600 9.5px/1 "JetBrains Mono",monospace; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+  #v6 .ring { display:flex; align-items:center; gap:12px; }
+  #v6 .ring b { font:600 21px/1 "JetBrains Mono",monospace; letter-spacing:-.02em; }
+  #v6 .ring span { font-size:11px; color:var(--mut); }
+  #v6 .qin { width:100%; font:400 12.5px/1.4 Inter,sans-serif; padding:8px 10px; border-radius:9px; border:1px solid var(--bd2);
+             background:var(--pan); color:var(--fg); margin-bottom:8px; }
+  #v6 .qin:focus { outline:2px solid color-mix(in srgb,var(--acc) 35%,transparent); outline-offset:1px; border-color:var(--acc); }
+  #v6 .vd { font-size:11.5px; color:var(--mut); min-height:15px; margin-top:7px; }
+  #v6 .note { display:grid; grid-template-columns:16px 1fr; gap:9px; padding:9px 8px; border-top:1px dashed var(--bd2); border-radius:8px; transition:all .25s ease; }
+  #v6 .note:first-of-type { border-top:none; }
+  #v6 .note .n { font:600 10px/1.6 "JetBrains Mono",monospace; color:var(--acc2); }
+  #v6 .note .t { font-size:11.5px; color:var(--mut); }
+  #v6 .note .t b { display:block; color:var(--fg); font-weight:500; font-family:"JetBrains Mono",monospace; font-size:11px; }
+  #v6 .note.flash { background:color-mix(in srgb,var(--acc2) 10%,transparent); border-color:var(--acc2); }
+
+  #v6 .status { display:flex; align-items:center; gap:18px; padding:8px 18px; border-top:1px solid var(--bd); flex-wrap:wrap;
+                background:color-mix(in srgb,var(--pan) 88%,transparent); backdrop-filter:blur(12px);
+                font:400 10.5px/1 "JetBrains Mono",monospace; letter-spacing:.06em; color:var(--dim); }
+  #v6 .status b { color:var(--fg); font-weight:500; }
+  #v6 .status .am { color:var(--amber); }
+  #v6 .status .live { display:inline-flex; align-items:center; gap:6px; color:var(--ok); }
+  #v6 .status .live::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 18%,transparent); animation:pulse6 2.4s ease-in-out infinite; }
+  @keyframes pulse6 { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+  @media (prefers-reduced-motion:reduce){ #v6 .status .live::before { animation:none; } }
+  #v6 .status .keys { margin-left:auto; display:flex; gap:12px; }
+  #v6 .status .keys span { display:inline-flex; gap:5px; }
+  #v6 .status .keys em { font-style:normal; color:var(--mut); border:1px solid var(--bd); border-radius:4px; padding:1px 4px; background:var(--pan); }
+</style>
+
+<div class="wash"></div><div class="beam"></div>
+
+<div class="top">
+  <div class="fkeys"><b><i>F1</i>Wiki</b><b><i>F2</i>检索</b><b><i>F3</i>决策史</b><b><i>F4</i>自测</b><b><i>F5</i>重写</b></div>
+  <div class="brand"><span class="mark">◆</span><span>lore</span><em>D:\workspace\lore</em></div>
+  <div class="sbox"><span>搜索页面、章节、决策</span><kbd>/</kbd></div>
+  <button class="btn p">重写这页</button>
+</div>
+
+<div class="main">
+  <aside class="nav">
+    <div class="gh">项目</div>
+    <button class="ni on">首页</button>
+    <div class="gh">主线</div>
+    <button class="ni">定位与取舍</button>
+    <div class="gh">component</div>
+    <button class="ni">runner<span class="m">3</span></button>
+    <button class="ni">sync<span class="m">15</span></button>
+    <button class="ni">backend</button>
+    <button class="ni">journal</button>
+    <div class="gh">docs</div>
+    <button class="ni">文档索引<span class="m">82</span></button>
+  </aside>
+
+  <article class="doc">
+    <div class="crumb">component / runner</div>
+    <h1>runner —— 自动重写运行器</h1>
+    <p class="sub">判断该不该跑 → 调模型重写一页 → 过五道机械检查 → 落盘。模型全程只读，写盘权留在本地。</p>
+    <div class="meta"><span class="chip w">陈旧 3</span><span class="chip a">深度页</span><span class="chip">a69bda5</span></div>
+
+    <div class="call"><i>i</i><p>一句话：它是 auto 档的夜班编辑——趁你不在，把过期页面拿给一个只能看、不能改的模型重写，稿子过了机械质检才替换原页。</p></div>
+
+    <h2><span class="no">01</span>它怎么跑</h2>
+    <div class="flow">
+      <div class="bx"><b>判断</b><span>该不该跑</span></div><span class="ar">→</span>
+      <div class="bx"><b>选后端</b><span>挑可用模型</span></div><span class="ar">→</span>
+      <div class="bx"><b>重写</b><span>只读工具</span></div><span class="ar">→</span>
+      <div class="bx"><b>过门</b><span>五道检查</span></div><span class="ar">→</span>
+      <div class="bx"><b>落盘</b><span>过了才写</span></div>
+    </div>
+
+    <h2><span class="no">02</span>机制详解</h2>
+    <details open><summary>为什么不让模型直接写文件<button class="mk" data-note="1">1</button></summary>
+      <div class="dc">它只拿到读类工具的许可，页面全文通过标准输出返回，写盘由本地代码执行——模型即使被诱导，也改不了你的仓库。</div></details>
+    <details><summary>为什么后端要可切换<button class="mk" data-note="2">2</button></summary>
+      <div class="dc">命令行工具会升级、会改参数语义、会没登录；一个不可用就换下一个，只有「不可用类」错误才切换。</div></details>
+
+    <h2><span class="no">03</span>修改记录</h2>
+    <div class="log">
+      <div class="r h"><div>版本</div><div>日期</div><div>变更与原因</div></div>
+      <div class="r"><div class="v">A-04.2</div><div class="d">2026-09-08</div><div>探测预算 5 秒 → 20 秒：冷启动被误判为不可用 <code>probe @ backend.js:142</code></div></div>
+      <div class="r"><div class="v">A-04.1</div><div class="d">2026-06-14</div><div>单页超时 10 → 20 分钟：真实耗时中位数落在 10 分钟外侧</div></div>
+      <div class="r"><div class="v">A-04.0</div><div class="d">2026-06-13</div><div>失败页留队导致重试风暴：加了轮间冷却闸</div></div>
+    </div>
+  </article>
+
+  <aside class="insp">
+    <div class="pc"><h4>学习进度</h4><div class="ring">
+      <svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="17" fill="none" stroke="var(--bd2)" stroke-width="3.5"/>
+      <circle cx="23" cy="23" r="17" fill="none" stroke="url(#g7)" stroke-width="3.5" stroke-linecap="round" transform="rotate(-90 23 23)"
+        stroke-dasharray="107" stroke-dashoffset="66"/>
+      <defs><linearGradient id="g7" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--acc)"/><stop offset="1" stop-color="var(--acc2)"/></linearGradient></defs></svg>
+      <div><b>38%</b><br><span>3 / 8 已掌握</span></div></div></div>
+
+    <div class="pc"><h4>引出线注记</h4>
+      <div class="note" id="note-1"><span class="n">1</span><span class="t"><b>runAuto @ lib/runner.js:77</b>入口：判断该不该跑</span></div>
+      <div class="note" id="note-2"><span class="n">2</span><span class="t"><b>resolveBackendChain @ lib/backend.js:171</b>后端链与探测预算</span></div>
+    </div>
+
+    <div class="pc"><h4>一句话自测</h4>
+      <p style="margin:0 0 8px;font-size:12px;color:var(--mut)">为什么不让模型直接写文件？</p>
+      <input class="qin" id="q7" placeholder="写下你的答案">
+      <button class="btn p" id="qb7" style="width:100%">提交</button>
+      <div class="vd" id="qv7"></div></div>
+  </aside>
+</div>
+
+<div class="status">
+  <span class="live">CAPTURE OK</span>
+  <span><b>94</b> 页</span>
+  <span>runner 空闲 <b>00:12</b></span>
+  <span class="am">队列 <b>2</b></span>
+  <span>上次捕获 <b>14:02</b></span>
+  <span class="keys"><span><em>/</em>检索</span><span><em>[</em><em>]</em>翻页</span><span><em>q</em>自测</span></span>
+</div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('v6');
+  root.addEventListener('click', function (e) {
+    var mk = e.target.closest('[data-note]');
+    if (mk) {
+      var n = document.getElementById('note-' + mk.dataset.note);
+      if (n) { n.classList.add('flash'); setTimeout(function () { n.classList.remove('flash'); }, 1400); }
+      return;
+    }
+    if (e.target.id === 'qb7') {
+      var v = document.getElementById('q7').value.trim();
+      var out = document.getElementById('qv7');
+      if (!v) { out.textContent = '先写一句。'; return; }
+      out.textContent = /白名单|只读|写盘|标准输出|stdout/.test(v) ? '已记为「已理解 @ 当前版本」。' : '要点：工具白名单 + 写盘权留在本地。';
+    }
+  });
+})();
+</script>
+</div></body></html>

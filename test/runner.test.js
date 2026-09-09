@@ -301,8 +301,9 @@ test('runAuto: 账本 I/O 失败（appendCost 抛错）不中断整轮——页�
     assert.match(rf(join(lore, 'wiki', 'component', 'lib.md'), 'utf8'), /新正文/);
     assert.equal(readAutoRuns(state).length, 1);                      // 运行历史照记
     assert.equal(spawned.length, 1);                                  // finalize 照触发
-    assert.match(spawned[0][0], /sync\.js$/);
-    assert.equal(spawned[0][1][0], 'finalize');
+    assert.equal(spawned[0][0], process.execPath);                    // finalize spawn 形状：spawnFn(execPath, [syncJs, 'finalize', loreDir])
+    assert.match(spawned[0][1][0], /sync\.js$/);                       // 脚本路径在 args[0]（不在 cmd）
+    assert.equal(spawned[0][1][1], 'finalize');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

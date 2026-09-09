@@ -5,16 +5,19 @@
 //   · 确认后原原子**字节不变**（append-only）；
 //   · 重复确认幂等；未知 atom id → 明确报错（CLI 层 exit 1，见 test/cli.test.js）；
 //   · 有效状态由最新 confirmation 派生（覆盖内联 status，内联字节不改）；
-//   · 机器重写不改确认记录（不变量③）。
+//   · 机器重写不改确认记录（不变量③）；
+//   · 来源诚实（不变量⑦）：不带 --by 的确认写 confirmed_by:'unattributed' + provenance {via, by}，
+//     只有显式署名（--by owner）才写 owner；未署名的确认在 doctor / evidence 单列计数。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  CONFIRM_SCHEMA_VERSION, ConfirmError, DEFAULT_CONFIRMED_BY, STATUS_BY_VERDICT, VERDICTS,
-  confirmAtom, confirmationRecord, confirmationSummary, confirmationsFor, confirmerOf, deriveStatus, deriveStatuses,
-  findAtom, latestByAtom, latestConfirmation, newConfirmationId, readConfirmations,
+  CONFIRM_SCHEMA_VERSION, ConfirmError, DEFAULT_CONFIRMED_BY, DEFAULT_VIA, PROVENANCE_VIAS, STATUS_BY_VERDICT,
+  UNATTRIBUTED_BY, VERDICTS, confirmAtom, confirmationRecord, confirmationSummary, confirmationsFor, confirmerOf,
+  countUnattributedConfirmations, deriveStatus, deriveStatuses, findAtom, isUnattributedConfirmation,
+  latestByAtom, latestConfirmation, newConfirmationId, readConfirmations,
 } from '../lib/confirm.js';
 import { CONFIRMATION_KIND, appendAtom, readAllAtoms, readAllRecords } from '../lib/journal.js';
 import { foldAtoms } from '../lib/fold.js';
@@ -47,13 +50,24 @@ test('confirmationRecord：形状含目标 atom id / verdict / confirmed_by / co
   assert.equal(CONFIRM_SCHEMA_VERSION, 1);
   assert.deepEqual(VERDICTS, ['confirm', 'dispute']);
   assert.deepEqual(STATUS_BY_VERDICT, { confirm: 'confirmed', dispute: 'disputed' });
-  assert.equal(DEFAULT_CONFIRMED_BY, 'owner');
+  assert.deepEqual(PROVENANCE_VIAS, ['cli', 'shell', 'api']);
+  assert.equal(DEFAULT_VIA, 'cli');
+  assert.equal(UNATTRIBUTED_BY, 'unattributed');
+  // 不变量⑦：署名者缺省 unattributed——不带 --by 的确认不得冒充 owner（D1 修复点）
+  assert.equal(DEFAULT_CONFIRMED_BY, 'unattributed');
 
   const rec = confirmationRecord({ atom: ATOM.id, why: '读过实现，判断成立\nCo-Authored-By: Bot <b@x>', ts: TS, id: 'confirmation:fixed' });
   assert.deepEqual(rec, {
     id: 'confirmation:fixed', ts: TS, kind: CONFIRMATION_KIND, atom: ATOM.id, verdict: 'confirm',
-    confirmed_by: 'owner', confirmed_at: TS, why: '读过实现，判断成立',      // trailer 已剥（不变量⑦）
+    confirmed_by: 'unattributed', confirmed_at: TS,
+    provenance: { via: 'cli', by: 'unattributed' },                        // 来源：入口 + 署名者
+    why: '读过实现，判断成立',                                                // trailer 已剥（不变量⑦）
   });
+  // 显式署名 / 显式入口：provenance.by 与 confirmed_by 恒同值（审计时按来源查得到人）
+  const signed = confirmationRecord({ atom: ATOM.id, confirmedBy: 'owner', via: 'api', ts: TS });
+  assert.equal(signed.confirmed_by, 'owner');
+  assert.deepEqual(signed.provenance, { via: 'api', by: 'owner' });
+  assert.equal(confirmationRecord({ atom: ATOM.id, confirmedBy: 'owner:magic', ts: TS }).provenance.by, 'owner:magic');
   // why 缺省 / 只有 trailer → 不写 why 键（无正文不写 why）
   assert.equal('why' in confirmationRecord({ atom: ATOM.id, ts: TS }), false);
   assert.equal('why' in confirmationRecord({ atom: ATOM.id, why: 'Signed-off-by: D <d@x>', ts: TS }), false);
@@ -66,6 +80,7 @@ test('confirmationRecord：形状含目标 atom id / verdict / confirmed_by / co
     [{ atom: '' }, 'missing-atom'],
     [{ atom: ATOM.id, verdict: 'maybe' }, 'invalid-verdict'],
     [{ atom: ATOM.id, confirmedBy: '' }, 'missing-confirmed-by'],
+    [{ atom: ATOM.id, via: 'telepathy' }, 'invalid-via'],          // 入口词表封闭：未知入口明确报错
   ]) {
     assert.throws(() => confirmationRecord({ ...args, ts: TS }), e => e instanceof ConfirmError && e.code === code, JSON.stringify(args));
   }
@@ -95,7 +110,8 @@ test('确认后原原子字节不变、journal 只多一行 kind:confirmation（
     assert.equal(records[1].kind, 'confirmation');
     assert.equal(records[1].atom, ATOM.id);
     assert.equal(records[1].verdict, 'confirm');
-    assert.equal(records[1].confirmed_by, 'owner');
+    assert.equal(records[1].confirmed_by, 'unattributed');   // 不署名 ≠ owner（不变量⑦）
+    assert.deepEqual(records[1].provenance, { via: 'cli', by: 'unattributed' });
     assert.ok(records[1].confirmed_at);
     assert.equal(JSON.stringify(records[0]), atomLine);     // 原原子逐字节不变
     assert.equal(records[0].status, 'draft');               // 内联 status 未被改写
@@ -234,15 +250,49 @@ test('confirmationSummary：决策原子的已确认 / 已否决 / 待确认 + �
     { kind: CONFIRMATION_KIND, atom: 'pitfall:p1', verdict: 'confirm', confirmed_at: TS, confirmed_by: 'owner' },
   ];
   assert.deepEqual(confirmationSummary([d1, d2, d3, p1], confirmations),
-    { records: 3, decisions: 3, confirmed: 2, disputed: 1, pending: 0 });
+    { records: 3, unattributed: 0, decisions: 3, confirmed: 2, disputed: 1, pending: 0 });
   // 只数 kind:'decision'：pitfall 的确认记录计入 records 但不进决策进度
   assert.deepEqual(confirmationSummary([p1], confirmations),
-    { records: 3, decisions: 0, confirmed: 0, disputed: 0, pending: 0 });
+    { records: 3, unattributed: 0, decisions: 0, confirmed: 0, disputed: 0, pending: 0 });
   // 无 .lore / 空输入 → 全 0（不是 unknown：这里数的是记录本身，缺就是 0 条）
-  assert.deepEqual(confirmationSummary([], []), { records: 0, decisions: 0, confirmed: 0, disputed: 0, pending: 0 });
+  assert.deepEqual(confirmationSummary([], []),
+    { records: 0, unattributed: 0, decisions: 0, confirmed: 0, disputed: 0, pending: 0 });
   // 一条未确认的决策 = pending
   assert.equal(confirmationSummary([d2], []).pending, 1);
   assert.equal(confirmationSummary([d2], []).confirmed, 0);
+});
+
+// D1（不变量⑦）：来源未署名的确认单列计数——「确认了」与「谁确认的」是两个维度，
+// doctor（confirmation.unattributed）与 evidence（counts.unattributedConfirmations）共用本口径。
+test('来源未署名的确认：单列计数，与确认进度分属两个维度', () => {
+  const ownerRec = { kind: CONFIRMATION_KIND, atom: 'decision:d1', verdict: 'confirm', confirmed_by: 'owner' };
+  const missing = { kind: CONFIRMATION_KIND, atom: 'decision:d1', verdict: 'confirm' };
+  const blank = { kind: CONFIRMATION_KIND, atom: 'decision:d1', verdict: 'dispute', confirmed_by: '   ' };
+  const un = { kind: CONFIRMATION_KIND, atom: 'decision:d1', verdict: 'confirm', confirmed_by: UNATTRIBUTED_BY };
+  assert.equal(isUnattributedConfirmation(ownerRec), false);
+  for (const r of [missing, blank, un]) assert.equal(isUnattributedConfirmation(r), true, JSON.stringify(r));
+  assert.equal(isUnattributedConfirmation(null), false);
+  assert.equal(isUnattributedConfirmation({}), true);                    // 无署名 = 未署名
+  assert.equal(countUnattributedConfirmations([ownerRec, missing, blank, un]), 3);
+  assert.equal(countUnattributedConfirmations(), 0);
+
+  const d1 = { id: 'decision:d1', kind: 'decision' };
+  assert.deepEqual(confirmationSummary([d1], [un, ownerRec]),
+    { records: 2, unattributed: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+  // 未署名 ≠ 未确认：一条未署名的 dispute 照样把派生状态翻成 disputed
+  assert.deepEqual(confirmationSummary([d1], [blank]),
+    { records: 1, unattributed: 1, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+
+  // 端到端：CLI 默认（不带 --by）落盘的就是未署名记录
+  const root = fixture();
+  try {
+    const j = journalDirOf(root);
+    confirmAtom(j, { atom: ATOM.id, ts: TS, id: 'confirmation:c1' });
+    assert.equal(countUnattributedConfirmations(readConfirmations(j)), 1);
+    confirmAtom(j, { atom: ATOM.id, verdict: 'dispute', confirmedBy: 'owner', ts: LATER, id: 'confirmation:c2' });
+    assert.equal(countUnattributedConfirmations(readConfirmations(j)), 1);   // owner 署名的不算未署名
+    assert.equal(readConfirmations(j).length, 2);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('confirmationRecord 不写 why 空串；confirmationsFor 只看目标原子', () => {

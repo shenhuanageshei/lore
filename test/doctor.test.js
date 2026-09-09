@@ -132,7 +132,7 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
         'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays', 'confirmation']);
     assert.deepEqual(Object.keys(doc.capture.noise), ['high', 'low', 'none']);   // 分布契约只有这三个键
     assert.deepEqual(Object.keys(doc.capture.confirmation),
-      ['records', 'decisions', 'confirmed', 'disputed', 'pending']);            // S3 确认进度契约
+      ['records', 'unattributed', 'decisions', 'confirmed', 'disputed', 'pending']);   // S3 确认进度契约（D1 增 unattributed）
     // 夹具里只有 a1 是 trailer-only → high；其余五条干净 → none
     assert.deepEqual(doc.capture.noise, { high: 1, low: 0, none: 5 });
     assert.deepEqual(Object.keys(doc.capture.window), ['size', 'commits', 'decisions', 'startTs', 'rate', 'ratePct']);
@@ -142,7 +142,8 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     assert.equal(doc.capture.pitfalls, 2);
     assert.equal(doc.capture.refsPitfall, 1);
     // S3：夹具里 1 条 decision、0 条确认记录 → 全部待确认
-    assert.deepEqual(doc.capture.confirmation, { records: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
+    assert.deepEqual(doc.capture.confirmation,
+      { records: 0, unattributed: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -265,11 +266,11 @@ test('S3 确认进度：confirmation 记录不污染原子计数；已确认/待
     assert.equal(s.decisions, 1);
     assert.equal(s.lastAtomTs, '2026-09-09T00:00:00Z');      // 确认记录的 10:00 不算「原子最新时间」
     assert.equal(s.lastSource, 'miner:commits');
-    assert.deepEqual(s.confirmation, { records: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.deepEqual(s.confirmation, { records: 1, unattributed: 0, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
 
     const r = diagnose(dir, { now: NOW });
-    assert.deepEqual(r.capture.confirmation, { records: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
-    assert.match(formatReport(r), /confirm\s+已确认 1 · 待确认 0 · 已否决 0（决策 1 · confirmation 记录 1）/);
+    assert.deepEqual(r.capture.confirmation, { records: 1, unattributed: 0, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.match(formatReport(r), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 0（决策 1 · confirmation 记录 1）/);
 
     // 追加一条更晚的 dispute → 派生状态翻转为已否决（最新确认覆盖）
     writeFileSync(shard, readFileSync(shard, 'utf8') + confLine({
@@ -277,13 +278,13 @@ test('S3 确认进度：confirmation 记录不污染原子计数；已确认/待
       confirmed_at: '2026-09-09T11:00:00Z',
     }) + '\n');
     assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
-      { records: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+      { records: 2, unattributed: 0, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
     // 未被确认的决策 = 待确认（draft / 无 status 都算）
     writeFileSync(shard, readFileSync(shard, 'utf8') + atom({
       id: 'decision:d2', ts: '2026-09-09T12:00:00Z', kind: 'decision', source: 'agent', title: 't2', why: 'w2', status: 'draft',
     }) + '\n');
     assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
-      { records: 2, decisions: 2, confirmed: 0, disputed: 1, pending: 1 });
+      { records: 2, unattributed: 0, decisions: 2, confirmed: 0, disputed: 1, pending: 1 });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -300,18 +301,26 @@ test('S3 端到端：CLI note --draft → confirm → doctor 报已确认 1 / �
     const id = sink.join('\n').match(/note (\S+)/)[1];
     // 未确认的决策 = 待确认（人读 + --json 两个出口同源）
     assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
-      { records: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
-    assert.match(formatReport(diagnose(dir, { now: NOW })), /confirm\s+已确认 0 · 待确认 1 · 已否决 0/);
+      { records: 0, unattributed: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
+    assert.match(formatReport(diagnose(dir, { now: NOW })), /confirm\s+已确认 0 · 待确认 1 · 已否决 0 · 未署名 0/);
 
+    // D1：不带 --by → 未署名（不冒充 owner），体检单列「未署名 1」
     assert.equal(run(['confirm', id, '--why', '读过实现', '--root', dir]), 0);
     const after = diagnose(dir, { now: NOW });
-    assert.deepEqual(after.capture.confirmation, { records: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
-    assert.match(formatReport(after), /confirm\s+已确认 1 · 待确认 0 · 已否决 0（决策 1 · confirmation 记录 1）/);
+    assert.deepEqual(after.capture.confirmation,
+      { records: 1, unattributed: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.match(formatReport(after), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 1（决策 1 · confirmation 记录 1）/);
 
     // dispute → 派生 flipped（体检与确认同源，不各自算一遍）
     assert.equal(run(['confirm', id, '--verdict', 'dispute', '--why', '锚点已漂移', '--root', dir]), 0);
     assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
-      { records: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+      { records: 2, unattributed: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+
+    // 显式署名 --by owner → 未署名计数不再增长（只有 owner 本人署名才写 owner）
+    assert.equal(run(['confirm', id, '--by', 'owner', '--why', 'owner 本人确认', '--root', dir]), 0);
+    assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
+      { records: 3, unattributed: 2, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.match(formatReport(diagnose(dir, { now: NOW })), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 2/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

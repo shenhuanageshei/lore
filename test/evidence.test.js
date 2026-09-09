@@ -87,6 +87,7 @@ test('每条结论一行：只有 decision|rejected|correction 进账，commit/p
       byKind: { decision: 2, rejected: 1, correction: 1 },
       unverified: 1,
       lowConfidence: 1,
+      unattributedConfirmations: 0,                 // D1：记录层口径（本夹具无确认记录）
     });
     // 字段逐条落到账上（来源 / 定位 / 时间 / 置信 / 确认人）
     const d1 = report.entries[0];
@@ -115,7 +116,7 @@ test('无锚点 → 显式标「未验证」（不变量⑧）；有锚点不标
 
     const txt = formatEvidence(report);
     assert.match(txt, /decision:d2[\s\S]*定位 未验证（无 refs\.anchors）/);
-    assert.match(txt, /结论 4 条（decision 2 · rejected 1 · correction 1）· 未验证 1 · 低置信 1/);
+    assert.match(txt, /结论 4 条（decision 2 · rejected 1 · correction 1）· 未验证 1 · 低置信 1 · 未署名确认 0/);
     // 纯函数：置信判定与锚点提取
     assert.deepEqual(confidenceOf([], 'none'), { verification: 'unverified', lowConfidence: false, confidence: 'unverified' });
     assert.deepEqual(confidenceOf(['a @ b.js:1'], 'high'), { verification: 'verified', lowConfidence: true, confidence: 'low' });
@@ -147,7 +148,7 @@ test('确认人来自 confirmation 记录（记录层）：confirm → confirmed
   const root = fixture();
   try {
     const j = journalDirOf(root);
-    confirmAtom(j, { atom: 'decision:d1', why: '读过实现', ts: '2026-09-07T00:00:00Z', id: 'confirmation:x1' });
+    confirmAtom(j, { atom: 'decision:d1', why: '读过实现', confirmedBy: 'owner', ts: '2026-09-07T00:00:00Z', id: 'confirmation:x1' });
     const confirmed = evidenceReport(root, { now: NOW }).entries.find(e => e.id === 'decision:d1');
     assert.equal(confirmed.status, 'confirmed');
     assert.equal(confirmed.statusFrom, 'confirmation');
@@ -155,7 +156,7 @@ test('确认人来自 confirmation 记录（记录层）：confirm → confirmed
     assert.equal(confirmed.confirmedAt, '2026-09-07T00:00:00Z');
     assert.equal(confirmed.verdict, 'confirm');
 
-    confirmAtom(j, { atom: 'decision:d1', verdict: 'dispute', why: '锚点漂移', ts: '2026-09-08T00:00:00Z', id: 'confirmation:x2' });
+    confirmAtom(j, { atom: 'decision:d1', verdict: 'dispute', why: '锚点漂移', confirmedBy: 'owner', ts: '2026-09-08T00:00:00Z', id: 'confirmation:x2' });
     const disputed = evidenceReport(root, { now: NOW }).entries.find(e => e.id === 'decision:d1');
     assert.equal(disputed.status, 'disputed');
     assert.equal(disputed.verdict, 'dispute');
@@ -172,6 +173,25 @@ test('确认人来自 confirmation 记录（记录层）：confirm → confirmed
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// D1（不变量⑦ 来源诚实）：未署名的确认（不带 --by 的机器代写）在账本里就是 'unattributed'，
+// 并在 counts 里单列计数——与 doctor 的 confirmation.unattributed 同口径（同一份 isUnattributedConfirmation）。
+test('来源未署名的确认：账本单列计数，与 doctor 同口径', () => {
+  const root = fixture();
+  try {
+    const j = journalDirOf(root);
+    confirmAtom(j, { atom: 'decision:d1', ts: '2026-09-07T00:00:00Z', id: 'confirmation:u1' });                  // 缺省 = 未署名
+    confirmAtom(j, { atom: 'decision:d2', confirmedBy: 'owner', ts: '2026-09-07T01:00:00Z', id: 'confirmation:u2' });
+    const report = evidenceReport(root, { now: NOW });
+    assert.equal(report.counts.unattributedConfirmations, 1);
+    assert.equal(report.entries.find(e => e.id === 'decision:d1').confirmer, 'unattributed');
+    assert.equal(report.entries.find(e => e.id === 'decision:d2').confirmer, 'owner');
+    assert.match(formatEvidence(report), /未署名确认 1/);
+    const stats = readJournalStats(journalDirOf(root));
+    assert.equal(stats.confirmation.unattributed, report.counts.unattributedConfirmations);
+    assert.equal(JSON.parse(run('evidence', '--json', '--root', root).stdout).counts.unattributedConfirmations, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('--json：字段集锁定（稳定契约）；CLI 人读输出含「未验证」「低置信」', () => {
   const root = fixture();
   try {
@@ -180,7 +200,8 @@ test('--json：字段集锁定（稳定契约）；CLI 人读输出含「未验�
     const doc = JSON.parse(r.stdout);
     assert.deepEqual(Object.keys(doc),
       ['schemaVersion', 'generatedAt', 'root', 'journal', 'initialized', 'counts', 'entries']);
-    assert.deepEqual(Object.keys(doc.counts), ['total', 'byKind', 'unverified', 'lowConfidence']);
+    assert.deepEqual(Object.keys(doc.counts),
+      ['total', 'byKind', 'unverified', 'lowConfidence', 'unattributedConfirmations']);
     assert.deepEqual(Object.keys(doc.entries[0]),
       ['id', 'kind', 'title', 'ts', 'source', 'anchors', 'verification', 'lowConfidence', 'confidence',
         'noise', 'status', 'statusFrom', 'confirmer', 'confirmedAt', 'verdict']);
@@ -194,7 +215,7 @@ test('--json：字段集锁定（稳定契约）；CLI 人读输出含「未验�
     assert.match(human.stdout, /置信 低（噪音 high: trailer-only）/);
     // 纯函数计数（渲染与 --json 同源）
     assert.equal(countEvidence([]).total, 0);
-    assert.deepEqual(countEvidence(doc.entries), doc.counts);
+    assert.deepEqual(countEvidence(doc.entries, []), doc.counts);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -254,7 +275,10 @@ test('空 journal（已 init 无原子）：账本 0 条，人读输出明确说
     mkdirSync(journalDirOf(root), { recursive: true });
     const report = evidenceReport(root, { now: NOW });
     assert.equal(report.initialized, false);
-    assert.deepEqual(report.counts, { total: 0, byKind: { decision: 0, rejected: 0, correction: 0 }, unverified: 0, lowConfidence: 0 });
+    assert.deepEqual(report.counts, {
+      total: 0, byKind: { decision: 0, rejected: 0, correction: 0 }, unverified: 0, lowConfidence: 0,
+      unattributedConfirmations: 0,
+    });
     assert.deepEqual(report.entries, []);
     assert.match(formatEvidence(report), /（无结论原子：kind decision\|rejected\|correction）/);
     const r = run('evidence', '--json', '--root', root);

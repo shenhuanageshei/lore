@@ -373,7 +373,8 @@ test('confirm：追加 kind:confirmation（原原子字节不变）、幂等、d
     assert.equal(recs[1].kind, 'confirmation');
     assert.equal(recs[1].atom, id);
     assert.equal(recs[1].verdict, 'confirm');
-    assert.equal(recs[1].confirmed_by, 'owner');          // 只有 owner 的直接动作产生确认
+    assert.equal(recs[1].confirmed_by, 'unattributed');   // D1：不带 --by 不冒充 owner（不变量⑦）
+    assert.deepEqual(recs[1].provenance, { via: 'cli', by: 'unattributed' });
     assert.ok(recs[1].confirmed_at);
     assert.equal(recs[1].why, '读过实现，判断成立');
     assert.equal(recs[0].status, 'draft');                // 内联 status 未被改写
@@ -401,8 +402,25 @@ test('confirm：追加 kind:confirmation（原原子字节不变）、幂等、d
     assert.equal(readAllRecords(j)[0].status, 'draft');
     // doctor 与 --list 同源：确认后体检报「已确认 / 待确认」
     const doc = JSON.parse(run('doctor', '--json', '--root', root).stdout);
-    assert.deepEqual(doc.capture.confirmation, { records: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
-    assert.match(run('doctor', '--root', root).stdout, /confirm\s+已确认 0 · 待确认 0 · 已否决 1/);
+    assert.deepEqual(doc.capture.confirmation,
+      { records: 2, unattributed: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+    assert.match(run('doctor', '--root', root).stdout, /confirm\s+已确认 0 · 待确认 0 · 已否决 1 · 未署名 2/);
+
+    // D1：只有显式署名（--by owner）才写 owner；provenance.via 恒为 cli（来源诚实，不变量⑦）
+    const byOwner = run('confirm', id, '--by', 'owner', '--why', 'owner 本人确认', '--root', root);
+    assert.equal(byOwner.status, 0);
+    assert.match(byOwner.stdout, /· by owner/);
+    const lastRec = readAllRecords(j).at(-1);
+    assert.equal(lastRec.confirmed_by, 'owner');
+    assert.deepEqual(lastRec.provenance, { via: 'cli', by: 'owner' });
+    // 未署名计数随记录走：前两条（confirm + dispute）都没署名，最后一条署了 owner
+    const signedDoc = JSON.parse(run('doctor', '--json', '--root', root).stdout);
+    assert.deepEqual(signedDoc.capture.confirmation,
+      { records: 3, unattributed: 2, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.match(run('evidence', '--root', root).stdout, /未署名确认 2/);
+    // evidence --json 与 doctor 同口径（都走 lib/confirm.js 的 isUnattributedConfirmation）
+    const ev = JSON.parse(run('evidence', '--json', '--root', root).stdout);
+    assert.equal(ev.counts.unattributedConfirmations, signedDoc.capture.confirmation.unattributed);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -436,6 +454,12 @@ test('confirm 错误路径：未知 atom id / 非法 verdict / 缺 atom-id / 未
     const sink = [];
     assert.equal(main(['confirm', id, '--verdict'], { cwd: root, out: s => sink.push(s), err: s => sink.push(s) }), 1);
     assert.match(sink.join('\n'), /--verdict requires/);
+
+    // --by 给了却没值 → 用法错误（不静默回落 unattributed：用户明确署名时丢掉署名也是失真）
+    const bySink = [];
+    assert.equal(main(['confirm', id, '--by'], { cwd: root, out: s => bySink.push(s), err: s => bySink.push(s) }), 1);
+    assert.match(bySink.join('\n'), /--by requires <who>/);
+    assert.deepEqual(readAllRecords(j), before);
 
     // 未 init → 明确报错，不凭空造 .lore
     const noInit = run('confirm', 'decision:x', '--root', other);

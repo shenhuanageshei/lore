@@ -115,6 +115,17 @@
   - **约定**：在 `lib/resident.js` 生成的 resident 区块里加一条规则——「做出非显然决策时，追加一条 `kind:decision` 的 **draft** 原子（附 why 与源码锚点）」，并给出 `lore note --draft` 的 CLI 示例；CLAUDE.md / AGENTS.md 同源渲染、内容一致（沿用 S3 去重纪律）。
   - **CLI**：`lib/note.js` 的 `noteAtom` 补 `status:'draft'`（现在连 status 都没有），新增 `--draft` 旗标，默认行为不变。
   - **闸门**：`doctor` 增可配置阈值——捕获率低于 X 或断流超过 N 天 → 醒目告警 + **非零退出码**，供 CI 与壳状态行消费。
+- **阈值与采样口径（先定死后实现，评审 🔴#2）**：
+  - **闸门口径**（doctor，沿用 S5 既有指标，不新增口径——审计「键集只增不改」）：`captureRatePct` = 全仓 `kind:decision` 原子数 ÷ `git rev-list --count --no-merges HEAD`；`gapDays` = 现在 − 最新 `source:'hook'` 原子的 `ts`（整天下取整）。
+  - **阈值 X（捕获率下限，百分数）与 N（断流上限，天）可配置，默认不配置 = 不阻断**（与 S6 预算闸同纪律：未配置 → 行为与今天一致）。配置落 `.lore/config.yml`：
+    ```yaml
+    doctor:
+      capture_rate_min: 5      # 捕获率下限，百分数 0–100；低于它 → 闸门红
+      gap_days_max: 30         # 断流上限，天（≥1）；超过它 → 闸门红
+    ```
+    或 CLI 覆盖：`lore doctor --capture-rate-min 5 --gap-days-max 30`。**任一阈值被配置（config 或 flag）→ 闸门生效**；未配置 → `gate:{ok:true,reason:'not-configured'}` 且 exit 0。阈值非法（越界/非数字）→ 判红并写明 `invalid`，绝不静默失效（否则又是「安静地不工作」）。
+  - **unknown 判红**：闸门生效时，取不到的数字（非 git → commits unknown；无 hook 原子 → gapDays unknown）**算不通过**（unknown 不是健康证据），reason 写明 unknown；未配置阈值时 unknown 照旧只显示不拦。
+  - **per-backend 采样口径**（评审 🔴#2；本期落口径与报告格式，不追求统计显著）：每个后端（claude / codex / opencode）各跑 **5 个会话**，每个会话给**同一组 3 个决策任务**（选型 / 否决 / 权衡各一）；逐会话记 `{backend, session, decisions_made, atoms_captured, status_draft, anchors_attached}`；报告形状 `{schemaVersion, generated_at, per_backend:[…], gate:{ok,reason}}`，其中 `rate = atoms_captured / decisions_made`，闸门阈值同 X。**采样脚本本身未排进本阶段文件清单**（清单无 `scripts/`）——口径与报告格式先落此节，脚本作为 S8 的显式待办。
 - **文件**：`lib/resident.js`、`lib/note.js`、`lib/doctor.js`、`lib/cli.js`、`CLAUDE.md`、`AGENTS.md`、`test/resident.test.js`、`test/note.test.js`、`test/doctor.test.js`
 - **验收**：
   - resident 区块出现该约定，且 CLAUDE.md 与 AGENTS.md 渲染一致（同源）。

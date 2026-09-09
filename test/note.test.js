@@ -1,7 +1,7 @@
 // test/note.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -55,6 +55,86 @@ test('CLI: note flags → decision atom in journal', () => {
     assert.deepEqual(atoms[0].facets.component, ['lib']);
     assert.deepEqual(atoms[0].refs.files, ['lib/a.js', 'lib/b.js']);
     assert.match(atoms[0].id, /^note:/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------- S8：agent 代捕获约定（--draft ⇒ status:'draft'，过 S1 的「机器来源 ⇒ draft」规则） ----------
+import { normalizeAtom, validateAtom } from '../lib/atom.js';
+import { main as cliMain } from '../lib/cli.js';
+
+test('noteAtom 默认不加 status（默认行为不变）', () => {
+  const a = noteAtom({ id: 'note:d0', ts: '2026-09-09T08:00:00Z', title: 't', why: 'w' });
+  assert.equal('status' in a, false);
+  assert.equal(normalizeAtom(a).atom.status, 'draft');    // S1 归一化仍按机器来源补 draft
+});
+
+test("noteAtom draft:true → status:'draft'，且过 S1 校验（机器来源只能是草稿）", () => {
+  const a = noteAtom({ id: 'note:d1', ts: '2026-09-09T08:00:00Z', title: '选 X 弃 Y', why: '因为 Z', draft: true });
+  assert.equal(a.status, 'draft');
+  assert.equal(a.source, 'agent');                        // 机器来源
+  assert.equal(validateAtom(a).ok, true, JSON.stringify(validateAtom(a).errors));
+  const norm = normalizeAtom(a);
+  assert.equal(norm.ok, true);
+  assert.equal(norm.atom.status, 'draft');
+  assert.equal(validateAtom({ ...a, status: 'confirmed' }).ok, false);   // 机器来源不可能是 confirmed（无 confirmed_by）
+});
+
+test('noteAtom anchors: 非空才写 refs.anchors（空数组不写，refs 形状不漂移）', () => {
+  const withAnchors = noteAtom({ id: 'note:a1', ts: '2026-09-09T08:00:00Z', title: 't', why: 'w', anchors: ['runAuto @ lib/runner.js:77'] });
+  assert.deepEqual(withAnchors.refs.anchors, ['runAuto @ lib/runner.js:77']);
+  assert.equal(validateAtom(withAnchors).ok, true);
+  const empty = noteAtom({ id: 'note:a2', ts: '2026-09-09T08:00:00Z', title: 't', why: 'w' });
+  assert.equal('anchors' in empty.refs, false);
+  assert.deepEqual(empty.refs, { files: [], pitfall: null, related: [] });   // 与既有形状逐字一致
+});
+
+test('CLI: node lib/note.js --draft --anchors → 原子 status:draft + 源码锚点', () => {
+  const root = tmpDir();
+  try {
+    const out = execFileSync('node', ['lib/note.js', root, '--title', '选 X 弃 Y', '--why', '因为 Z', '--draft',
+      '--anchors', 'runAuto @ lib/runner.js:77,planSync @ lib/sync.js:12'], { cwd: process.cwd() }).toString();
+    assert.match(out, /noted decision atom note:.*\(draft\)/);
+    const atoms = readAllAtoms(join(root, '.lore', 'journal'));
+    assert.equal(atoms.length, 1);
+    assert.equal(atoms[0].status, 'draft');
+    assert.deepEqual(atoms[0].refs.anchors, ['runAuto @ lib/runner.js:77', 'planSync @ lib/sync.js:12']);
+    assert.equal(validateAtom(atoms[0]).ok, true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lore note --draft（统一 CLI）：status:draft 落库；默认不加 status；未 init → exit 1 不写散文件', () => {
+  const root = tmpDir();
+  try {
+    // 未 init → 明确报错，不静默写散文件
+    const sink = [];
+    assert.equal(cliMain(['note', '--title', 't', '--why', 'w', '--draft', '--root', root],
+      { cwd: process.cwd(), out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.match(sink.join('\n'), /no \.lore at/);
+    assert.equal(existsSync(join(root, '.lore')), false);
+
+    mkdirSync(join(root, '.lore'), { recursive: true });
+    const ok = [];
+    assert.equal(cliMain(['note', '--title', '选 X 弃 Y', '--why', '因为 Z', '--draft', '--component', 'lib',
+      '--anchors', 'runAuto @ lib/runner.js:77', '--root', root],
+      { cwd: process.cwd(), out: s => ok.push(s), err: s => ok.push(s) }), 0);
+    assert.match(ok.join('\n'), /✓ note note:.*\(draft\)/);
+
+    assert.equal(cliMain(['note', '--title', 'plain', '--why', 'w', '--root', root],
+      { cwd: process.cwd(), out: () => {}, err: () => {} }), 0);
+
+    const atoms = readAllAtoms(join(root, '.lore', 'journal'));
+    assert.equal(atoms.length, 2);
+    const draft = atoms.find(a => a.title === '选 X 弃 Y');
+    assert.equal(draft.status, 'draft');
+    assert.deepEqual(draft.facets.component, ['lib']);
+    assert.deepEqual(draft.refs.anchors, ['runAuto @ lib/runner.js:77']);
+    assert.equal(validateAtom(draft).ok, true);
+    const plain = atoms.find(a => a.title === 'plain');
+    assert.equal('status' in plain, false);                 // 默认行为不变
+    // 缺 --title → 用法错误 exit 1
+    const bad = [];
+    assert.equal(cliMain(['note', '--why', 'w', '--root', root], { cwd: process.cwd(), out: s => bad.push(s), err: s => bad.push(s) }), 1);
+    assert.match(bad.join('\n'), /note requires --title/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -130,6 +130,40 @@ test('installResident 多文件: CLAUDE.md + AGENTS.md 都写、幂等、refresh
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// ---------- S8：agent 代捕获约定（评审 🔴#1） ----------
+// 约定必须出现在 resident 区块里，且 CLAUDE.md / AGENTS.md 同源渲染——两边内容一致（syncHint 行按文件参数化，是设计内的唯一差异）。
+const SYNC_HINT_RE = /^- wiki 缺失.*$/m;
+const stripSyncHint = s => s.replace(SYNC_HINT_RE, '- wiki 缺失（sync hint 按文件参数化）');
+
+test('residentSection: agent 代捕获约定（kind:decision 的 draft 原子 + why + 源码锚点 + CLI 示例）', () => {
+  const s = residentSection(STATS);
+  assert.match(s, /决策当下就记/);
+  assert.match(s, /\`kind:decision\`/);
+  assert.match(s, /\*\*draft\*\*/);
+  assert.match(s, /\`why\` 写清因果/);
+  assert.match(s, /\`refs.anchors\` 挂源码锚点 \`fn @ file:line\`/);
+  assert.match(s, /lore note --draft --title/);          // CLI 示例可直接照抄
+  assert.match(s, /--anchors "runAuto @ lib\/runner.js:77"/);
+  assert.match(s, /只有 owner 的直接动作能产生 confirmed/);   // 不变量⑦ 的口径写进约定
+});
+
+test('同源：CLAUDE.md / AGENTS.md 的 resident 区块除 syncHint 外逐字一致', () => {
+  const c = residentSection(STATS, 'CLAUDE.md');
+  const a = residentSection(STATS, 'AGENTS.md');
+  assert.notEqual(c, a);                                   // syncHint 确实按文件参数化
+  assert.equal(stripSyncHint(c), stripSyncHint(a));        // 其余内容逐字一致
+});
+
+test('本仓库 CLAUDE.md / AGENTS.md 的 resident 区块内容一致且含约定（同源渲染验收）', () => {
+  const read = f => readFileSync(join(process.cwd(), f), 'utf8').match(/<!--\s*LORE_RESIDENT:START\s*-->[\s\S]*?<!--\s*LORE_RESIDENT:END\s*-->/)?.[0];
+  const c = read('CLAUDE.md');
+  const a = read('AGENTS.md');
+  assert.ok(c && a, '两个文件都应有 LORE_RESIDENT 标记节');
+  assert.equal(stripSyncHint(c), stripSyncHint(a));
+  assert.match(c, /lore note --draft/);
+  assert.match(a, /lore note --draft/);
+});
+
 test('residentStats: 从 manifest 算 {pages, deepPages, updated}；无 manifest → 零值', () => {
   const root = tmp();
   try {

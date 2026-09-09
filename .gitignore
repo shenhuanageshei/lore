@@ -17,3 +17,6 @@ rtk/
 
 # machine-local host config (per-machine absolute paths, not repo assets)
 .codex/
+
+# visualize 卡片临时产物（会话内预览，非仓库资产）
+viz/

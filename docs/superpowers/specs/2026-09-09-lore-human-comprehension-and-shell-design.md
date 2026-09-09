@@ -100,6 +100,11 @@
 
 `.lore/config.yml` 声明 `mine: [commits, changelog, claude_md_pitfalls]`，但 `lib/mine.js:50` 只写 `kind:'commit'`、`lib/mine.js:56` 硬编码 `pitfall:null`——**踩坑挖掘这条声明路径是死的**。与"hook 断流 3 个月"同型：**声明了 ≠ 接上电**。⓪ 期必须接线或摘掉声明。
 
+### 3.6 两个被评审点名的术语（先定义再排期）
+
+- **agent 代捕获约定**：在 CLAUDE.md / AGENTS.md 的 resident 区块里加一条规则——"做出非显然决策时，追加一条 `kind:decision` 的 **draft** 原子（附 `why` 与源码锚点）"，并给出 `lore note --draft` 的 CLI 示例。它是**指令文件 + CLI 的标准约定**，不依赖任何宿主特性。
+- **成本账本**：每次 LLM 调用追加一行 `{ts, page, backend, tokens, ms, ok}` 到 `.lore/.state/cost.ndjson`（per-machine、gitignored）；**预算上限** = 每版本 token 上限，超限则自动档不启动、等人工放行。账本只记录会变成验尸报告，**必须配预算闸**。
+
 ---
 
 ## 4. 理解层（v2 重排）

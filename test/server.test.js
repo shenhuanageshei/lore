@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { writeSyncMode, readSyncMode } from '../lib/syncstate.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -386,3 +386,111 @@ test('POST /api/sync/mode: 坏 JSON body → 400', async () => {
     assert.equal(r.status, 400);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
+// --- S7 壳打开传感器：POST /api/human/visit（localhost-only，写 <root>/human/visits.jsonl）---
+// 注：createServer(root) 的 root 就是 .lore 目录（server.js 里 wiki/ 与 .state/ 都挂在它下面）。
+function visitFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'lore-visit-'));
+  mkdirSync(join(root, 'wiki', 'component'), { recursive: true });
+  writeFileSync(join(root, 'wiki', 'component', 'lib.md'), '# lib');
+  return root;
+}
+const visitLines = root => {
+  try { return readFileSync(join(root, 'human', 'visits.jsonl'), 'utf8').split('\n').filter(Boolean); }
+  catch { return []; }
+};
+const postVisit = (port, body, headers = {}) => fetch(`http://127.0.0.1:${port}/api/human/visit`, {
+  method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
+});
+
+test('POST /api/human/visit 写入一条 visit（kind/page/ts 形状由 lib/human.js 定）', async () => {
+  const root = visitFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await postVisit(port, { page: 'component/lib.md' });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { ok: true, page: 'component/lib.md', deduped: false });
+    const lines = visitLines(root);
+    assert.equal(lines.length, 1);
+    const rec = JSON.parse(lines[0]);
+    assert.equal(rec.kind, 'visit');
+    assert.equal(rec.page, 'component/lib.md');
+    assert.match(rec.ts, /^\d{4}-\d{2}-\d{2}T/);
+    // 带点的文件级页（component/server.js.md）同样在白名单内
+    writeFileSync(join(root, 'wiki', 'component', 'server.js.md'), '# s');
+    assert.equal((await postVisit(port, { page: 'component/server.js.md' })).status, 200);
+    assert.equal(visitLines(root).length, 2);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/human/visit 同一页短窗重复打开 → 去重不写第二行；换页照写', async () => {
+  const root = visitFixture();
+  writeFileSync(join(root, 'wiki', 'component', 'hook.md'), '# hook');
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    assert.equal((await (await postVisit(port, { page: 'component/lib.md' })).json()).deduped, false);
+    const again = await (await postVisit(port, { page: 'component/lib.md' })).json();
+    assert.equal(again.deduped, true);                          // 短窗内重复打开 → 去重（窗口 = lib/human.js DEDUPE_WINDOW_MS）
+    assert.equal(visitLines(root).length, 1);
+    assert.equal((await (await postVisit(port, { page: 'component/hook.md' })).json()).deduped, false);
+    assert.equal(visitLines(root).length, 2);                   // 换页是新记录
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/human/visit 非法/越界 page → 400 且不写盘', async () => {
+  const root = visitFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    for (const page of ['../../etc/passwd.md', '../../evil.md', 'not-md.txt', '', 'component/lib.md.bak', 42, null]) {
+      const r = await postVisit(port, { page });
+      assert.equal(r.status, 400, `page=${String(page)} 应被拒`);
+    }
+    assert.equal(visitLines(root).length, 0);                   // 拒绝路径零副作用
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/human/visit 非 localhost Host → 403（沿用 DNS-rebind 防护）且不写盘', async () => {
+  const root = visitFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const status = await new Promise((resolve, reject) => {
+      const rq = http.request(
+        { host: '127.0.0.1', port, path: '/api/human/visit', method: 'POST',
+          headers: { 'content-type': 'application/json', host: 'evil.example' } },
+        res => { res.resume(); resolve(res.statusCode); });
+      rq.on('error', reject);
+      rq.end(JSON.stringify({ page: 'component/lib.md' }));
+    });
+    assert.equal(status, 403);
+    assert.equal(visitLines(root).length, 0);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('POST /api/human/visit 无 .lore（未 init）→ 404 not-initialized，不崩、不写散文件', async () => {
+  const root = join(tmpdir(), `lore-visit-missing-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await postVisit(port, { page: 'component/lib.md' });
+    assert.equal(r.status, 404);
+    assert.deepEqual(await r.json(), { error: 'not-initialized' });
+    assert.equal(existsSync(root), false);                      // 没有凭空造目录
+  } finally { server.close(); }
+});
+
+test('POST /api/human/visit 坏 JSON body → 400', async () => {
+  const root = visitFixture();
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/human/visit`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{',
+    });
+    assert.equal(r.status, 400);
+    assert.equal(visitLines(root).length, 0);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+

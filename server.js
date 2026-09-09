@@ -9,6 +9,7 @@ import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
   readSyncConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
 import { isAlive } from './lib/serve.js';
+import { HumanStoreError, appendHuman, visitRecord } from './lib/human.js';
 
 const LANG_RE = /^[a-z]{2}(?:-[A-Za-z0-9]+)?$/;
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -138,6 +139,24 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
         return sendJson(res, 200, { ok: true, request });
       } catch {
         return sendJson(res, 400, { error: 'bad request' });
+      }
+    }
+
+    // --- S7 壳打开传感器（设计 2026-09-09 §7 / §4.4）：壳记 page-open，喂 ② 期再入简报与 wiki 健康度 ---
+    // 记录形状与写入纪律的唯一真源在 lib/human.js（S4 存储层），这里只做「校验 → 追加」。
+    // localHost 防护由上方统一 POST /api/* 闸门覆盖；page 沿用 safeWikiPage 白名单（仅 root/wiki 内的 .md）。
+    if (req.method === 'POST' && pathname === '/api/human/visit') {
+      let body;
+      try { body = await readJson(req); } catch { return sendJson(res, 400, { error: 'bad json' }); }
+      const page = String(body.page ?? '');
+      if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
+      try {
+        const r = appendHuman(root, 'visits', visitRecord({ page }));
+        return sendJson(res, 200, { ok: true, page, deduped: r.deduped });
+      } catch (e) {
+        // 未 init（无 .lore）→ 明确报错（绝不静默写散文件）；壳侧 catch 掉即降级，阅读不受影响。
+        if (e instanceof HumanStoreError) return sendJson(res, 404, { error: e.code });
+        return sendJson(res, 500, { error: 'visit failed' });
       }
     }
 

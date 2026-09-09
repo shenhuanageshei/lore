@@ -367,3 +367,163 @@ test('buildThemeRows buckets an ungrouped child under an empty group name', () =
   assert.deepEqual(p.groups.map(g => g.group), ['', 'g1']);   // 空组在前（无组子页），具名组在后
   assert.deepEqual(p.groups[0].rows.map(r => r.id), ['p--c1']);
 });
+
+// --- S7 壳打开传感器：打开/切换页 → POST /api/human/visit；失败静默、不阻塞阅读 ---
+import {
+  VISIT_ENDPOINT, VISIT_DEDUPE_MS, buildVisitPathIndex, firstVisitKey, visitKey,
+  createVisitSensor, installVisitSensor,
+} from '../site/shell.mjs';
+
+const VISIT_MANIFEST = {
+  axes: [
+    { id: 'HOME', label: 'Home', pages: [{ id: 'HOME', path: 'HOME.md' }] },
+    { id: 'component', label: 'Component', pages: [
+      { id: 'lib', path: 'component/lib.md' },
+      { id: 'server.js', path: 'component/server.js.md' },
+    ] },
+  ],
+};
+
+function visitFetch({ manifest = VISIT_MANIFEST, manifestOk = true, apiOk = true, failManifest = false, failApi = false } = {}) {
+  const calls = [];
+  const fetchFn = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    if (url.endsWith('.manifest.json')) {
+      if (failManifest) throw new Error('offline');
+      return { ok: manifestOk, status: manifestOk ? 200 : 404, json: async () => (typeof manifest === 'function' ? manifest() : manifest) };
+    }
+    if (failApi) throw new Error('offline');
+    return { ok: apiOk, status: apiOk ? 200 : 500, json: async () => ({ ok: apiOk }) };
+  };
+  const posts = () => calls.filter(c => c.url.endsWith(VISIT_ENDPOINT));
+  return { calls, posts, fetchFn };
+}
+
+test('buildVisitPathIndex: 以 manifest 为真源（HOME/HOME → HOME.md 不满足 key+".md"）；坏 manifest 空表', () => {
+  const idx = buildVisitPathIndex(VISIT_MANIFEST);
+  assert.equal(idx['HOME/HOME'], 'HOME.md');
+  assert.equal(idx['component/lib'], 'component/lib.md');
+  assert.equal(idx['component/server.js'], 'component/server.js.md');   // 带点的文件级页
+  assert.deepEqual(Object.keys(buildVisitPathIndex(null)), []);                  // 空表（null 原型，防键污染）
+  assert.deepEqual(Object.keys(buildVisitPathIndex({ axes: [{ id: 'a' }] })), []);
+});
+
+test('visitKey: 裸键/带 # 的 hash 归一；空 hash → 落地页（与 firstPageKey 同口径）；console 不记', () => {
+  assert.equal(firstVisitKey(VISIT_MANIFEST), 'HOME/HOME');
+  assert.equal(visitKey('', VISIT_MANIFEST), 'HOME/HOME');
+  assert.equal(visitKey('#', VISIT_MANIFEST), 'HOME/HOME');
+  assert.equal(visitKey('#component/lib', VISIT_MANIFEST), 'component/lib');
+  assert.equal(visitKey('component/lib', VISIT_MANIFEST), 'component/lib');
+  assert.equal(visitKey('#console', VISIT_MANIFEST), '');            // 控制台不是 wiki 页
+  assert.equal(firstVisitKey({ axes: [] }), '');
+});
+
+test('record: POST 一条 visit 到 BASE + api/human/visit（page = wiki 相对路径）', async () => {
+  const { calls, posts, fetchFn } = visitFetch();
+  const sensor = createVisitSensor({ fetchFn });
+  assert.deepEqual(await sensor.record('#component/lib'), { sent: true, page: 'component/lib.md' });
+  assert.equal(calls[0].url, '/wiki/.manifest.json');               // manifest 相对 BASE（per-repo "/"）
+  assert.equal(calls[0].opts.cache, 'no-store');
+  assert.equal(posts().length, 1);
+  assert.equal(posts()[0].url, '/api/human/visit');
+  assert.equal(posts()[0].opts.method, 'POST');
+  assert.equal(posts()[0].opts.headers['content-type'], 'application/json');
+  assert.deepEqual(JSON.parse(posts()[0].opts.body), { page: 'component/lib.md' });
+  // 只碰本机同源相对 URL：无协议、无外部主机
+  assert.equal(calls.every(c => c.url.startsWith('/') && !/^[a-z]+:/i.test(c.url)), true);
+});
+
+test('record: portal 形态（BASE=/<repo>/）URL 带前缀；manifest 只取一次', async () => {
+  const { calls, fetchFn } = visitFetch();
+  const sensor = createVisitSensor({ base: '/lore/', fetchFn });
+  await sensor.record('#component/lib');
+  await sensor.record('#component/server.js');
+  assert.equal(calls.filter(c => c.url.endsWith('.manifest.json')).length, 1);
+  assert.deepEqual(calls.map(c => c.url), [
+    '/lore/wiki/.manifest.json', '/lore/api/human/visit', '/lore/api/human/visit',
+  ]);
+});
+
+test('record: 同一页短窗内重复打开 → deduped 不发第二次请求；窗口外再记', async () => {
+  const { posts, fetchFn } = visitFetch();
+  const clock = { t: 1_000_000 };
+  const sensor = createVisitSensor({ fetchFn, now: () => clock.t });
+  assert.equal((await sensor.record('#component/lib')).sent, true);
+  assert.deepEqual(await sensor.record('#component/lib'), { sent: false, reason: 'deduped', page: 'component/lib.md' });
+  assert.equal(posts().length, 1);
+  clock.t += VISIT_DEDUPE_MS;                                       // 窗口边界外
+  assert.equal((await sensor.record('#component/lib')).sent, true);
+  assert.equal(posts().length, 2);
+  const off = createVisitSensor({ fetchFn, dedupeMs: 0, now: () => clock.t });
+  await off.record('#component/lib');
+  await off.record('#component/lib');
+  assert.equal(posts().length, 4);                                  // dedupeMs:0 = 关闭壳侧去重（服务端仍兜底）
+});
+
+test('record: console / 未知页键 / 空 manifest → 不记，且不抛', async () => {
+  const { posts, fetchFn } = visitFetch();
+  const sensor = createVisitSensor({ fetchFn });
+  assert.deepEqual(await sensor.record('#console'), { sent: false, reason: 'not-a-page' });
+  assert.deepEqual(await sensor.record('#component/ghost'), { sent: false, reason: 'unknown-page' });
+  assert.equal(posts().length, 0);
+  const empty = visitFetch({ manifest: { axes: [] } });
+  assert.deepEqual(await createVisitSensor({ fetchFn: empty.fetchFn }).record(''), { sent: false, reason: 'not-a-page' });
+  assert.equal(empty.posts().length, 0);
+});
+
+test('record: API 不可用（fetch 抛错 / 非 2xx）→ 静默降级，不抛、不重试风暴', async () => {
+  const down = visitFetch({ failApi: true });
+  assert.deepEqual(await createVisitSensor({ fetchFn: down.fetchFn }).record('#component/lib'),
+    { sent: false, reason: 'api-unavailable', page: 'component/lib.md' });
+  assert.equal(down.posts().length, 1);
+  const bad = visitFetch({ apiOk: false });
+  assert.equal((await createVisitSensor({ fetchFn: bad.fetchFn }).record('#component/lib')).sent, false);
+});
+
+test('record: 壳常驻期间新出现的页 → 缓存失效重取 manifest 后仍记上（不静默丢一次阅读）', async () => {
+  let m = VISIT_MANIFEST;
+  const { posts, fetchFn } = visitFetch({ manifest: () => m });
+  const sensor = createVisitSensor({ fetchFn });
+  assert.deepEqual(await sensor.record('#component/newpage'), { sent: false, reason: 'unknown-page' });
+  assert.equal(posts().length, 0);
+  m = { axes: [{ id: 'component', pages: [{ id: 'newpage', path: 'component/newpage.md' }] }] };
+  assert.deepEqual(await sensor.record('#component/newpage'), { sent: true, page: 'component/newpage.md' });
+  assert.equal(posts().length, 1);
+});
+
+test('record: manifest 取不到（无 .lore / 静态服务）→ no-manifest，零 POST、不抛', async () => {
+  const offline = visitFetch({ failManifest: true });
+  assert.deepEqual(await createVisitSensor({ fetchFn: offline.fetchFn }).record('#component/lib'),
+    { sent: false, reason: 'no-manifest' });
+  assert.equal(offline.posts().length, 0);
+  const missing = visitFetch({ manifestOk: false });
+  assert.deepEqual(await createVisitSensor({ fetchFn: missing.fetchFn }).record('#component/lib'),
+    { sent: false, reason: 'no-manifest' });
+  assert.equal(missing.posts().length, 0);
+});
+
+test('installVisitSensor: 浏览器自装配——落地页立即记一次 + 每次 hash 切换记一次；失败不抛', async () => {
+  const { posts, fetchFn } = visitFetch();
+  const listeners = {};
+  const win = { location: { hash: '#component/lib' }, addEventListener: (ev, fn) => { (listeners[ev] ??= []).push(fn); } };
+  const sensor = installVisitSensor({ win, fetchFn });
+  assert.ok(sensor);
+  await new Promise(r => setTimeout(r, 5));                         // fire-and-forget：等一拍让请求落地
+  assert.equal(posts().length, 1);                                  // 打开当前页即记
+  win.location.hash = '#component/server.js';
+  for (const fn of listeners.hashchange) fn();                      // 切换页 → 再记
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(posts().length, 2);
+  assert.deepEqual(JSON.parse(posts()[1].opts.body), { page: 'component/server.js.md' });
+  // API 全挂 → 装配仍成功、渲染不受影响（无未捕获异常）
+  const down = visitFetch({ failApi: true, failManifest: true });
+  const win2 = { location: { hash: '#component/lib' }, addEventListener: () => {} };
+  assert.ok(installVisitSensor({ win: win2, fetchFn: down.fetchFn }));
+  await new Promise(r => setTimeout(r, 5));
+});
+
+test('installVisitSensor: Node / 无 location / 无 addEventListener → 不装配（返回 null，零副作用）', () => {
+  assert.equal(installVisitSensor(), null);                          // 测试进程里 globalThis 没有 location
+  assert.equal(installVisitSensor({ win: {} }), null);
+  assert.equal(installVisitSensor({ win: { location: { hash: '#x' } } }), null);
+});

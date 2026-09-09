@@ -88,12 +88,13 @@
 
 ### S7 · 壳打开传感器
 - **目标**：壳打开页面时调用 `visit`（本地、失败静默），为 ② 期的再入简报与健康度提供数据。
-- **文件**：`site/shell.mjs`、`test/shell.test.js`
+- **文件**：`server.js`（新增 localhost-only `POST /api/human/visit`，复用 S4 `lib/human.js`）、`site/shell.mjs`、`test/server.test.js`、`test/shell.test.js`
 - **验收**：
-  - 打开页写入一条 visit；同一页短时间内重复打开可去重（窗口可配）。
-  - CLI 不可用 / 无 .lore → 静默降级，不影响阅读。
+  - `POST /api/human/visit` 写入一条 visit 到 `.lore/human/visits.jsonl`；非 localhost 请求被拒；非法/越界 page 路径被拒。
+  - 同一页短时间内重复打开可去重（窗口可配：存储层 `windowMs` / 壳侧 `dedupeMs`）。
+  - CLI 不可用 / 无 .lore → 壳静默降级，不影响阅读。
   - 不引入任何宿主依赖（浏览器内不调用外部网络）。
-- **自检**：`node --test test/shell.test.js`
+- **自检**：`node --test test/server.test.js test/shell.test.js`
 
 ## 3. 全局验收（本期完成判据）
 

@@ -247,3 +247,115 @@ export function buildThemeRows(pages) {
     }, []),
   }));
 }
+
+// ---------- 壳打开传感器（设计 §7 S7 / §4.4；不变量⑥ per-human 边界） ----------
+// 壳在浏览器里跑、写不进 .lore → 必须走 server 的 localhost-only API（POST /api/human/visit）。
+// 整条链路只碰本机同源 URL（wiki/.manifest.json + api/human/visit）：不引宿主依赖、不发外部网络。
+// 任何一步失败都静默返回（record 自身不抛），绝不阻塞阅读——调用方 fire-and-forget。
+export const VISIT_ENDPOINT = 'api/human/visit';   // 相对 BASE：per-repo "/" · portal "/<repo>/"
+export const VISIT_MANIFEST = 'wiki/.manifest.json';
+export const VISIT_DEDUPE_MS = 30 * 60 * 1000;     // 与 lib/human.js DEDUPE_WINDOW_MS 同窗；服务端仍是权威去重
+const VISIT_CONSOLE_KEY = 'console';               // 控制台不是 wiki 页，不记
+
+// 页键（axis/id）→ wiki 相对路径。必须以 manifest 为真源：HOME/HOME → HOME.md 这类不满足 `${key}.md`。
+export function buildVisitPathIndex(manifest) {
+  const idx = Object.create(null);
+  for (const ax of manifest?.axes ?? []) {
+    for (const p of ax?.pages ?? []) {
+      if (ax?.id && p?.id && p?.path) idx[`${ax.id}/${p.id}`] = p.path;
+    }
+  }
+  return idx;
+}
+
+// 落地页口径与壳 index.html 的 firstPageKey 一致：首个轴的首个页（无 hash 时打开的就是它）。
+export function firstVisitKey(manifest) {
+  for (const ax of manifest?.axes ?? []) {
+    if (ax?.pages?.[0]?.id) return `${ax.id}/${ax.pages[0].id}`;
+  }
+  return '';
+}
+
+// location.hash / 裸页键 → 页键。'#component/lib' → 'component/lib'；'' → 落地页；'console' → ''（不记）。
+export function visitKey(hash, manifest) {
+  const key = String(hash ?? '').replace(/^#/, '').replace(/^\/+/, '').trim();
+  if (key === VISIT_CONSOLE_KEY) return '';
+  return key || firstVisitKey(manifest);
+}
+
+// 传感器：record(hash) → {sent, reason, page?}（返回值只为测试/诊断，阅读路径不必 await）。
+export function createVisitSensor({
+  base = '/',
+  manifestUrl = VISIT_MANIFEST,
+  endpoint = VISIT_ENDPOINT,
+  dedupeMs = VISIT_DEDUPE_MS,
+  fetchFn = (...args) => globalThis.fetch(...args),
+  now = () => Date.now(),
+} = {}) {
+  const seen = new Map();          // page → ts（壳侧短窗去重，省一次网络；服务端去重兜底）
+  let cachedManifest = null;
+
+  // manifest 成功才缓存：取不到（未 init / 静态服务 / 服务端重启中）返回 null 且不缓存，
+  // 下次打开再试——一次瞬时失败不该把传感器整个会话静音。
+  const loadManifest = async ({ fresh = false } = {}) => {
+    if (!fresh && cachedManifest) return cachedManifest;
+    try {
+      const res = await fetchFn(base + manifestUrl, { cache: 'no-store' });
+      if (!res?.ok) return null;
+      const m = await res.json();
+      cachedManifest = m;
+      return m;
+    } catch { return null; }   // 无 manifest → 降级：不记、不抛
+  };
+
+  async function record(hash) {
+    try {
+      const manifest = await loadManifest();
+      if (!manifest) return { sent: false, reason: 'no-manifest' };
+      const key = visitKey(hash, manifest);
+      if (!key) return { sent: false, reason: 'not-a-page' };
+      let page = buildVisitPathIndex(manifest)[key];
+      if (!page) {
+        // 缓存里没有该页键（壳常驻期间新生成 / 改名的页）→ 失效重取一次再试，别静默丢一次阅读
+        const fresh = await loadManifest({ fresh: true });
+        if (!fresh) return { sent: false, reason: 'no-manifest' };
+        page = buildVisitPathIndex(fresh)[key];
+      }
+      if (!page) return { sent: false, reason: 'unknown-page' };
+      const t = now();
+      if (dedupeMs > 0 && seen.has(page) && t - seen.get(page) < dedupeMs) {
+        return { sent: false, reason: 'deduped', page };
+      }
+      try {
+        const res = await fetchFn(base + endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ page }),
+        });
+        if (!res?.ok) return { sent: false, reason: 'api-unavailable', page };
+        seen.set(page, t);         // 只有真记上才进壳侧窗口（API 不可用时下次照试）
+        return { sent: true, page };
+      } catch {
+        return { sent: false, reason: 'api-unavailable', page };   // 无 .lore / 静态服务 → 静默降级
+      }
+    } catch {
+      return { sent: false, reason: 'error' };                     // 传感器绝不把异常抛给阅读路径
+    }
+  }
+
+  return { record, reset: () => seen.clear() };
+}
+
+// 浏览器自装配：壳（site/index.html）import 本模块即生效——打开落地页 + 每次 hash 切换各记一次。
+// Node（测试 / CLI）没有 location 与 addEventListener → 直接不装配，纯函数语义不变。
+export function installVisitSensor({ win = globalThis, ...opts } = {}) {
+  if (!win || typeof win.addEventListener !== 'function' || !win.location) return null;
+  const sensor = createVisitSensor(opts);
+  const onOpen = () => { sensor.record(win.location.hash); };   // fire-and-forget：不 await、不阻塞渲染
+  win.addEventListener('hashchange', onOpen);
+  onOpen();
+  return sensor;
+}
+
+installVisitSensor();
+

@@ -3,6 +3,9 @@
   "version": "0.10.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "lore": "./lib/cli.js"
+  },
   "description": "Repo living-docs / decision-history framework — capture → synthesize (HOME + multi-axis wiki, bilingual) → consume (human read / agent retrieval)",
   "scripts": {
     "test": "node --test",

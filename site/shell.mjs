@@ -350,7 +350,11 @@ export function createVisitSensor({
 // Node（测试 / CLI）没有 location 与 addEventListener → 直接不装配，纯函数语义不变。
 export function installVisitSensor({ win = globalThis, ...opts } = {}) {
   if (!win || typeof win.addEventListener !== 'function' || !win.location) return null;
-  const sensor = createVisitSensor(opts);
+  // 自装配必须自己推导前缀：portal 形态壳在 /<repo>/site/index.html，写死 '/' 会把请求打到
+  // /wiki/… 而不是 /<repo>/wiki/… → 恒 no-manifest、零 visit、零告警（审计 D5 已实测复现）。
+  // 显式传 base 仍优先——调用方/测试的既有语义不变。
+  const base = opts.base ?? baseFromPathname(win.location.pathname ?? '');
+  const sensor = createVisitSensor({ ...opts, base });
   const onOpen = () => { sensor.record(win.location.hash); };   // fire-and-forget：不 await、不阻塞渲染
   win.addEventListener('hashchange', onOpen);
   onOpen();

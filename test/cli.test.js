@@ -140,6 +140,36 @@ test('未知 verb / 缺参数 / 非法取值：打印用法并 exit 1', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+
+test('--root 给了却没值 → 用法 + exit 1（不静默回落 cwd）', () => {
+  const r = run('doctor', '--json', '--root');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--root requires <repo>/);
+  assert.match(r.stderr, /usage: node lib\/cli\.js/);
+  assert.equal(r.stdout, '');
+  // 检查在 verb 分发之前 → 每个 verb 一致
+  for (const c of [['visit', 'p', '--root'], ['human', 'export', '--root'], ['bogus', '--root']]) {
+    const x = run(...c);
+    assert.equal(x.status, 1, c.join(' '));
+    assert.match(x.stderr, /--root requires <repo>/, c.join(' '));
+  }
+  // 直调 main() 也一致（不依赖测试壳）
+  const sink = [];
+  assert.equal(main(['doctor', '--root'], { cwd: process.cwd(), out: s => sink.push(s), err: s => sink.push(s) }), 1);
+  assert.match(sink.join('\n'), /--root requires <repo>/);
+});
+
+test('package.json bin: lore → ./lib/cli.js（可执行入口；指向的就是统一 CLI）', () => {
+  const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+  assert.deepEqual(pkg.bin, { lore: './lib/cli.js' });
+  assert.equal(existsSync(CLI), true);
+  // 可执行 = 有 node shebang：POSIX 上 npm 的 bin shim 靠它选解释器（无 shebang 会被当 shell 脚本执行）
+  assert.match(readFileSync(CLI, 'utf8').split('\n')[0], /^#!\/usr\/bin\/env node$/);
+  const r = spawnSync(process.execPath, [CLI], { cwd: process.cwd(), encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /usage: node lib\/cli\.js/);
+});
+
 test('新 init 的仓库：.lore/human/ 自动进 .gitignore，visit 数据落盘且真被 git 忽略', () => {
   const root = tmp();
   const home = tmp();                                                       // 机器层宿主资产隔离进 tmp

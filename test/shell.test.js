@@ -522,6 +522,38 @@ test('installVisitSensor: 浏览器自装配——落地页立即记一次 + 每
   await new Promise(r => setTimeout(r, 5));
 });
 
+
+test('installVisitSensor: 自装配推导 base —— portal /lore/site/index.html → /lore/wiki/… 与 /lore/api/human/visit', async () => {
+  // 审计 D5：自装配写死 base='/' 时，portal 形态请求打到 /wiki/… → 恒 no-manifest、零 visit、零告警
+  const portal = visitFetch();
+  const win = { location: { hash: '#component/lib', pathname: '/lore/site/index.html' }, addEventListener: () => {} };
+  assert.ok(installVisitSensor({ win, fetchFn: portal.fetchFn }));
+  await new Promise(r => setTimeout(r, 5));
+  assert.deepEqual(portal.calls.map(c => c.url), ['/lore/wiki/.manifest.json', '/lore/api/human/visit']);
+  assert.equal(portal.posts().length, 1);
+
+  // per-repo 形态（/site/index.html）→ 前缀 "/"，与既有行为一致
+  const repo = visitFetch();
+  const winRepo = { location: { hash: '#component/lib', pathname: '/site/index.html' }, addEventListener: () => {} };
+  installVisitSensor({ win: winRepo, fetchFn: repo.fetchFn });
+  await new Promise(r => setTimeout(r, 5));
+  assert.deepEqual(repo.calls.map(c => c.url), ['/wiki/.manifest.json', '/api/human/visit']);
+
+  // 显式传 base 仍优先（既有语义不变）
+  const explicit = visitFetch();
+  const winExplicit = { location: { hash: '#component/lib', pathname: '/lore/site/index.html' }, addEventListener: () => {} };
+  installVisitSensor({ win: winExplicit, base: '/ti/', fetchFn: explicit.fetchFn });
+  await new Promise(r => setTimeout(r, 5));
+  assert.deepEqual(explicit.calls.map(c => c.url), ['/ti/wiki/.manifest.json', '/ti/api/human/visit']);
+
+  // 无 pathname（旧窗口形状）→ 兜底 "/"，不抛
+  const legacy = visitFetch();
+  const winLegacy = { location: { hash: '#component/lib' }, addEventListener: () => {} };
+  installVisitSensor({ win: winLegacy, fetchFn: legacy.fetchFn });
+  await new Promise(r => setTimeout(r, 5));
+  assert.deepEqual(legacy.calls.map(c => c.url), ['/wiki/.manifest.json', '/api/human/visit']);
+});
+
 test('installVisitSensor: Node / 无 location / 无 addEventListener → 不装配（返回 null，零副作用）', () => {
   assert.equal(installVisitSensor(), null);                          // 测试进程里 globalThis 没有 location
   assert.equal(installVisitSensor({ win: {} }), null);

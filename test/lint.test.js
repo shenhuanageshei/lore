@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { lintOrphans, lintMissing, lintStale, lintUnfolded, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig, lintThemeDeepConfig, lintThemeDeepPages, componentScopes } from '../lib/lint.js';
+import { lintOrphans, lintMissing, lintStale, lintUnfolded, lintTrailerOnly, lint, lintMissingDiagram, lintMissingMechanism, lintDeepConfig, lintThemeDeepConfig, lintThemeDeepPages, componentScopes } from '../lib/lint.js';
 import { init } from '../lib/init.js';
 
 function tmpDir() { return mkdtempSync(join(tmpdir(), 'lore-lint-')); }
@@ -101,7 +101,7 @@ test('lint: clean repo → clean:true', () => {
     writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
     page(lore, 'lib', cur);   // current sha, matches root → no drift
     const r = lint({ loreDir: lore });
-    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], mermaid: [], missingDiagram: [], missingMechanism: [], deepConfig: [], themeDeep: [], themeDeepWarnings: [], clean: true });
+    assert.deepEqual(r, { stale: [], orphans: [], missing: [], unfolded: [], trailerOnly: [], mermaid: [], missingDiagram: [], missingMechanism: [], deepConfig: [], themeDeep: [], themeDeepWarnings: [], clean: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -193,6 +193,76 @@ function wikiPage(loreDir, axis, id, frontmatter, body) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${id}.md`), `---\n${frontmatter}\n---\n${body}`);
 }
+
+// ---- trailer-only 闸门（不变量⑦「无正文不写 why」的会红规则）----
+
+function journalLine(lore, atoms) {
+  const dir = join(lore, 'journal', '2026', '09');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, '2026-09-09.ndjson'), atoms.map(a => JSON.stringify(a)).join('\n') + '\n');
+}
+
+test('lintTrailerOnly: 原子 why 剥完为空 → 报；有正文（哪怕带 trailer 行）→ 不报', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    journalLine(lore, [
+      { id: 'commit:bad', ts: '2026-09-01T00:00:00Z', kind: 'commit', why: 'Co-Authored-By: X <x@y>' },
+      { id: 'commit:signed', ts: '2026-09-02T00:00:00Z', kind: 'commit', why: 'Signed-off-by: Y <y@z>' },
+      { id: 'commit:gen', ts: '2026-09-03T00:00:00Z', kind: 'commit', why: '🤖 Generated with [Claude Code](https://claude.com/claude-code)' },
+      { id: 'commit:good', ts: '2026-09-04T00:00:00Z', kind: 'commit', why: '真的原因\n\nCo-Authored-By: X <x@y>' },
+      { id: 'commit:blank', ts: '2026-09-05T00:00:00Z', kind: 'commit', why: '   ' },
+      { id: 'commit:none', ts: '2026-09-06T00:00:00Z', kind: 'commit' },
+    ]);
+    const out = lintTrailerOnly(lore);
+    assert.deepEqual(out.map(t => t.where), ['commit:bad', 'commit:signed', 'commit:gen']);
+    assert.equal(out.every(t => t.kind === 'atom'), true);
+    assert.match(out[0].excerpt, /Co-Authored-By/);
+    // 干净样例（只有正文 why / 空 why / 无 why）→ 一条都不报
+    const clean = join(tmpDir(), '.lore');
+    journalLine(clean, [{ id: 'commit:ok', ts: '2026-09-01T00:00:00Z', kind: 'commit', why: '有正文' }]);
+    assert.deepEqual(lintTrailerOnly(clean), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lintTrailerOnly: 已 finalize 页出现 bare trailer 行 → 报；未 finalize / fenced code / inline span → 不报', () => {
+  const root = tmpDir();
+  try {
+    const lore = join(root, '.lore');
+    // 已 finalize 且正文有独立成行的 trailer → 无正文的 why 被物化进页
+    wikiPage(lore, 'component', 'bad', 'title: B\ncode_sha: abc1234', '# B\n\nCo-Authored-By: Claude <n@a>\n');
+    // 已 finalize 但 trailer 只是正文里被引用 → 不报
+    wikiPage(lore, 'component', 'good', 'title: G\ncode_sha: abc1234', '# G\n\n真的原因，正文提到 Co-Authored-By: X 会被剥掉。\n');
+    // 未 finalize（无 code_sha）→ 不查，同 lintUnfolded
+    wikiPage(lore, 'component', 'presync', 'title: P', '# P\n\nCo-Authored-By: X <x@y>\n');
+    // fenced code / inline code span 里的字面引用 → 不报
+    wikiPage(lore, 'component', 'fenced', 'title: F\ncode_sha: abc1234', '# F\n\n```\nCo-Authored-By: X\n```\n');
+    wikiPage(lore, 'component', 'span', 'title: S\ncode_sha: abc1234', '# S\n\n机制：`Co-Authored-By: X` 会被剥。\n');
+    const out = lintTrailerOnly(lore);
+    assert.deepEqual(out.map(t => t.where), ['component/bad.md']);
+    assert.equal(out[0].kind, 'page');
+    assert.equal(out[0].line, 3);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lint: trailer-only 使 clean 变红，并在 CLI 输出里可见', () => {
+  const root = gitRepo();
+  try {
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    const cur = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
+    writeFileSync(join(lore, 'config.yml'), '    code_roots: [lib]\n');
+    page(lore, 'lib', cur);
+    assert.equal(lint({ loreDir: lore }).clean, true);          // 干净基线
+    journalLine(lore, [{ id: 'commit:bad', ts: '2026-09-01T00:00:00Z', kind: 'commit', why: 'Co-Authored-By: X <x@y>' }]);
+    const r = lint({ loreDir: lore });
+    assert.equal(r.trailerOnly.length, 1);
+    assert.equal(r.clean, false);
+    const out = execFileSync('node', ['lib/lint.js', lore], { cwd: process.cwd() }).toString();
+    assert.match(out, /trailer-only \(1\)/);
+    assert.match(out, /commit:bad/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test('lintUnfolded: finalized page (has code_sha) still holding a literal token → flagged', () => {
   const root = tmpDir();

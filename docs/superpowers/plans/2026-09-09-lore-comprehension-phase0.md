@@ -17,11 +17,11 @@
 ## 1. 现状勘察（开工前事实）
 
 - 无统一 CLI：`lib/*.js` 15 个独立入口（`ask/hook/host/init/lint/lorehook/manifest/migrate/mine/note/portal/runner/serve/sync/translate`），无 `bin`，无 `lore <verb>` 入口 → 不变量④（CLI 对等）当前**不成立**。
-- 原子现状：490 条中 `kind:decision` 1 条；`why` 非空 272、仅 trailer 127；`refs.pitfall` 0 条；`status` 字段尚不存在。
+- 原子现状（**口径统一**：撰写时 490 条 = 489 `commit` + 1 `decision`；实施后实测 509 条 = 新增 11 条 `pitfall` + 8 条 hook 原子）：`kind:decision` 1 条；`why` 非空 272、仅 trailer 127；`refs.pitfall` 0 条；`status` 字段尚不存在。
 - 死声明：`.lore/config.yml` 有 `mine: [commits, changelog, claude_md_pitfalls]`，但 `lib/mine.js:50` 只写 `kind:'commit'`、`:56` 硬编码 `pitfall:null`。
 - `stripTrailers` 已在 `lib/fold.js:72`、`lib/mine.js:7`，仅在渲染侧生效。
 
-## 2. 分阶段实施（7 阶段）
+## 2. 分阶段实施（8 阶段）
 
 每阶段独立可验收；**任阶段自检失败两次即停**，不带着红灯往下走。
 
@@ -29,19 +29,23 @@
 - **目标**：定义六类原子（`decision|rejected|correction|question|evidence|pitfall`）的字段契约与校验/规范化函数；**不改变现有写入行为**（纯新增）。
 - **文件**：`lib/atom.js`（新）、`test/atom.test.js`（新）
 - **验收**：
-  - 六类 kind 各有合法/非法用例；未知 kind 拒绝。
+  - 六类 kind 各有合法/非法用例；**未知 kind 拒绝，但 `commit` 作为 legacy 合法 kind 显式保留**——历史 489 条都是它，不保留就与「现有原子全通过」自相矛盾（评审 🔴#3）。
+  - 公共字段逐个枚举、各有合法/非法用例：`title` / `why` / `refs{supersedes,evidence,files,anchors}` / `source` / `status` / `confirmed_by` / `confirmed_at`（不变量⑦⑧ 的数据基础，评审 🟡#6）。
   - `status` 仅允许 `draft|confirmed|disputed|superseded`；`confirmed` 必须带 `confirmed_by`。
+  - **机器来源（agent / miner / hook）写入 ⇒ `status` 只能是 `draft`**（§3.2「只有 owner 的直接动作能产生 confirmed」，评审 🟡#5）。
   - `pitfall` 缺 `problem|fix|prevention` 任一 → 非法。
-  - 对现有 490 条原子全通过（向后兼容），未知字段保留不丢。
+  - 对现有全部原子（实测 509 条）通过校验，未知字段保留不丢。
 - **自检**：`node --test test/atom.test.js`
 
 ### S2 · 写入侧纪律（trailer-only 不落库）
 - **目标**：`stripTrailers` 前移到写入侧；剥掉 trailer 后为空则不写 `why` 字段；补会红的回归测试。
-- **文件**：`lib/fold.js`、`lib/hook.js`、`lib/mine.js`、`lib/note.js`、`test/fold.test.js`、`test/mine.test.js`、`test/hook.test.js`、`test/note.test.js`
+- **文件**：`lib/fold.js`、`lib/hook.js`、`lib/mine.js`、`lib/note.js`、`lib/lint.js`（会红规则 `lintTrailerOnly`）、`test/fold.test.js`、`test/mine.test.js`、`test/hook.test.js`、`test/note.test.js`、`test/lint.test.js`
+- **前置**：先审计**全部**写 `why` 的入口并把完整集合写进本节——§1 列了 15 个 lib 入口，除上述四个外是否还有别的写 why 未核实（评审 🟡#8）。
 - **验收**：
   - 新写入的原子 `why` 不含 `Co-Authored-By|Signed-off-by|Generated with`。
   - 剥后为空 → 不写 `why` 键（而非写空串）。
   - 渲染侧 `renderDecisionHistory` 行为不变（老原子仍防御性剥离）。
+  - **lint 会红**（审计 D9-lint）：`lintTrailerOnly` 查两个落点——已 finalize 的页（正文独立成行的 trailer）与 journal 原子（why 剥完为空）；命中即 `clean:false` 并在 CLI 输出 `trailer-only (N)`。历史 127 条不回填，但一直可见。
 - **自检**：`node --test test/fold.test.js test/mine.test.js test/hook.test.js test/note.test.js`
 
 ### S3 · 踩坑入库（接线死声明）
@@ -58,31 +62,37 @@
 - **目标**：`.lore/human/*.jsonl`（visits / read / blackbox / checks）+ 统一入口 `node lib/cli.js <verb>`（`visit|read|blackbox|human export`）+ 边界（不进 git）。
 - **文件**：
   - S4a：`lib/human.js`（新）、`test/human.test.js`（新）
-  - S4b：`lib/cli.js`（新）、`test/cli.test.js`（新）、`lib/migrate.js`（GITIGNORE_LINES 增 `.lore/human/`）、`.gitignore`、`test/migrate.test.js`（增行后同步该行数期望值）
+  - S4b：`lib/cli.js`（新）、`test/cli.test.js`（新）、`package.json`（`bin: {lore: "./lib/cli.js"}`——不变量④ 的 `lore <verb>` 入口，零依赖、无副作用）、`lib/migrate.js`（GITIGNORE_LINES 增 `.lore/human/`）、`.gitignore`、`test/migrate.test.js`（增行后同步该行数期望值）
 - **验收**：
   - 四类记录（visits / read / blackbox / checks）可 append 与读回；坏行跳过不崩。
-  - 四个 verb（visit / read / blackbox / human export）可读写且幂等。
+  - 五个 verb（visit / read / blackbox / human export / **human clear**）可读写且幂等——不变量⑥ 明列「可清除」必须有 CLI（评审 🟡#4）。
+  - `lore human clear --kind <visits|read|blackbox|checks|all> [--yes]` 写前打印将删条数。
+  - `lore check`（设计 §3.3）本期只落 `checks.jsonl` 存储层、不落 verb——**显式声明延后到 ④ 期**，避免被当成不变量④ 漏项（评审 🔵#9）。
   - `lore human export` 产出可移植 JSON（含 schema 版本号）。
   - 新 init 的仓库自动 ignore `.lore/human/`（不变量⑥）。
   - 未 `init` 过的目录调用 verb → 明确报错而非静默写散文件。
+  - `--root` 给了却没值 → 用法 + exit 1（与 `--out` 同一纪律，不静默回落 cwd——审计 D9-cli）。
 - **自检**：S4a `node --test test/human.test.js`；S4b `node --test test/cli.test.js test/migrate.test.js`
 
 ### S5 · 体检 + 捕获召回率（"没记下来"要能看见）
-- **目标**：`node lib/cli.js doctor` 报告：hook 指向是否有效、上次成功捕获时间、断流天数、决策捕获率（`kind:decision` ÷ 提交数）、trailer-only 计数、`refs.pitfall` 计数；支持 `--json`。
+- **目标**：`node lib/cli.js doctor` 报告：hook 指向是否有效、上次成功捕获时间、断流天数、决策捕获率（`kind:decision` ÷ 提交数）、trailer-only 计数、**踩坑计数（`kind==='pitfall'`）** 与 `refs.pitfall` 两个口径分列；支持 `--json`。
 - **文件**：`lib/doctor.js`（新）、`lib/cli.js`、`test/doctor.test.js`（新）
 - **验收**：
-  - 对本仓库输出真实数字（原子 490 / decision 1 / trailer-only 127）。
+  - 对本仓库输出真实数字（原子 509 / decision 1 / trailer-only 127 / **pitfall 11**）。
+  - 踩坑计数按 `kind==='pitfall'` 统计：S3 落地后 `refs.pitfall` 恒为 null，若只数它，体检会报 0 而与记录层事实矛盾（审计 D1）。
   - 非 git 目录降级不崩，字段标 `unknown` 而非 0。
-  - `--json` 输出可被程序消费（字段稳定）。
+  - `--json` 输出可被程序消费（字段稳定）；踩坑按 kind 的计数落在 `capture.pitfalls`（审计 D1：键集只增不改，既有键名/语义不动）。
 - **自检**：`node --test test/doctor.test.js`
 
 ### S6 · 成本账本 + 预算闸
-- **目标**：每次 LLM 调用追加 `.lore/.state/cost.ndjson`（`{ts,page,backend,ms,ok,tokens?}`）；每版本 token 预算，超限时 auto 不启动并给出原因。
+- **目标**：每次 LLM 调用追加 `.lore/.state/cost.ndjson`（`{ts,page,backend,ms,ok,tokens?,version}`）；每版本预算（token 与**可回退计量**），超限时 auto 不启动**并把原因送到可见处**。
 - **文件**：`lib/cost.js`（新）、`lib/runner.js`、`lib/backend.js`、`lib/syncstate.js`、`test/cost.test.js`（新）
 - **验收**：
   - 成功/失败/超时都记账；坏行跳过。
   - `tokens` 拿不到时留空（不伪造 0）——CLI 后端目前不回报 token 数。
   - 预算超限 → `shouldRunAuto` 返回 `{run:false, reason:'budget'}`，且不产生副作用。
+  - **计量可回退**：三个 CLI 后端都不回报 token 数，只按 token 计预算则永远算不出超支（评审 🟡#7 / 审计 D3）→ 预算维度支持 `tokens | calls | ms`，未配置 tokens 时用 `calls` 兜底，且测试要证明闸**能被触发**。
+  - **原因有出口**：`/api/sync/status` 增 `budget:{configured,budget,used,exceeded,version}`，壳状态行可读；新增 `lore budget <n>|--clear` verb（复用已有 `writeBudgetConfig`）——否则 auto 静默停摆（审计 D4）。
   - 预算未配置 → 行为与今天一致（不阻断）。
 - **自检**：`node --test test/cost.test.js test/runner.test.js`
 
@@ -91,10 +101,28 @@
 - **文件**：`server.js`（新增 localhost-only `POST /api/human/visit`，复用 S4 `lib/human.js`）、`site/shell.mjs`、`test/server.test.js`、`test/shell.test.js`
 - **验收**：
   - `POST /api/human/visit` 写入一条 visit 到 `.lore/human/visits.jsonl`；非 localhost 请求被拒；非法/越界 page 路径被拒。
-  - 同一页短时间内重复打开可去重（窗口可配：存储层 `windowMs` / 壳侧 `dedupeMs`）。
+  - 同一页短时间内重复打开可去重（**单一旋钮**：存储层 `windowMs`，壳侧不再单独配 `dedupeMs`——评审 🔵#10 指两处配置会漂移）。
+  - **自装配必须推导 base**：`installVisitSensor()` 默认 base 用 `baseFromPathname(location.pathname)`，否则 portal 形态下请求打到 `/wiki/…` 而非 `/<repo>/wiki/…` → 恒 `no-manifest`、零 visit、零告警（审计 D5 已实测复现）。
   - CLI 不可用 / 无 .lore → 壳静默降级，不影响阅读。
   - 不引入任何宿主依赖（浏览器内不调用外部网络）。
 - **自检**：`node --test test/server.test.js test/shell.test.js`
+
+### S8 · agent 代捕获约定 + 捕获召回率闸门（评审 🔴#1/#2；审计 D2）
+
+设计 §7⓪ 明列这两项，原计划只做了度量（S5）却没做**供给**与**闸门**——"只测沉默，不防沉默"。本阶段补齐。
+
+- **目标**：
+  - **约定**：在 `lib/resident.js` 生成的 resident 区块里加一条规则——「做出非显然决策时，追加一条 `kind:decision` 的 **draft** 原子（附 why 与源码锚点）」，并给出 `lore note --draft` 的 CLI 示例；CLAUDE.md / AGENTS.md 同源渲染、内容一致（沿用 S3 去重纪律）。
+  - **CLI**：`lib/note.js` 的 `noteAtom` 补 `status:'draft'`（现在连 status 都没有），新增 `--draft` 旗标，默认行为不变。
+  - **闸门**：`doctor` 增可配置阈值——捕获率低于 X 或断流超过 N 天 → 醒目告警 + **非零退出码**，供 CI 与壳状态行消费。
+- **文件**：`lib/resident.js`、`lib/note.js`、`lib/doctor.js`、`lib/cli.js`、`CLAUDE.md`、`AGENTS.md`、`test/resident.test.js`、`test/note.test.js`、`test/doctor.test.js`
+- **验收**：
+  - resident 区块出现该约定，且 CLAUDE.md 与 AGENTS.md 渲染一致（同源）。
+  - `lore note --draft` 产出的原子 `status:'draft'`，过 S1 的「机器来源 ⇒ draft」规则。
+  - `doctor` 在低于阈值时**非零退出**；`--json` 含 `gate:{ok,reason}`。
+  - **per-backend 矩阵**：至少覆盖 claude / codex / opencode 三后端下"约定是否被遵守"的采样口径（本期只落采样脚本与报告格式，不追求统计显著）。
+  - 阈值 X / N 与采样口径写进本节后再动手（评审 🔴#2 要求现在定死，不能留到 ②）。
+- **自检**：`node --test test/resident.test.js test/note.test.js test/doctor.test.js`
 
 ## 3. 全局验收（本期完成判据）
 
@@ -102,11 +130,13 @@
 |---|---|
 | 六类原子 | schema + 校验器落地，现有原子全兼容 |
 | trailer-only | 新写入为 0；lint/测试会红 |
-| 踩坑 | 11 条入库且幂等；`claude_md_pitfalls` 不再是死声明 |
-| CLI 对等 | `visit/read/blackbox/human export/doctor` 全部有一等 CLI |
-| per-human 边界 | `.lore/human/` 不进 git，可导出 |
-| 可见性 | `doctor` 能报出断流天数与决策捕获率 |
-| 成本 | 每次调用有账，预算可闸 |
+| 踩坑 | 11 条入库且幂等；`claude_md_pitfalls` 不再是死声明；doctor 按 `kind` 报出 11（不再是 0） |
+| 燃料供给 | resident 约定 + `lore note --draft` 落地；机器来源写入恒为 `draft` |
+| 捕获闸门 | 低于阈值时 doctor 非零退出；per-backend 采样矩阵可跑并出报告 |
+| CLI 对等 | `visit/read/blackbox/human export/human clear/doctor/budget` 全部有一等 CLI |
+| per-human 边界 | `.lore/human/` 不进 git，可导出、可清除 |
+| 可见性 | `doctor` 能报出断流天数、决策捕获率、踩坑数、闸门状态 |
+| 成本 | 每次调用有账；预算可闸（token/calls/ms 任一维度可触发）；超限原因能从 `/api/sync/status` 与壳状态行读到 |
 | 全量回归 | `node --test` 全绿（含现有 587 项） |
 
 ## 4. 明确不做（防范围蔓延）

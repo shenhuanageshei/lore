@@ -46,6 +46,9 @@ const ATOMS = [
   atom({ id: 'commit:a2', ts: '2026-09-02T00:00:00Z', kind: 'commit', source: 'hook', why: '真的原因' , refs: { pitfall: 'pitfall:abc' } }),
   atom({ id: 'decision:d1', ts: '2026-09-05T00:00:00Z', kind: 'decision', source: 'agent', title: 't', why: 'w' }),
   atom({ id: 'commit:a3', ts: '2026-09-09T00:00:00Z', kind: 'commit', source: 'miner:commits' }),
+  // 踩坑两口径：kind==='pitfall'（S3 入库形态，审计 D1 的正口径）与 refs.pitfall（旧形态，恒 null）
+  atom({ id: 'pitfall:p1', ts: '2026-09-06T00:00:00Z', kind: 'pitfall', source: 'miner:claude_md_pitfalls', problem: 'p', fix: 'f', prevention: 'v' }),
+  atom({ id: 'pitfall:p2', ts: '2026-09-07T00:00:00Z', kind: 'pitfall', source: 'miner:claude_md_pitfalls', problem: 'p2', fix: 'f2', prevention: 'v2' }),
 ].join('\n') + '\n{oops\n42\n';
 
 // ---------- 验收 1：本仓库真实数字 ----------
@@ -57,6 +60,8 @@ test('本仓库：原子 ~490 / decision 1 / trailer-only 127 量级；hook 指�
   assert.ok(r.capture.atoms >= 400 && r.capture.atoms <= 2000, 'atoms=' + r.capture.atoms);
   assert.ok(r.capture.decisions >= 1, 'decisions=' + r.capture.decisions);
   assert.ok(r.capture.trailerOnly >= 100, 'trailerOnly=' + r.capture.trailerOnly);
+  // 踩坑按 kind 计（审计 D1）：S3 之后 refs.pitfall 恒 null，只数它会报 0 而与记录层事实矛盾
+  assert.ok(r.capture.pitfalls >= 11, 'pitfalls=' + r.capture.pitfalls);
   assert.equal(typeof r.capture.refsPitfall, 'number');
   assert.ok(r.capture.commits > 300, 'commits=' + r.capture.commits);
   assert.ok(r.capture.captureRate > 0 && r.capture.captureRate < 0.05, 'rate=' + r.capture.captureRate);
@@ -67,6 +72,8 @@ test('本仓库：原子 ~490 / decision 1 / trailer-only 127 量级；hook 指�
   const txt = formatReport(r);
   assert.match(txt, /lore doctor — /);
   assert.match(txt, /trailer-only \d+/);
+  assert.match(txt, /pitfall \d+（kind=pitfall）/, '两口径分列：按 kind 的踩坑数');
+  assert.match(txt, /refs\.pitfall \d+/, '旧口径 refs.pitfall 仍单列');
   assert.match(txt, /decision \/ \d+ commits/);
 });
 
@@ -81,6 +88,7 @@ test('非 git 目录：git 派生指标一律 unknown，不崩、不写成 0', (
     assert.equal(r.capture.captureRate, UNKNOWN);
     assert.equal(r.capture.captureRatePct, UNKNOWN);
     assert.equal(r.capture.atoms, UNKNOWN);          // 无 .lore → 没数过，不是 0
+    assert.equal(r.capture.pitfalls, UNKNOWN);
     assert.equal(r.capture.gapDays, UNKNOWN);
     assert.equal(r.capture.lastHookTs, UNKNOWN);
     assert.equal(r.hook.status, 'no-git');
@@ -105,12 +113,15 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     assert.deepEqual(Object.keys(doc), ['schemaVersion', 'generatedAt', 'repo', 'initialized', 'hook', 'capture']);
     assert.deepEqual(Object.keys(doc.repo), ['root', 'isGit', 'head', 'version', 'commits']);
     assert.deepEqual(Object.keys(doc.hook), ['status', 'ok', 'hookPath', 'target', 'expected']);
+    // 键集只增不改：pitfalls 是新增（按 kind 计），既有键名/语义一律不动
     assert.deepEqual(Object.keys(doc.capture),
-      ['atoms', 'badLines', 'decisions', 'trailerOnly', 'refsPitfall', 'commits', 'captureRate',
+      ['atoms', 'badLines', 'decisions', 'pitfalls', 'trailerOnly', 'refsPitfall', 'commits', 'captureRate',
         'captureRatePct', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays']);
     assert.equal(doc.repo.root, resolve(dir));       // --json 后跟 --root 未被吞掉
-    assert.equal(doc.capture.atoms, 4);
+    assert.equal(doc.capture.atoms, 6);
     assert.equal(doc.capture.badLines, 2);
+    assert.equal(doc.capture.pitfalls, 2);
+    assert.equal(doc.capture.refsPitfall, 1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -191,18 +202,20 @@ test('计数口径：trailer-only / decision / refs.pitfall / 坏行 / lastHook 
     writeFileSync(join(dir, '.lore', 'journal', '2026', '09', '2026-09-09.ndjson'), ATOMS);
 
     const s = readJournalStats(join(dir, '.lore', 'journal'));
-    assert.equal(s.atoms, 4);
+    assert.equal(s.atoms, 6);
     assert.equal(s.badLines, 2);
     assert.equal(s.decisions, 1);
+    assert.equal(s.pitfalls, 2);                        // 口径①：kind === 'pitfall'
     assert.equal(s.trailerOnly, 1);                     // Co-Authored-By 剥完为空
-    assert.equal(s.refsPitfall, 1);
+    assert.equal(s.refsPitfall, 1);                     // 口径②：refs.pitfall 非空（与口径①分列，不互相替代）
     assert.equal(s.lastHookTs, '2026-09-02T00:00:00Z'); // 只看 source=hook
     assert.equal(s.lastAtomTs, '2026-09-09T00:00:00Z');
     assert.equal(s.lastSource, 'miner:commits');
 
     const r = diagnose(dir, { now: new Date('2026-09-05T00:00:00Z') });
     assert.equal(r.capture.gapDays, 3);                 // 2026-09-02 → 09-05
-    assert.equal(r.capture.atoms, 4);
+    assert.equal(r.capture.atoms, 6);
+    assert.equal(r.capture.pitfalls, 2);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -215,6 +228,7 @@ test('无 .lore 但有 git：atoms 等仍为 unknown（不是 0）', () => {
     assert.equal(r.initialized, false);
     assert.equal(r.capture.atoms, UNKNOWN);
     assert.equal(r.capture.decisions, UNKNOWN);
+    assert.equal(r.capture.pitfalls, UNKNOWN);
     assert.equal(r.capture.trailerOnly, UNKNOWN);
     assert.equal(r.capture.gapDays, UNKNOWN);
   } finally { rmSync(dir, { recursive: true, force: true }); }

@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
-import { writeSyncMode, readSyncMode } from '../lib/syncstate.js';
+import { writeSyncMode, readSyncMode, writeBudgetConfig } from '../lib/syncstate.js';
+import { appendCost } from '../lib/cost.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, createPortalServer } from '../server.js';
@@ -257,6 +258,35 @@ test('GET /api/sync/status: B2 扩展形状（config + runner_running）', async
     const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
     assert.deepEqual(body.config, { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15, backend: 'auto' });
     assert.equal(body.runner_running, false);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+// 审计 D4：预算闸超限时 auto 静默停摆，原因必须能从状态接口读到（壳状态行的数据源）。
+test('GET /api/sync/status: budget{configured,dimension,budget,used,exceeded}——闸的原因出口', async () => {
+  const root = syncFixture();
+  const state = join(root, '.state');
+  // 版本戳注入固定值：临时仓库无 tag，不注入就断言不了窗口键
+  const exec = () => 'v1.0.0\n';
+  const server = createServer(root, { exec });
+  const port = await listen(server);
+  try {
+    const status = () => fetch(`http://127.0.0.1:${port}/api/sync/status`).then(r => r.json());
+    // 未配置预算：照报 budget（configured:false）——「为什么没跑」要能一眼区分没配 vs 超了
+    assert.deepEqual((await status()).budget,
+      { configured: false, dimension: 'calls', budget: null, used: 0, exceeded: false, version: 'v1.0.0' });
+
+    // 一行账（无 tokens——三个 CLI 后端都不回报）+ calls 维度预算 1 → 闸红（审计 D3/D4）
+    appendCost(state, { ts: 't', page: 'component/lib.md', backend: 'claude', ms: 1500, ok: true, version: 'v1.0.0' });
+    writeBudgetConfig(state, { budget: 1, dimension: 'calls' });
+    assert.deepEqual((await status()).budget,
+      { configured: true, dimension: 'calls', budget: 1, used: 1, exceeded: true, version: 'v1.0.0' });
+
+    // 换维度/上限 → 数值跟着变（ms 维度用注入的耗时）
+    writeBudgetConfig(state, { budget: 5000, dimension: 'ms' });
+    const ms = (await status()).budget;
+    assert.equal(ms.dimension, 'ms');
+    assert.equal(ms.used, 1500);
+    assert.equal(ms.exceeded, false);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

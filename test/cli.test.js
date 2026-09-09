@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { init } from '../lib/init.js';
 import { readHuman, exportHuman } from '../lib/human.js';
+import { readBudgetConfig } from '../lib/syncstate.js';
 import { main } from '../lib/cli.js';
 
 const CLI = join(process.cwd(), 'lib', 'cli.js');
@@ -103,6 +104,112 @@ test('human export：stdout 为含 schemaVersion 的可移植 JSON；--out 落�
 
     assert.deepEqual(exportHuman(loreOf(root)).counts, doc.counts);        // 导出是只读
     assert.equal(lines(join(loreOf(root), 'human', 'visits.jsonl')).length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('budget：设上限（含维度）/ 清空 / 非法取值；未 init 目录明确报错（审计 D4 的 CLI 出口）', () => {
+  const root = tmp();
+  try {
+    // 未 init → 明确报错，不凭空造 .lore/.state
+    const noInit = run('budget', '5', '--root', root);
+    assert.equal(noInit.status, 1);
+    assert.match(noInit.stderr, /no \.lore at/);
+    assert.equal(existsSync(loreOf(root)), false);
+
+    mkdirSync(loreOf(root), { recursive: true });
+    const state = join(loreOf(root), '.state');
+
+    const r1 = run('budget', '3', '--dimension', 'calls', '--root', root);
+    assert.equal(r1.status, 0);
+    assert.match(r1.stdout, /✓ budget 3 \(dimension calls\)/);
+    assert.deepEqual(readBudgetConfig(state), { budget: 3, dimension: 'calls' });
+
+    // 缺省维度 = calls（审计 D3：后端不回报 token 用量，token 维度算不出超支）
+    assert.equal(run('budget', '2', '--root', root).status, 0);
+    assert.deepEqual(readBudgetConfig(state), { budget: 2, dimension: 'calls' });
+
+    assert.equal(run('budget', '2000', '--dimension', 'ms', '--root', root).status, 0);
+    assert.deepEqual(readBudgetConfig(state), { budget: 2000, dimension: 'ms' });
+
+    // 清空 = 不阻断
+    const r4 = run('budget', '--clear', '--root', root);
+    assert.equal(r4.status, 0);
+    assert.match(r4.stdout, /budget cleared/);
+    assert.deepEqual(readBudgetConfig(state), { budget: null, dimension: 'calls' });
+    assert.equal(readFileSync(join(state, 'budget.json'), 'utf8'), '{}\n');
+
+    // 用法错误：消息 + 用法块
+    const usage = run('budget', '--root', root);
+    assert.equal(usage.status, 1);
+    assert.match(usage.stderr, /budget requires <n> or --clear/);
+    assert.match(usage.stderr, /usage: node lib\/cli\.js/);
+    // --dimension 给了却没值 → 用法错误（直调 main，避免测试壳把它吞成 --root 的值）
+    const sink = [];
+    assert.equal(main(['budget', '5', '--dimension'], { cwd: root, out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.match(sink.join('\n'), /--dimension requires/);
+
+    // 取值非法：校验规则住在 lib/syncstate.js，CLI 不复制一份
+    for (const bad of [['budget', '0'], ['budget', '-1'], ['budget', 'lots']]) {
+      const r = run(...bad, '--root', root);
+      assert.equal(r.status, 1, bad.join(' '));
+      assert.match(r.stderr, /invalid budget/, bad.join(' '));
+    }
+    const badDim = run('budget', '5', '--dimension', 'minutes', '--root', root);
+    assert.equal(badDim.status, 1);
+    assert.match(badDim.stderr, /invalid budget dimension/);
+    assert.deepEqual(readBudgetConfig(state), { budget: null, dimension: 'calls' });   // 非法没落盘
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('human clear：缺 --yes 只报将删条数不删；--yes 才删；按 kind/all；清后可继续追加（不变量⑥）', () => {
+  const root = tmp();
+  try {
+    mkdirSync(loreOf(root), { recursive: true });
+    run('visit', 'a', '--root', root);
+    run('visit', 'b', '--root', root);
+    run('read', 'p', '--at', 'sha1', '--root', root);
+    const visitsFile = join(loreOf(root), 'human', 'visits.jsonl');
+
+    // 缺 --yes → 报将删条数、不删、exit 1（不是静默 0）
+    const dry = run('human', 'clear', '--kind', 'visits', '--root', root);
+    assert.equal(dry.status, 1);
+    assert.match(dry.stderr, /will delete 2 record\(s\) from visits/);
+    assert.match(dry.stderr, /--yes/);
+    assert.equal(readHuman(loreOf(root), 'visits').length, 2);            // 一条没删
+
+    // --yes → 真删（只清该类）
+    const done = run('human', 'clear', '--kind', 'visits', '--yes', '--root', root);
+    assert.equal(done.status, 0);
+    assert.match(done.stdout, /✓ cleared 2 record\(s\) \(visits\)/);
+    assert.equal(readHuman(loreOf(root), 'visits').length, 0);
+    assert.equal(existsSync(visitsFile), false);
+    assert.equal(readHuman(loreOf(root), 'read').length, 1);              // 别的类不受影响
+
+    // 清除后可继续追加（同一页不再被短窗去重挡住）
+    const again = run('visit', 'a', '--root', root);
+    assert.equal(again.status, 0);
+    assert.match(again.stdout, /✓ visit a$/m);
+    assert.equal(readHuman(loreOf(root), 'visits').length, 1);
+
+    // --kind all → 清全部
+    const all = run('human', 'clear', '--kind', 'all', '--yes', '--root', root);
+    assert.equal(all.status, 0);
+    assert.match(all.stdout, /✓ cleared 2 record\(s\) \(all\)/);        // 1 visit + 1 read
+    assert.deepEqual(exportHuman(loreOf(root)).counts, { visits: 0, read: 0, blackbox: 0, checks: 0 });
+
+    // 用法/取值错误
+    for (const [args, re] of [[['human', 'clear'], /human clear requires --kind/],
+                              [['human', 'clear', '--kind', 'nope', '--yes'], /kind must be one of/]]) {
+      const r = run(...args, '--root', root);
+      assert.equal(r.status, 1, args.join(' '));
+      assert.match(r.stderr, re, args.join(' '));
+    }
+    // --kind 给了却没值 → 用法错误（直调 main，避免测试壳把 --root 吞成 --kind 的值）
+    const sink = [];
+    assert.equal(main(['human', 'clear', '--kind'], { cwd: root, out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.match(sink.join('\n'), /--kind requires/);
+    assert.match(sink.join('\n'), /usage: node lib\/cli\.js/);
+    assert.equal(run('human', 'clear', '--kind', 'visits', '--root', root).status, 1);   // 仍未删（上面已清空）
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

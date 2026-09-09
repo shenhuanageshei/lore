@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ATOM_KINDS, ATOM_STATUSES, COMPREHENSION_KINDS, PITFALL_FIELDS,
-  isKnownKind, requiresTitle, validateAtom, normalizeAtom, parseAtom,
+  ATOM_KINDS, ATOM_STATUSES, COMPREHENSION_KINDS, MACHINE_SOURCES, PITFALL_FIELDS,
+  isKnownKind, isMachineSource, requiresTitle, validateAtom, normalizeAtom, parseAtom,
 } from '../lib/atom.js';
 import { readAllAtoms } from '../lib/journal.js';
 
@@ -117,7 +117,35 @@ test('validateAtom 不改入参、不抛', () => {
   assert.equal(JSON.stringify(a), snapshot);
 });
 
-test('normalizeAtom: 未知字段保留、facets/refs 补空壳、status 缺省 draft、数组保序去重', () => {
+// status 缺省补 draft **只对机器来源**（审计 D6/D9）：无差别补会把 owner 手写的原子标成机器草稿。
+test('normalizeAtom: 机器来源（agent|miner|hook）缺 status → draft；人工/历史来源保持无 status', () => {
+  assert.deepEqual([...MACHINE_SOURCES], ['agent', 'miner', 'hook']);
+  assert.equal(isMachineSource('agent'), true);
+  assert.equal(isMachineSource('agent:dsh'), true);                     // §3.2 的 source 形如 agent:dsh
+  assert.equal(isMachineSource('hook:post-commit'), true);
+  assert.equal(isMachineSource('miner'), true);
+  assert.equal(isMachineSource('human'), false);
+  assert.equal(isMachineSource('owner'), false);
+  assert.equal(isMachineSource('commit'), false);
+  assert.equal(isMachineSource(''), false);
+  assert.equal(isMachineSource(undefined), false);
+
+  for (const source of ['agent', 'agent:dsh', 'miner', 'hook:post-commit']) {
+    const r = normalizeAtom(base({ source }));
+    assert.equal(r.ok, true, source);
+    assert.equal(r.atom.status, 'draft', source);
+  }
+  for (const over of [{ source: 'human' }, { source: 'owner' }, { source: '' }, {}]) {
+    const r = normalizeAtom(base(over));
+    assert.equal(r.ok, true);
+    assert.equal('status' in r.atom, false, JSON.stringify(over));      // 不补 = 无 status 键
+  }
+  // 显式 status 永不被覆盖（机器来源写了 confirmed 也照原样回传——合法性由 validateAtom 管）
+  assert.equal(normalizeAtom(base({ source: 'agent', status: 'disputed' })).atom.status, 'disputed');
+  assert.equal(normalizeAtom(base({ source: 'human', status: 'confirmed', confirmed_by: 'owner' })).atom.status, 'confirmed');
+});
+
+test('normalizeAtom: 未知字段保留、facets/refs 补空壳、数组保序去重（status 见机器来源专测）', () => {
   const a = base({
     custom_field: { nested: [1, 2] },
     extra: 'keep me',
@@ -134,7 +162,7 @@ test('normalizeAtom: 未知字段保留、facets/refs 补空壳、status 缺省 
   assert.deepEqual(r.atom.refs.files, ['a.js']);
   assert.equal(r.atom.refs.pitfall, null);
   assert.equal(r.atom.refs.weird, true);
-  assert.equal(r.atom.status, 'draft');                            // 缺省草稿
+  assert.equal('status' in r.atom, false);                         // 无 source → 不补 status（人工/历史原子）
   assert.equal(a.status, undefined);                               // 不改入参
   assert.equal(normalizeAtom(base({ status: 'disputed' })).atom.status, 'disputed');   // 显式值不覆盖
 });

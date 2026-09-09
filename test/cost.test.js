@@ -1,6 +1,8 @@
 // test/cost.test.js —— S6 成本账本 + 预算闸（设计 §3.6 / §7 ⓪ 期）。
-// 四条硬验收：成功/失败/超时都记账且坏行跳过 · tokens 拿不到留空不伪造 0 ·
-// 预算超限 shouldRunAuto 返回 {run:false,reason:'budget'} 且无副作用 · 未配置预算与今天一致。
+// 五条硬验收：成功/失败/超时都记账且坏行跳过 · tokens 拿不到留空不伪造 0 ·
+// 预算超限 shouldRunAuto 返回 {run:false,reason:'budget'} 且无副作用 · 未配置预算与今天一致 ·
+// **闸能被触发**（审计 D3：三个 CLI 后端都不回报 token 用量 → 维度支持 tokens|calls|ms，
+// 未显式选 tokens/ms 时用 calls 兜底；触发用注入的计量值证明，不依赖真实 token 回报）。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
@@ -8,7 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
-  UNKNOWN_VERSION, appendCost, budgetStatus, costPath, readCost, sumTokens, versionStamp,
+  BUDGET_DIMENSIONS, DEFAULT_BUDGET_DIMENSION, UNKNOWN_VERSION, appendCost, budgetStatus, costPath,
+  meterUsage, readCost, sumCalls, sumMs, sumTokens, versionStamp,
 } from '../lib/cost.js';
 import { shouldRunAuto, tickAuto, runAuto } from '../lib/runner.js';
 import { readBudgetConfig, writeBudgetConfig, writeAutoPending, readAutoPending } from '../lib/syncstate.js';
@@ -163,6 +166,51 @@ test('budgetStatus：未配置不阻断；超限 exceeded；窗口外条目不�
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// ---------- 计量维度（审计 D3：闸必须能被触发） ----------
+test('meterUsage：calls/ms/tokens 三维度口径；缺省与未知维度都回 calls 兜底', () => {
+  const entries = [
+    { ts: 't', page: 'p', backend: 'claude', ms: 100, ok: true, version: 'v1.0.0' },            // 无 tokens
+    { ts: 't', page: 'p', backend: 'codex', ms: 250, ok: true, tokens: 60, version: 'v1.0.0' },
+    { ts: 't', page: 'p', backend: 'codex', ms: 5, ok: true, version: 'v0.9.0' },
+  ];
+  assert.deepEqual([...BUDGET_DIMENSIONS], ['tokens', 'calls', 'ms']);
+  assert.equal(DEFAULT_BUDGET_DIMENSION, 'calls');
+  assert.deepEqual(meterUsage(entries, { version: 'v1.0.0', dimension: 'calls' }), { used: 2, counted: 2, unknownTokens: 1 });
+  assert.deepEqual(meterUsage(entries, { version: 'v1.0.0', dimension: 'ms' }), { used: 350, counted: 2, unknownTokens: 1 });
+  assert.deepEqual(meterUsage(entries, { version: 'v1.0.0', dimension: 'tokens' }), { used: 60, counted: 2, unknownTokens: 1 });
+  assert.deepEqual(meterUsage(entries, { version: 'v1.0.0' }), { used: 2, counted: 2, unknownTokens: 1 });          // 缺省 calls
+  assert.deepEqual(meterUsage(entries, { version: 'v1.0.0', dimension: 'bogus' }), { used: 2, counted: 2, unknownTokens: 1 });
+  assert.deepEqual(sumCalls(entries, { version: UNKNOWN_VERSION }), { used: 3, counted: 3, unknownTokens: 2 });
+  assert.deepEqual(sumMs(entries, { version: UNKNOWN_VERSION }), { used: 355, counted: 3, unknownTokens: 2 });
+});
+
+test('预算闸可触发（注入计量值，不依赖 token 回报）：calls 预算 1 + 已用 1 → exceeded → shouldRunAuto 拒绝', () => {
+  const dir = tmp();
+  try {
+    // 账本里**一行 tokens 都没有**——正是三个 CLI 后端的真实情况：旧口径 used 恒 0、闸永不触发
+    appendCost(dir, { ts: 't', page: 'component/a.md', backend: 'claude', ms: 1234, ok: true, version: 'v1.0.0' });
+
+    const bs = budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 1, dimension: 'calls' });
+    assert.equal(bs.configured, true);
+    assert.equal(bs.dimension, 'calls');
+    assert.equal(bs.budget, 1);
+    assert.equal(bs.used, 1);
+    assert.equal(bs.unknownTokens, 1);
+    assert.equal(bs.exceeded, true);                                        // ← 闸真能红
+
+    const base = { config: cfgAuto, pendingTs: '2026-06-10T11:00:00', lastRunDate: null, now: NOW, runnerAlive: false };
+    assert.deepEqual(shouldRunAuto({ ...base, budget: bs }), { run: false, reason: 'budget' });
+
+    // ms 维度同样可触发（注入耗时）
+    assert.equal(budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 1000, dimension: 'ms' }).exceeded, true);
+    assert.equal(budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 5000, dimension: 'ms' }).exceeded, false);
+    // tokens 维度在无回报时确实算不出来（诚实保留，不估算）——这正是 calls 兜底存在的理由
+    assert.equal(budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 1, dimension: 'tokens' }).exceeded, false);
+    assert.equal(budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 1 }).dimension, 'calls');       // 缺省兜底
+    assert.equal(budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 1 }).exceeded, true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // ---------- 闸：纯函数 + ticker 无副作用 ----------
 test('shouldRunAuto：预算超限 → {run:false,reason:budget}；未超限/未配置 → 与今天一致', () => {
   const base = { config: cfgAuto, pendingTs: '2026-06-10T11:00:00', lastRunDate: null, now: NOW, runnerAlive: false };
@@ -201,24 +249,59 @@ test('tickAuto 超预算：不 spawn、不清 pending；清空预算后立刻放
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('tickAuto：calls 维度预算（账本无任何 token）→ 不 spawn、不清 pending；清空后立刻放行', () => {
+  const { root, lore } = autoRepo();
+  try {
+    const state = join(lore, '.state');
+    mkdirSync(state, { recursive: true });
+    writeFileSync(join(state, 'sync.json'), JSON.stringify({ mode: 'auto', debounce_minutes: 0 }));
+    writeAutoPending(state, '2026-06-10T00:00:00Z');
+    appendCost(state, { ts: '2026-06-10T00:00:00Z', page: 'component/lib.md', backend: 'claude', ms: 900, ok: true, version: UNKNOWN_VERSION });
+    writeBudgetConfig(state, { budget: 1, dimension: 'calls' });
+
+    let spawned = 0;
+    const r = tickAuto(lore, { spawnFn: () => { spawned++; return noopSpawn(); } });
+    assert.deepEqual(r, { run: false, reason: 'budget' });
+    assert.equal(spawned, 0);                                              // 没启动
+    assert.equal(readAutoPending(state), '2026-06-10T00:00:00Z');          // 没清 pending
+    assert.equal(existsSync(join(state, 'runner.pid')), false);            // 没留运行痕迹
+
+    writeBudgetConfig(state, { budget: null });                            // 人工放行
+    const r2 = tickAuto(lore, { spawnFn: () => { spawned++; return noopSpawn(); } });
+    assert.equal(r2.run, true);
+    assert.equal(spawned, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ---------- 预算配置（syncstate） ----------
-test('预算配置：round-trip / 校验 / 清空不留键 / 坏文件回未配置', () => {
+test('预算配置：{budget,dimension} round-trip / 校验 / 清空不留键 / 旧形状可读 / 坏文件回未配置', () => {
   const dir = tmp();
   try {
-    assert.deepEqual(readBudgetConfig(dir), { token_budget: null });       // 缺文件 → 未配置
-    writeBudgetConfig(dir, { token_budget: 250000 });
-    assert.equal(readBudgetConfig(dir).token_budget, 250000);
-    assert.equal(readFileSync(join(dir, 'budget.json'), 'utf8'), '{\n  "token_budget": 250000\n}\n');
-    writeBudgetConfig(dir, { token_budget: null });                        // 清空
-    assert.equal(readBudgetConfig(dir).token_budget, null);
+    assert.deepEqual(readBudgetConfig(dir), { budget: null, dimension: 'calls' });   // 缺文件 → 未配置 + 兜底维度
+    writeBudgetConfig(dir, { budget: 20, dimension: 'calls' });
+    assert.deepEqual(readBudgetConfig(dir), { budget: 20, dimension: 'calls' });
+    assert.equal(readFileSync(join(dir, 'budget.json'), 'utf8'), '{\n  "budget": 20,\n  "dimension": "calls"\n}\n');
+    writeBudgetConfig(dir, { dimension: 'ms' });                           // 只改维度
+    assert.deepEqual(readBudgetConfig(dir), { budget: 20, dimension: 'ms' });
+    writeBudgetConfig(dir, { budget: 30 });                                // 只改上限 → 维度保留
+    assert.deepEqual(readBudgetConfig(dir), { budget: 30, dimension: 'ms' });
+    writeBudgetConfig(dir, { budget: null });                              // 清空
+    assert.deepEqual(readBudgetConfig(dir), { budget: null, dimension: 'calls' });
     assert.equal(readFileSync(join(dir, 'budget.json'), 'utf8'), '{}\n');  // 不留 null 键
-    assert.throws(() => writeBudgetConfig(dir, { token_budget: 0 }), /invalid token_budget/);
-    assert.throws(() => writeBudgetConfig(dir, { token_budget: -1 }), /invalid token_budget/);
-    assert.throws(() => writeBudgetConfig(dir, { token_budget: 'lots' }), /invalid token_budget/);
+    assert.throws(() => writeBudgetConfig(dir, { budget: 0 }), /invalid budget/);
+    assert.throws(() => writeBudgetConfig(dir, { budget: -1 }), /invalid budget/);
+    assert.throws(() => writeBudgetConfig(dir, { budget: 'lots' }), /invalid budget/);
+    assert.throws(() => writeBudgetConfig(dir, { budget: 10, dimension: 'minutes' }), /invalid budget dimension/);
+    // 旧形状（S6 首版 {token_budget:n}）仍可读 → 等价 tokens 维度；再写时归一到新形状（旧键清掉）
+    writeFileSync(join(dir, 'budget.json'), JSON.stringify({ token_budget: 250000 }));
+    assert.deepEqual(readBudgetConfig(dir), { budget: 250000, dimension: 'tokens' });
+    writeBudgetConfig(dir, { budget: 7, dimension: 'calls' });
+    assert.equal(readFileSync(join(dir, 'budget.json'), 'utf8'), '{\n  "budget": 7,\n  "dimension": "calls"\n}\n');
+    // 坏文件 / 非法值 → 不阻断（不崩）
     writeFileSync(join(dir, 'budget.json'), '{oops');
-    assert.equal(readBudgetConfig(dir).token_budget, null);                // 坏 JSON → 不阻断（不崩）
-    writeFileSync(join(dir, 'budget.json'), JSON.stringify({ token_budget: 'lots' }));
-    assert.equal(readBudgetConfig(dir).token_budget, null);                // 非法值 → 不阻断
+    assert.deepEqual(readBudgetConfig(dir), { budget: null, dimension: 'calls' });
+    writeFileSync(join(dir, 'budget.json'), JSON.stringify({ budget: 'lots', dimension: 'bogus' }));
+    assert.deepEqual(readBudgetConfig(dir), { budget: null, dimension: 'calls' });   // 非法值 → 未配置
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

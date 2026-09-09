@@ -5,9 +5,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  HUMAN_SCHEMA_VERSION, HUMAN_KINDS, BLACKBOX_LEVELS, DEDUPE_WINDOW_MS, HumanStoreError,
+  HUMAN_SCHEMA_VERSION, HUMAN_KINDS, CLEAR_KINDS, BLACKBOX_LEVELS, DEDUPE_WINDOW_MS, HumanStoreError,
   humanDir, humanFilePath, assertInitialized, visitRecord, readRecord, blackboxRecord, checkRecord,
-  dedupeKey, appendHuman, readHuman, readHumanFile, readAllHuman, exportHuman,
+  dedupeKey, appendHuman, clearHuman, readHuman, readHumanFile, readAllHuman, exportHuman,
 } from '../lib/human.js';
 
 function tmp() { return mkdtempSync(join(tmpdir(), 'lore-human-')); }
@@ -162,6 +162,63 @@ test('记录构造器与 appendHuman 校验：非法输入 → HumanStoreError',
     assert.throws(() => appendHuman(lore, 'visits', null), invalid);
     assert.equal(existsSync(humanDir(lore)), false);                       // 全部被拒 → 一个文件没落
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------- 清除（不变量⑥「可清除」） ----------
+test('clearHuman：dryRun 只报将删条数不落写；按 kind 只清该类；清除后可继续追加', () => {
+  const { root, lore } = initLore();
+  const T0 = '2026-09-09T00:00:00.000Z';
+  try {
+    assert.deepEqual([...CLEAR_KINDS], ['visits', 'read', 'blackbox', 'checks', 'all']);
+    appendHuman(lore, 'visits', visitRecord({ page: 'a', ts: T0 }));
+    appendHuman(lore, 'visits', visitRecord({ page: 'b', ts: T0 }));
+    appendHuman(lore, 'read', readRecord({ page: 'p', at: 'sha1', ts: T0 }));
+    appendHuman(lore, 'blackbox', blackboxRecord({ module: 'm', level: '懂', ts: T0 }));
+    appendHuman(lore, 'checks', checkRecord({ page: 'q', ts: T0 }));
+
+    // dryRun：报数不删
+    const preview = clearHuman(lore, 'visits', { dryRun: true });
+    assert.deepEqual({ kind: preview.kind, cleared: preview.cleared, skipped: preview.skipped, dryRun: preview.dryRun },
+      { kind: 'visits', cleared: 2, skipped: 0, dryRun: true });
+    assert.deepEqual(preview.perKind, { visits: 2 });
+    assert.equal(readHuman(lore, 'visits').length, 2);                    // 一条没删
+
+    // 真删：只清 visits，其余三类不动
+    const done = clearHuman(lore, 'visits');
+    assert.equal(done.cleared, 2);
+    assert.equal(done.dryRun, false);
+    assert.equal(existsSync(humanFilePath(lore, 'visits')), false);       // 删文件（不是写空行）
+    assert.deepEqual(readHuman(lore, 'visits'), []);
+    assert.equal(readHuman(lore, 'read').length, 1);
+    assert.equal(readHuman(lore, 'blackbox').length, 1);
+    assert.equal(readHuman(lore, 'checks').length, 1);
+
+    // 清除后可继续追加（appendHuman 按需重建文件）
+    assert.equal(appendHuman(lore, 'visits', visitRecord({ page: 'c', ts: T0 })).appended, true);
+    assert.deepEqual(readHuman(lore, 'visits').map(r => r.page), ['c']);
+
+    // 'all' 清全部；重复清除幂等（0 条）
+    assert.equal(clearHuman(lore, 'all').cleared, 4);
+    for (const k of HUMAN_KINDS) assert.deepEqual(readHuman(lore, k), []);
+    assert.equal(clearHuman(lore, 'all').cleared, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('clearHuman：坏行不计入将删条数（另用 skipped 报出）；未知 kind / 未 init → HumanStoreError', () => {
+  const { root, lore } = initLore();
+  const orphanRoot = tmp();
+  const notInit = join(orphanRoot, '.lore');
+  try {
+    mkdirSync(humanDir(lore), { recursive: true });
+    writeFileSync(humanFilePath(lore, 'visits'),
+      JSON.stringify(visitRecord({ page: 'a', ts: '2026-09-09T00:00:00.000Z' })) + '\n{broken\n');
+    const r = clearHuman(lore, 'visits');
+    assert.equal(r.cleared, 1);                                           // 只算真记录
+    assert.equal(r.skipped, 1);                                           // 坏行如实报出
+    assert.throws(() => clearHuman(lore, 'visit'), e => e instanceof HumanStoreError && e.code === 'unknown-kind');
+    assert.throws(() => clearHuman(notInit, 'visits'), e => e instanceof HumanStoreError && e.code === 'not-initialized');
+    assert.equal(existsSync(notInit), false);                             // 未 init 不静默造目录
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(orphanRoot, { recursive: true, force: true }); }
 });
 
 test('缺失的文件读回为空数组（未写的类目不崩）', () => {

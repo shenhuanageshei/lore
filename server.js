@@ -1,13 +1,14 @@
 // server.js
 import http from 'node:http';
 import { appendFileSync, createReadStream, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, normalize, sep, extname } from 'node:path';
+import { dirname, join, normalize, resolve, sep, extname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
-  readSyncConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
+  readSyncConfig, readBudgetConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
+import { budgetStatus } from './lib/cost.js';
 import { isAlive } from './lib/serve.js';
 import { HumanStoreError, appendHuman, visitRecord } from './lib/human.js';
 
@@ -100,7 +101,7 @@ const slashLower = p => normalize(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '
 // 返回 true = 已响应；false = 非 API 路径（调用方继续静态/404）。
 // Local write APIs (only reachable on 127.0.0.1). Scoped to <root>/.state and
 // a read of <root>/wiki; never write arbitrary paths.
-export async function handleApi(root, req, res, pathname, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json') } = {}) {
+export async function handleApi(root, req, res, pathname, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync } = {}) {
     if (req.method === 'POST' && pathname.startsWith('/api/') && !localHost(req)) {
       sendJson(res, 403, { error: 'forbidden host' });
       return true;
@@ -167,7 +168,21 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
       let lastFinalize = null;
       try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
       catch { /* 无 manifest（未 sync）→ null */ }
-      return sendJson(res, 200, { mode: config.mode, last_finalize: lastFinalize, config, runner_running: runnerAlive(stateDir, isAlive) });
+      // 预算闸的**可见出口**（审计 D4）：auto 因超预算静默停摆时，壳状态行必须读得到原因。
+      // 未配置预算也照报（configured:false）——「为什么没跑」要能一眼看出是没配还是超了。
+      const budgetCfg = readBudgetConfig(stateDir);
+      const bs = budgetStatus({
+        stateDir, repoRoot: join(resolve(root), '..'),
+        budget: budgetCfg.budget, dimension: budgetCfg.dimension, exec,
+      });
+      return sendJson(res, 200, {
+        mode: config.mode, last_finalize: lastFinalize, config,
+        runner_running: runnerAlive(stateDir, isAlive),
+        budget: {
+          configured: bs.configured, dimension: bs.dimension, budget: bs.budget,
+          used: bs.used, exceeded: bs.exceeded, version: bs.version,
+        },
+      });
     }
 
     if (req.method === 'POST' && pathname === '/api/sync/config') {
@@ -238,14 +253,14 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
   return false;   // 非 API 路径
 }
 
-export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json') } = {}) {
+export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync } = {}) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer(async (req, res) => {
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
 
-    if (await handleApi(root, req, res, pathname, { spawnFn, reposPath })) return;
+    if (await handleApi(root, req, res, pathname, { spawnFn, reposPath, exec })) return;
 
     const rel = pathname.replace(/^\/+/, '');
     return serveStatic(root, rel, res, pathname);

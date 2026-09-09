@@ -33,6 +33,7 @@
   - 公共字段逐个枚举、各有合法/非法用例：`title` / `why` / `refs{supersedes,evidence,files,anchors}` / `source` / `status` / `confirmed_by` / `confirmed_at`（不变量⑦⑧ 的数据基础，评审 🟡#6）。
   - `status` 仅允许 `draft|confirmed|disputed|superseded`；`confirmed` 必须带 `confirmed_by`。
   - **机器来源（agent / miner / hook）写入 ⇒ `status` 只能是 `draft`**（§3.2「只有 owner 的直接动作能产生 confirmed」，评审 🟡#5）。
+    - **口径落在 `normalizeAtom`（审计 D6）**：只对机器来源（`source` 取 `:` 前那段 ∈ agent|miner|hook）缺 `status` 的原子补 `draft`；**人工/历史来源缺 `status` 就保持无 `status`**——无差别补 `draft` 会把 owner 手写的 decision 标成机器草稿（违反不变量③/§3.2）。显式 `status` 永不被覆盖。
   - `pitfall` 缺 `problem|fix|prevention` 任一 → 非法。
   - 对现有全部原子（实测 509 条）通过校验，未知字段保留不丢。
 - **自检**：`node --test test/atom.test.js`
@@ -66,7 +67,7 @@
 - **验收**：
   - 四类记录（visits / read / blackbox / checks）可 append 与读回；坏行跳过不崩。
   - 五个 verb（visit / read / blackbox / human export / **human clear**）可读写且幂等——不变量⑥ 明列「可清除」必须有 CLI（评审 🟡#4）。
-  - `lore human clear --kind <visits|read|blackbox|checks|all> [--yes]` 写前打印将删条数。
+  - `lore human clear --kind <visits|read|blackbox|checks|all> [--yes]` 写前打印将删条数（存储层 `clearHuman` 的 `dryRun`）；**缺 `--yes` 一律不删并 exit 1**（静默「什么都没做」是最危险的失败形态），`--yes` 才删；清除 = 删文件，之后 `appendHuman` 按需重建（清除后可继续追加，审计 D9）。
   - `lore check`（设计 §3.3）本期只落 `checks.jsonl` 存储层、不落 verb——**显式声明延后到 ④ 期**，避免被当成不变量④ 漏项（评审 🔵#9）。
   - `lore human export` 产出可移植 JSON（含 schema 版本号）。
   - 新 init 的仓库自动 ignore `.lore/human/`（不变量⑥）。
@@ -86,13 +87,14 @@
 
 ### S6 · 成本账本 + 预算闸
 - **目标**：每次 LLM 调用追加 `.lore/.state/cost.ndjson`（`{ts,page,backend,ms,ok,tokens?,version}`）；每版本预算（token 与**可回退计量**），超限时 auto 不启动**并把原因送到可见处**。
-- **文件**：`lib/cost.js`（新）、`lib/runner.js`、`lib/backend.js`、`lib/syncstate.js`、`test/cost.test.js`（新）
+- **文件**：`lib/cost.js`（新）、`lib/runner.js`、`lib/backend.js`、`lib/syncstate.js`、`server.js`（`/api/sync/status` 的原因出口）、`lib/cli.js`（`budget` verb）、`test/cost.test.js`（新）、`test/server.test.js`、`test/cli.test.js`
 - **验收**：
   - 成功/失败/超时都记账；坏行跳过。
   - `tokens` 拿不到时留空（不伪造 0）——CLI 后端目前不回报 token 数。
   - 预算超限 → `shouldRunAuto` 返回 `{run:false, reason:'budget'}`，且不产生副作用。
-  - **计量可回退**：三个 CLI 后端都不回报 token 数，只按 token 计预算则永远算不出超支（评审 🟡#7 / 审计 D3）→ 预算维度支持 `tokens | calls | ms`，未配置 tokens 时用 `calls` 兜底，且测试要证明闸**能被触发**。
-  - **原因有出口**：`/api/sync/status` 增 `budget:{configured,budget,used,exceeded,version}`，壳状态行可读；新增 `lore budget <n>|--clear` verb（复用已有 `writeBudgetConfig`）——否则 auto 静默停摆（审计 D4）。
+  - **计量可回退**：三个 CLI 后端都不回报 token 数，只按 token 计预算则永远算不出超支（评审 🟡#7 / 审计 D3）→ 预算维度支持 `tokens | calls | ms`，**未显式选 tokens/ms 时用 `calls` 兜底**（`calls` = 窗口内账目条数，与后端是否回报用量无关，必然可算），且测试要证明闸**能被触发**（注入计量值，不依赖真实 token 回报）。
+  - **配置形状**：`.lore/.state/budget.json` = `{budget: n, dimension: 'tokens'|'calls'|'ms'}`；旧形状 `{token_budget: n}` 仍可读（等价 `{budget: n, dimension: 'tokens'}`），写入时归一到新形状。
+  - **原因有出口**：`/api/sync/status` 增 `budget:{configured,dimension,budget,used,exceeded,version}`，壳状态行可读；新增 `lore budget <n> [--dimension <d>] | lore budget --clear` verb（复用已有 `writeBudgetConfig`）——否则 auto 静默停摆（审计 D4）。
   - 预算未配置 → 行为与今天一致（不阻断）。
 - **自检**：`node --test test/cost.test.js test/runner.test.js`
 

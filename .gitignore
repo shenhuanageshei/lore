@@ -13,6 +13,7 @@ rtk/
 .preview-serve.cjs
 .lore/wiki/
 .lore/site/
+.lore/human/
 .claude/settings.local.json
 
 # machine-local host config (per-machine absolute paths, not repo assets)

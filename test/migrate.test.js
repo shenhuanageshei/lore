@@ -252,13 +252,13 @@ test('renderConfigYaml: 从 CONFIG_BLOCKS 拼装 —— 含全部块 + 动态 co
   }
 });
 
-test('alignGitignore: 三行补缺 + 已有行保留 + 幂等 + 删行 applied 不复活', () => {
+test('alignGitignore: 四行补缺（含 per-human 边界）+ 已有行保留 + 幂等 + 删行 applied 不复活', () => {
   const root = tmp();
   try {
     writeFileSync(join(root, '.gitignore'), 'node_modules/\n.lore/.state/\n');
     const applied = new Set(); const rec = id => applied.add(id);
     const a1 = alignGitignore(root, applied, rec);
-    assert.equal(a1.length, 2);                                          // wiki + site（.state 已在）
+    assert.equal(a1.length, 3);                                          // wiki + site + human（.state 已在）
     const txt = readFileSync(join(root, '.gitignore'), 'utf8');
     assert.match(txt, /^node_modules\/$/m);                              // 已有行保留
     for (const l of GITIGNORE_LINES) assert.ok(txt.split(/\r?\n/).some(x => x.trim() === l));

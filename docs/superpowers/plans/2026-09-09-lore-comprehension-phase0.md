@@ -54,14 +54,18 @@
 - **自检**：`node --test test/mine.test.js`
 
 ### S4 · per-human 存储与统一 CLI
+分两阶段执行（S4a 自检先绿再进 S4b）：**S4a 存储层** → **S4b 统一 CLI 与边界**。
 - **目标**：`.lore/human/*.jsonl`（visits / read / blackbox / checks）+ 统一入口 `node lib/cli.js <verb>`（`visit|read|blackbox|human export`）+ 边界（不进 git）。
-- **文件**：`lib/human.js`（新）、`lib/cli.js`（新）、`test/human.test.js`（新）、`lib/migrate.js`（把 `.lore/human/` 追加进 .gitignore）、`.gitignore`
+- **文件**：
+  - S4a：`lib/human.js`（新）、`test/human.test.js`（新）
+  - S4b：`lib/cli.js`（新）、`test/cli.test.js`（新）、`lib/migrate.js`（GITIGNORE_LINES 增 `.lore/human/`）、`.gitignore`、`test/migrate.test.js`（增行后同步该行数期望值）
 - **验收**：
-  - 四个 verb 可读写且幂等；坏行跳过不崩。
+  - 四类记录（visits / read / blackbox / checks）可 append 与读回；坏行跳过不崩。
+  - 四个 verb（visit / read / blackbox / human export）可读写且幂等。
   - `lore human export` 产出可移植 JSON（含 schema 版本号）。
   - 新 init 的仓库自动 ignore `.lore/human/`（不变量⑥）。
   - 未 `init` 过的目录调用 verb → 明确报错而非静默写散文件。
-- **自检**：`node --test test/human.test.js`
+- **自检**：S4a `node --test test/human.test.js`；S4b `node --test test/cli.test.js test/migrate.test.js`
 
 ### S5 · 体检 + 捕获召回率（"没记下来"要能看见）
 - **目标**：`node lib/cli.js doctor` 报告：hook 指向是否有效、上次成功捕获时间、断流天数、决策捕获率（`kind:decision` ÷ 提交数）、trailer-only 计数、`refs.pitfall` 计数；支持 `--json`。

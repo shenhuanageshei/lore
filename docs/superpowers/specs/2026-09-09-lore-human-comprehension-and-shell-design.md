@@ -78,6 +78,15 @@
 `status`：`draft` | `confirmed` | `disputed` | `superseded`。
 **只有 owner 的直接动作能产生 `confirmed`**（agent 代写只能是 `draft`）。
 
+**有效状态 = 派生视图**（① 期 S3 定案，评审 🟡#1）：原子内联 `status` 的字节**永不改写**（不变量③），
+「有效状态」由最新一条 `kind:'confirmation'` 记录覆盖内联 `status` 派生——`verdict:'confirm'` → `confirmed`，
+`verdict:'dispute'` → `disputed`；无确认记录时回退内联 `status`。确认记录与原子**同源**落在 journal 内
+（append-only、可审计），但它**不是原子**：不计入原子数、不进决策史物化（doctor / fold / sync 一律剔除）。
+实现：形状与派生在 `lib/confirm.js`，CLI 为 `lore confirm <atom-id> [--why "…"] [--verdict confirm|dispute]`
+与 `lore confirm --list`；体检出口是 `lore doctor` 的 `confirm 已确认 N · 待确认 M · 已否决 K` 行。
+证据账本（`lore evidence [--json]`，`lib/evidence.js`）按同一份派生列账：缺 `refs.anchors` 标「未验证」（不变量⑧），
+噪音 `high` 标「低置信」（与 doctor 同源分类器）；只读，`--json` 不含 `.lore/human/` 的 per-human 内容。
+
 ### 3.3 per-human 记录（评审 #1 补齐）
 
 | 产物 | 存储 | CLI |

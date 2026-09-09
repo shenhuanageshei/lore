@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { init } from '../lib/init.js';
 import { readHuman, exportHuman } from '../lib/human.js';
+import { readAllRecords } from '../lib/journal.js';
 import { readBudgetConfig } from '../lib/syncstate.js';
 import { main } from '../lib/cli.js';
 
@@ -224,6 +225,7 @@ test('未知 verb / 缺参数 / 非法取值：打印用法并 exit 1', () => {
       [['visit'], /visit requires <page>/],
       [['read', 'p'], /read requires --at/],
       [['blackbox', 'm'], /blackbox requires --level/],
+      [['confirm'], /confirm requires <atom-id> or --list/],
       [['human'], /unknown subcommand: human/],
       [['human', 'bogus'], /unknown subcommand: human bogus/],
     ];
@@ -328,6 +330,122 @@ test('新 init 的仓库：.lore/human/ 自动进 .gitignore，visit 数据落�
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+
+// ---------- S3：lore confirm（CLI 接线；形状/幂等/派生全在 lib/confirm.js） ----------
+function ndjsonFiles(dir) {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...ndjsonFiles(p));
+    else if (e.name.endsWith('.ndjson')) out.push(p);
+  }
+  return out;
+}
+// 夹具：一个已 init 的 repo + 一条 note 草稿决策原子，返回 { root, id }
+function notedDecision() {
+  const root = tmp();
+  mkdirSync(loreOf(root), { recursive: true });
+  const r = run('note', '--title', '选 X 弃 Y', '--why', '因为 Z', '--draft', '--root', root);
+  assert.equal(r.status, 0);
+  const id = r.stdout.match(/note (\S+)/)[1];
+  return { root, id };
+}
+
+test('confirm：追加 kind:confirmation（原原子字节不变）、幂等、dispute 派生 disputed、--list 列队列', () => {
+  const { root, id } = notedDecision();
+  try {
+    const j = join(loreOf(root), 'journal');
+    const shard = ndjsonFiles(j)[0];
+    const before = readFileSync(shard, 'utf8');
+
+    const r1 = run('confirm', id, '--why', '读过实现，判断成立', '--root', root);
+    assert.equal(r1.status, 0);
+    assert.match(r1.stdout, new RegExp('✓ confirm ' + id + ' → confirmed · confirmation:'));
+
+    // append-only：旧字节是新内容的字节前缀，原原子逐字节不变
+    const after = readFileSync(shard, 'utf8');
+    assert.ok(after.startsWith(before), '旧内容必须是新内容的字节前缀（append-only）');
+    const recs = readAllRecords(j);
+    assert.equal(recs.length, 2);
+    assert.equal(recs[1].kind, 'confirmation');
+    assert.equal(recs[1].atom, id);
+    assert.equal(recs[1].verdict, 'confirm');
+    assert.equal(recs[1].confirmed_by, 'owner');          // 只有 owner 的直接动作产生确认
+    assert.ok(recs[1].confirmed_at);
+    assert.equal(recs[1].why, '读过实现，判断成立');
+    assert.equal(recs[0].status, 'draft');                // 内联 status 未被改写
+
+    // 重复确认幂等：同 (verdict, why) 不写第二行
+    const r2 = run('confirm', id, '--why', '读过实现，判断成立', '--root', root);
+    assert.equal(r2.status, 0);
+    assert.match(r2.stdout, /\(deduped\)/);
+    assert.equal(readAllRecords(j).length, 2);
+
+    // --list：已确认 / 待确认 / 已否决（口径与 doctor 的 confirm 行同源）
+    const list = run('confirm', '--list', '--root', root);
+    assert.equal(list.status, 0);
+    assert.match(list.stdout, /决策 已确认 1 · 待确认 0 · 已否决 0（决策 1 · confirmation 记录 1）/);
+    assert.match(list.stdout, /已确认 \(1\)/);
+    assert.ok(list.stdout.includes(id));
+
+    // --verdict dispute → 派生状态 disputed（追加记录，仍不改原行）
+    const d = run('confirm', id, '--verdict', 'dispute', '--why', '锚点已漂移', '--root', root);
+    assert.equal(d.status, 0);
+    assert.match(d.stdout, /→ disputed/);
+    const afterDispute = run('confirm', '--list', '--root', root);
+    assert.match(afterDispute.stdout, /决策 已确认 0 · 待确认 0 · 已否决 1（决策 1 · confirmation 记录 2）/);
+    assert.match(afterDispute.stdout, /已否决 \(1\)/);
+    assert.equal(readAllRecords(j)[0].status, 'draft');
+    // doctor 与 --list 同源：确认后体检报「已确认 / 待确认」
+    const doc = JSON.parse(run('doctor', '--json', '--root', root).stdout);
+    assert.deepEqual(doc.capture.confirmation, { records: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+    assert.match(run('doctor', '--root', root).stdout, /confirm\s+已确认 0 · 待确认 0 · 已否决 1/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('confirm 错误路径：未知 atom id / 非法 verdict / 缺 atom-id / 未 init → exit 1，一个字节都不落', () => {
+  const { root, id } = notedDecision();
+  const other = tmp();
+  try {
+    const j = join(loreOf(root), 'journal');
+    const before = readAllRecords(j);
+
+    // 未知 atom id → 明确报错（不写一条指向空气的确认）
+    const unknown = run('confirm', 'decision:does-not-exist', '--root', root);
+    assert.equal(unknown.status, 1);
+    assert.match(unknown.stderr, /unknown atom id: decision:does-not-exist/);
+    assert.equal(unknown.stdout, '');
+    assert.deepEqual(readAllRecords(j), before);
+
+    // 非法 verdict → 校验规则住在 lib/confirm.js，CLI 不复制一份（明确消息 + exit 1，不打印用法块）
+    const bad = run('confirm', id, '--verdict', 'maybe', '--root', root);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /verdict must be one of confirm\|dispute/);
+    assert.deepEqual(readAllRecords(j), before);
+
+    // 缺 atom-id（也没给 --list）→ 用法错误 + 用法块
+    const missing = run('confirm', '--root', root);
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /confirm requires <atom-id> or --list/);
+    assert.match(missing.stderr, /usage: node lib\/cli\.js/);
+
+    // --verdict 给了却没值 → 用法错误（直调 main，避免测试壳把 --root 吞成 --verdict 的值）
+    const sink = [];
+    assert.equal(main(['confirm', id, '--verdict'], { cwd: root, out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.match(sink.join('\n'), /--verdict requires/);
+
+    // 未 init → 明确报错，不凭空造 .lore
+    const noInit = run('confirm', 'decision:x', '--root', other);
+    assert.equal(noInit.status, 1);
+    assert.match(noInit.stderr, /no \.lore at/);
+    assert.equal(existsSync(loreOf(other)), false);
+    assert.deepEqual(readAllRecords(j), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true });
   }
 });
 

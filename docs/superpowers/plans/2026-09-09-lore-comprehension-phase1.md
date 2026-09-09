@@ -48,7 +48,7 @@
 - **自检**：`node --test test/noise.test.js test/doctor.test.js`
 
 ### S3 · `lore confirm` + 已阅 @ 版本
-- **目标**：owner 的确认成为一等数据。`lore confirm <atom-id> [--why "…"]` 以**追加**方式记录确认（不改原行）；`lore read <page> --at <sha>` 记录「已阅 @ 版本」（复用 `lib/human.js` 的 read 记录）。
+- **目标**：owner 的确认成为一等数据。`lore confirm <atom-id> [--why "…"] [--verdict confirm|dispute]` 以**追加**方式记录确认（不改原行）；`lore confirm --list` 列出决策原子的已确认 / 待确认 / 已否决（口径与 doctor 的 `confirm` 行同源）；`lore read <page> --at <sha>` 记录「已阅 @ 版本」（复用 `lib/human.js` 的 read 记录）。
 - **文件**：`lib/confirm.js`（新）、`lib/human.js`、`lib/cli.js`、`test/confirm.test.js`（新）、`test/cli.test.js`
 - **验收**：
   - **存储定案**（评审 🟡#2）：确认记录落在 journal 内、独立 `kind:'confirmation'`（同源、天然 append-only、可审计）。
@@ -64,8 +64,8 @@
 - **文件**：`lib/evidence.js`（新）、`lib/cli.js`、`test/evidence.test.js`（新）
 - **验收**：
   - 每条 `kind:decision|rejected|correction` 在账本中有一行；缺 `refs.anchors` 标「未验证」。
-  - `--json` 字段稳定；只读，不写 `.lore`。
-  - 与 `doctor` 的噪音分布交叉：high 噪音的原子在账本里标「低置信」。
+  - `--json` 字段稳定（契约 = `lib/evidence.js` 的 `EVIDENCE_SCHEMA_VERSION`：report 键集 / `counts` / entry 键集 / `noise` 子对象全锁定）；只读，不写 `.lore`（跑前跑后文件集合 / 大小 / mtime 不变）。
+  - 与 `doctor` 的噪音分布交叉：high 噪音的原子在账本里标「低置信」（两处共用 `lib/noise.js`，账本低置信条数 == doctor 的 `noise.high`）。
   - （评审 🔵#8）`--json` 不含 `.lore/human/` 四类 per-human 存储内容；journal 内的 `confirmed_by` 属记录层、保留。
 - **自检**：`node --test test/evidence.test.js`
 

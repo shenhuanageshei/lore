@@ -73,6 +73,8 @@ test('本仓库：原子 ~490 / decision 1 / trailer-only 127 量级；hook 指�
   const txt = formatReport(r);
   assert.match(txt, /lore doctor — /);
   assert.match(txt, /trailer-only \d+/);
+  // S3：确认进度行（已确认 / 待确认），口径与 capture.confirmation 同源
+  assert.match(txt, /confirm\s+已确认 \d+ · 待确认 \d+ · 已否决 \d+/);
   // S2 噪音分布（降权强度）——本仓库 trailer-only 127 条全部 high（设计 §3.4 只降权不删除）
   assert.match(txt, /noise\s+high \d+ · low \d+ · none \d+/);
   assert.ok(r.capture.noise.high >= 100, 'noise.high=' + r.capture.noise.high);
@@ -124,10 +126,13 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     assert.deepEqual(Object.keys(doc.hook), ['status', 'ok', 'hookPath', 'target', 'expected']);
     // 键集只增不改：pitfalls / window 是新增，既有键名/语义一律不动
     // S2 新增 noise（键集只增不改：既有键名/语义一律不动）
+    // S3 新增 confirmation（键集只增不改：既有键名/语义一律不动）
     assert.deepEqual(Object.keys(doc.capture),
       ['atoms', 'badLines', 'decisions', 'pitfalls', 'trailerOnly', 'noise', 'refsPitfall', 'commits', 'captureRate',
-        'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays']);
+        'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays', 'confirmation']);
     assert.deepEqual(Object.keys(doc.capture.noise), ['high', 'low', 'none']);   // 分布契约只有这三个键
+    assert.deepEqual(Object.keys(doc.capture.confirmation),
+      ['records', 'decisions', 'confirmed', 'disputed', 'pending']);            // S3 确认进度契约
     // 夹具里只有 a1 是 trailer-only → high；其余五条干净 → none
     assert.deepEqual(doc.capture.noise, { high: 1, low: 0, none: 5 });
     assert.deepEqual(Object.keys(doc.capture.window), ['size', 'commits', 'decisions', 'startTs', 'rate', 'ratePct']);
@@ -136,6 +141,8 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     assert.equal(doc.capture.badLines, 2);
     assert.equal(doc.capture.pitfalls, 2);
     assert.equal(doc.capture.refsPitfall, 1);
+    // S3：夹具里 1 条 decision、0 条确认记录 → 全部待确认
+    assert.deepEqual(doc.capture.confirmation, { records: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -233,6 +240,78 @@ test('计数口径：trailer-only / decision / refs.pitfall / 坏行 / lastHook 
     assert.equal(r.capture.gapDays, 3);                 // 2026-09-02 → 09-05
     assert.equal(r.capture.atoms, 6);
     assert.equal(r.capture.pitfalls, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ---------- S3：确认进度（lore confirm 的体检出口） ----------
+const confLine = (o) => atom({ kind: 'confirmation', confirmed_by: 'owner', ...o });
+
+test('S3 确认进度：confirmation 记录不污染原子计数；已确认/待确认由最新确认派生', () => {
+  const dir = tmp();
+  try {
+    gitInit(dir);
+    mkdirSync(join(dir, '.lore', 'journal', '2026', '09'), { recursive: true });
+    const shard = join(dir, '.lore', 'journal', '2026', '09', '2026-09-09.ndjson');
+    writeFileSync(shard, ATOMS.trimEnd() + '\n' + confLine({
+      id: 'confirmation:c1', ts: '2026-09-09T10:00:00Z', atom: 'decision:d1', verdict: 'confirm',
+      confirmed_at: '2026-09-09T10:00:00Z',
+    }) + '\n');
+
+    const s = readJournalStats(join(dir, '.lore', 'journal'));
+    // 记录层条目从原子口径整体剔除：atoms / 噪音 / trailer-only / lastAtomTs 一个都不受影响
+    assert.equal(s.atoms, 6);
+    assert.deepEqual(s.noise, { high: 1, low: 0, none: 5 });
+    assert.equal(s.trailerOnly, 1);
+    assert.equal(s.decisions, 1);
+    assert.equal(s.lastAtomTs, '2026-09-09T00:00:00Z');      // 确认记录的 10:00 不算「原子最新时间」
+    assert.equal(s.lastSource, 'miner:commits');
+    assert.deepEqual(s.confirmation, { records: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+
+    const r = diagnose(dir, { now: NOW });
+    assert.deepEqual(r.capture.confirmation, { records: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.match(formatReport(r), /confirm\s+已确认 1 · 待确认 0 · 已否决 0（决策 1 · confirmation 记录 1）/);
+
+    // 追加一条更晚的 dispute → 派生状态翻转为已否决（最新确认覆盖）
+    writeFileSync(shard, readFileSync(shard, 'utf8') + confLine({
+      id: 'confirmation:c2', ts: '2026-09-09T11:00:00Z', atom: 'decision:d1', verdict: 'dispute',
+      confirmed_at: '2026-09-09T11:00:00Z',
+    }) + '\n');
+    assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
+      { records: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
+    // 未被确认的决策 = 待确认（draft / 无 status 都算）
+    writeFileSync(shard, readFileSync(shard, 'utf8') + atom({
+      id: 'decision:d2', ts: '2026-09-09T12:00:00Z', kind: 'decision', source: 'agent', title: 't2', why: 'w2', status: 'draft',
+    }) + '\n');
+    assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
+      { records: 2, decisions: 2, confirmed: 0, disputed: 1, pending: 1 });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+// 端到端（CLI 接线 + 体检同源）：lore confirm 写下的确认，doctor 立刻报出「已确认 / 待确认」。
+test('S3 端到端：CLI note --draft → confirm → doctor 报已确认 1 / 待确认 0', () => {
+  const dir = tmp();
+  try {
+    mkdirSync(join(dir, '.lore'), { recursive: true });
+    const sink = [];
+    const run = argv => { sink.length = 0; return main(argv, { cwd: dir, out: s => sink.push(s), err: s => sink.push(s) }); };
+
+    assert.equal(run(['note', '--title', '选 X 弃 Y', '--why', '因为 Z', '--draft', '--root', dir]), 0);
+    const id = sink.join('\n').match(/note (\S+)/)[1];
+    // 未确认的决策 = 待确认（人读 + --json 两个出口同源）
+    assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
+      { records: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
+    assert.match(formatReport(diagnose(dir, { now: NOW })), /confirm\s+已确认 0 · 待确认 1 · 已否决 0/);
+
+    assert.equal(run(['confirm', id, '--why', '读过实现', '--root', dir]), 0);
+    const after = diagnose(dir, { now: NOW });
+    assert.deepEqual(after.capture.confirmation, { records: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
+    assert.match(formatReport(after), /confirm\s+已确认 1 · 待确认 0 · 已否决 0（决策 1 · confirmation 记录 1）/);
+
+    // dispute → 派生 flipped（体检与确认同源，不各自算一遍）
+    assert.equal(run(['confirm', id, '--verdict', 'dispute', '--why', '锚点已漂移', '--root', dir]), 0);
+    assert.deepEqual(diagnose(dir, { now: NOW }).capture.confirmation,
+      { records: 2, decisions: 1, confirmed: 0, disputed: 1, pending: 0 });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -42,6 +42,23 @@ test('captureHead writes HEAD commit atom (source=hook), idempotent', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('captureHead: trailer-only commit body → 原子不写 why 键；真实 body 剥净签名', () => {
+  const root = gitRepo();
+  try {
+    commitFile(root, 'lib/a.js', 'x', 'feat: t\n\nCo-Authored-By: Bot <b@x.com>\n🤖 Generated with [Claude Code](https://x)');
+    const journalDir = join(root, '.lore', 'journal');
+    assert.equal(captureHead({ repoRoot: root, journalDir, codeRoots: ['lib'] }).added, 1);
+    const atom = readAllAtoms(journalDir)[0];
+    assert.equal('why' in atom, false);
+    // 对照：真实 body → why 保留且无签名
+    commitFile(root, 'lib/b.js', 'y', 'feat: u\n\nreal rationale\nSigned-off-by: D <d@x.com>');
+    assert.equal(captureHead({ repoRoot: root, journalDir, codeRoots: ['lib'] }).added, 1);
+    const second = readAllAtoms(journalDir).find(a => a.title === 'feat: u');
+    assert.equal(second.why, 'real rationale');
+    assert.doesNotMatch(second.why, /Co-Authored-By|Signed-off-by|Generated with/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('captureHead on a merge HEAD adds nothing new on the second call', () => {
   const root = gitRepo();
   try {

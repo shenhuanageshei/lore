@@ -26,6 +26,15 @@ test('noteAtom builds a decision atom (source=agent, enriched, commit=null)', ()
   assert.deepEqual(a.refs, { files: ['lib/a.js'], pitfall: null, related: [] });
 });
 
+test('noteAtom: 纯 trailer / 空 why → 不写 why 键（写入侧纪律，不变量⑦）', () => {
+  for (const why of ['Co-Authored-By: Bot <b@x.com>', '🤖 Generated with [Claude Code](https://x)', '', '   ']) {
+    const a = noteAtom({ id: 'note:t', ts: '2026-06-03T08:00:00Z', title: 't', why });
+    assert.equal('why' in a, false, JSON.stringify(why));
+  }
+  const a = noteAtom({ id: 'note:t', ts: '2026-06-03T08:00:00Z', title: 't', why: 'real\nSigned-off-by: D <d@x.com>\nGenerated with Codex' });
+  assert.equal(a.why, 'real');
+});
+
 test('noteAtom defaults facets/refs to empty', () => {
   const a = noteAtom({ id: 'note:y', ts: '2026-06-03T08:00:00Z', title: 't', why: 'w' });
   assert.deepEqual(a.facets, { component: [], flow: [], theme: [] });
@@ -106,6 +115,23 @@ test('integration: mine 骨架 → enrich 短 sha → fold 后 why 演化追加�
     assert.equal(folded.length, 1);
     assert.match(folded[0].why, /补记：为了演示 enrich/);
     assert.equal(folded[0].title, 'feat: add a');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('enrichAtom: 纯 trailer why → 不写 why 键', () => {
+  const a = enrichAtom({ sha: 'abc123full', ts: '2026-06-10T01:00:00Z', why: 'Co-Authored-By: Bot <b@x.com>' });
+  assert.equal('why' in a, false);
+  assert.equal(a.id, 'commit:abc123full');            // 其余字段不变
+});
+
+test('CLI: note --why 只有 trailer → 落库原子无 why 键', () => {
+  const root = tmpDir();
+  try {
+    const out = execFileSync('node', ['lib/note.js', root, '--title', 'trailer only', '--why', 'Co-Authored-By: Bot <b@x.com>'], { cwd: process.cwd() }).toString();
+    assert.match(out, /noted decision atom note:/);
+    const atoms = readAllAtoms(join(root, '.lore', 'journal'));
+    assert.equal(atoms.length, 1);
+    assert.equal('why' in atoms[0], false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

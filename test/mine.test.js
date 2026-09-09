@@ -115,9 +115,9 @@ test('mine appends new atoms; re-run is idempotent (dedup by id)', () => {
     commitFile(root, 'lib/b.js', 'y', 'c2');
     const journalDir = join(root, '.lore', 'journal');
     const r1 = mine({ repoRoot: root, journalDir, codeRoots: ['lib'] });
-    assert.deepEqual(r1, { scanned: 2, added: 2, skipped: 0 });
+    assert.deepEqual(r1, { scanned: 2, added: 2, skipped: 0, bySource: { commits: { scanned: 2, added: 2, skipped: 0 } } });
     const r2 = mine({ repoRoot: root, journalDir, codeRoots: ['lib'] });
-    assert.deepEqual(r2, { scanned: 2, added: 0, skipped: 2 });
+    assert.deepEqual(r2, { scanned: 2, added: 0, skipped: 2, bySource: { commits: { scanned: 2, added: 0, skipped: 2 } } });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -250,6 +250,140 @@ test('commitAtom: why strips git trailers (Co-Authored-By noise)', () => {
     body: 'because reasons\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>', files: ['lib/a.js'],
   };
   assert.equal(commitAtom(raw, ['lib']).why, 'because reasons');
-  const pure = { ...raw, body: 'Co-Authored-By: Bot <b@x.com>' };
-  assert.equal(commitAtom(pure, ['lib']).why, '');
 });
+
+test('commitAtom: trailer-only / 空 body → 不写 why 键（而非写空串）', () => {
+  const raw = { sha: 'fff111222', ts: '2026-06-10T01:00:00Z', subject: 'feat: x', files: ['lib/a.js'] };
+  for (const body of ['Co-Authored-By: Bot <b@x.com>', '🤖 Generated with [Claude Code](https://x)', '', '   ']) {
+    const atom = commitAtom({ ...raw, body }, ['lib']);
+    assert.equal('why' in atom, false, JSON.stringify(body));
+    assert.equal(atom.why, undefined);
+  }
+  // 新写入的 why 绝不含三类签名
+  const withWhy = commitAtom({ ...raw, body: 'real why\nSigned-off-by: D <d@x.com>\n🤖 Generated with [Claude Code](https://x)' }, ['lib']);
+  assert.equal(withWhy.why, 'real why');
+  assert.doesNotMatch(withWhy.why, /Co-Authored-By|Signed-off-by|Generated with/);
+});
+
+// ---------- S3：踩坑入库（接线 claude_md_pitfalls 死声明） ----------
+import { parsePitfallEntries, pitfallKey, pitfallId, pitfallAtom, minePitfalls, parseConfigMine, MINE_SOURCES } from '../lib/mine.js';
+import { validateAtom } from '../lib/atom.js';
+
+const PIT_MD = `# x
+
+## 踩坑记录
+
+**问题**：第一个问题
+**修复**：第一个修复
+**预防**：第一个预防
+
+**问题**：第二个问题（含 \`code\` 片段）
+**修复**：第二个修复
+**预防**：第二个预防
+`;
+
+test('parsePitfallEntries: 抽三段（问题/修复/预防），英文标签亦可', () => {
+  const e = parsePitfallEntries(PIT_MD);
+  assert.equal(e.length, 2);
+  assert.deepEqual(e[0], { problem: '第一个问题', fix: '第一个修复', prevention: '第一个预防' });
+  assert.equal(e[1].problem, '第二个问题（含 `code` 片段）');
+  const en = parsePitfallEntries('**Problem**: p\n**Fix**: f\n**Prevention**: v');
+  assert.deepEqual(en, [{ problem: 'p', fix: 'f', prevention: 'v' }]);
+  assert.deepEqual(parsePitfallEntries('no pitfalls here'), []);
+});
+
+test('parseConfigMine: 读 journal.mine 声明；缺声明 → [commits]', () => {
+  assert.deepEqual(parseConfigMine('journal:\n  mine: [commits, claude_md_pitfalls]\n'), ['commits', 'claude_md_pitfalls']);
+  assert.deepEqual(parseConfigMine('journal:\n  hook: true\n'), ['commits']);
+  assert.deepEqual(parseConfigMine(''), ['commits']);
+  assert.deepEqual(parseConfigMine('journal:\n  mine: []\n'), ['commits']);
+  assert.deepEqual([...MINE_SOURCES], ['commits', 'claude_md_pitfalls']);
+});
+
+test('pitfallKey/pitfallId: 内联代码段遮蔽 → 同源漂移得同一 id；内容不同则不同 id', () => {
+  const a = { problem: 'x（`claude exit: Command failed`）y', fix: 'f', prevention: 'p' };
+  const b = { problem: 'x（`Codex exit: Command failed`）y', fix: 'f', prevention: 'p' };
+  assert.equal(pitfallKey(a), pitfallKey(b));
+  assert.equal(pitfallId(a), pitfallId(b));
+  assert.match(pitfallId(a), /^pitfall:[0-9a-f]{16}$/);
+  assert.notEqual(pitfallId(a), pitfallId({ ...a, problem: '完全不同的另一个问题' }));
+});
+
+test('pitfallAtom: 过 S1 校验、kind=pitfall、三段固定、status=draft、sources 有序', () => {
+  const atom = pitfallAtom(
+    { problem: 'p', fix: 'f', prevention: 'v' },
+    { ts: '2026-09-09T00:00:00Z', sources: ['CLAUDE.md', 'AGENTS.md'] },
+  );
+  assert.equal(validateAtom(atom).ok, true, JSON.stringify(validateAtom(atom).errors));
+  assert.equal(atom.kind, 'pitfall');
+  assert.equal(atom.status, 'draft');
+  assert.equal(atom.source, 'miner:claude_md_pitfalls');
+  assert.deepEqual(atom.sources, ['AGENTS.md', 'CLAUDE.md']);
+  assert.equal(atom.problem, 'p');
+  assert.equal(atom.fix, 'f');
+  assert.equal(atom.prevention, 'v');
+  assert.equal('why' in atom, false);            // 踩坑三段即正文，不写 why
+  assert.equal(atom.commit, null);
+});
+
+test('本仓库 11 条踩坑 → 11 条 pitfall 原子，全部过 S1 校验，双份文件同源去重', () => {
+  const atoms = minePitfalls({ repoRoot: process.cwd(), now: '2026-09-09T00:00:00Z' });
+  assert.equal(atoms.length, 11);
+  assert.equal(new Set(atoms.map(a => a.id)).size, 11);
+  for (const a of atoms) assert.equal(validateAtom(a).ok, true, a.id);
+  for (const a of atoms) assert.deepEqual(a.sources, ['AGENTS.md', 'CLAUDE.md']);   // 两文件皆承载、只落一条
+});
+
+test('mine(mines:[claude_md_pitfalls]) 幂等：首轮落 11 条、重复 mine 不新增', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-pit-'));
+  try {
+    const journalDir = join(root, '.lore', 'journal');
+    const r1 = mine({ repoRoot: process.cwd(), journalDir, mines: ['claude_md_pitfalls'] });
+    assert.equal(r1.added, 11);
+    assert.deepEqual(r1.bySource.claude_md_pitfalls, { scanned: 11, added: 11, skipped: 0 });
+    const r2 = mine({ repoRoot: process.cwd(), journalDir, mines: ['claude_md_pitfalls'] });
+    assert.deepEqual(r2.bySource.claude_md_pitfalls, { scanned: 11, added: 0, skipped: 11 });
+    assert.equal(readAllAtoms(journalDir).length, 11);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLAUDE.md 与 AGENTS.md 同源去重：漂移条目（backend 名不同）只落一条', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-pit2-'));
+  try {
+    const body = (backend) => `## 踩坑记录
+
+**问题**：共享问题
+**修复**：共享修复
+**预防**：共享预防
+
+**问题**：漂移问题（\`${backend} exit: Command failed\`）
+**修复**：漂移修复
+**预防**：\`${backend}\` 专属预防
+`;
+    writeFileSync(join(root, 'CLAUDE.md'), body('claude'));
+    writeFileSync(join(root, 'AGENTS.md'), body('Codex'));
+    const atoms = minePitfalls({ repoRoot: root, now: '2026-09-09T00:00:00Z' });
+    assert.equal(atoms.length, 2);
+    for (const a of atoms) assert.deepEqual(a.sources, ['AGENTS.md', 'CLAUDE.md']);
+    assert.equal(atoms[0].prevention, '共享预防');                 // 先见者（CLAUDE.md）为准
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI: config mine 声明含 claude_md_pitfalls → 落 pitfall 原子且幂等', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-pit3-'));
+  try {
+    writeFileSync(join(root, 'CLAUDE.md'), '**问题**：p\n**修复**：f\n**预防**：v\n');
+    const lore = join(root, '.lore');
+    mkdirSync(lore, { recursive: true });
+    writeFileSync(join(lore, 'config.yml'), 'journal:\n  mine: [claude_md_pitfalls]\n');
+    const out1 = execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() }).toString();
+    assert.match(out1, /mined 1 new pitfall atom/);
+    const atoms = readAllAtoms(join(lore, 'journal'));
+    assert.equal(atoms.length, 1);
+    assert.equal(atoms[0].kind, 'pitfall');
+    const out2 = execFileSync('node', ['lib/mine.js', root], { cwd: process.cwd() }).toString();
+    assert.match(out2, /mined 0 new pitfall atom/);
+    assert.equal(readAllAtoms(join(lore, 'journal')).length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+

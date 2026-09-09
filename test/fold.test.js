@@ -93,3 +93,22 @@ test('stripTrailers: 普通冒号行不误伤（Note:/中文冒号/URL）', () =
   assert.equal(stripTrailers(body), body);
   assert.equal(stripTrailers(''), '');
 });
+
+test('stripTrailers: 生成器签名行也剥（Generated with / 🤖 Generated with）', () => {
+  assert.equal(stripTrailers('real why\n🤖 Generated with [Claude Code](https://claude.com/claude-code)'), 'real why');
+  assert.equal(stripTrailers('Generated with Codex'), '');
+  assert.equal(stripTrailers('real why\n\nCo-Authored-By: Bot <b@x.com>\n🤖 Generated with [Claude Code](https://x)'), 'real why');
+  // 正文里出现该词但不居行首 → 不剥（只认签名行）
+  assert.equal(stripTrailers('页面由 Generated with 说明'), '页面由 Generated with 说明');
+});
+
+import { whyField } from '../lib/fold.js';
+
+test('whyField: 有正文 → {why}；纯 trailer / 空 → {}（不写空串 why）', () => {
+  assert.deepEqual(whyField('real why'), { why: 'real why' });
+  assert.deepEqual(whyField('Co-Authored-By: Bot <b@x.com>'), {});
+  assert.deepEqual(whyField('🤖 Generated with [Claude Code](https://x)'), {});
+  assert.deepEqual(whyField(''), {});
+  assert.deepEqual(whyField(undefined), {});
+  assert.deepEqual(whyField('  \n  '), {});
+});

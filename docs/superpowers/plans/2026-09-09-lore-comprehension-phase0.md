@@ -30,7 +30,7 @@
 - **文件**：`lib/atom.js`（新）、`test/atom.test.js`（新）
 - **验收**：
   - 六类 kind 各有合法/非法用例；**未知 kind 拒绝，但 `commit` 作为 legacy 合法 kind 显式保留**——历史 489 条都是它，不保留就与「现有原子全通过」自相矛盾（评审 🔴#3）。
-  - 公共字段逐个枚举、各有合法/非法用例：`title` / `why` / `refs{supersedes,evidence,files,anchors}` / `source` / `status` / `confirmed_by` / `confirmed_at`（不变量⑦⑧ 的数据基础，评审 🟡#6）。
+  - 公共字段逐个枚举、各有合法/非法用例：`id`（格式/唯一性）/ `ts`（ISO-8601 带时区；是否进哈希需显式声明，关系不变量⑤）/ `title` / `why` / `refs{supersedes,evidence,files,anchors}` / `source` / `status` / `confirmed_by` / `confirmed_at`（不变量⑦⑧ 的数据基础，评审 🟡#6）。
   - `status` 仅允许 `draft|confirmed|disputed|superseded`；`confirmed` 必须带 `confirmed_by`。
   - **机器来源（agent / miner / hook）写入 ⇒ `status` 只能是 `draft`**（§3.2「只有 owner 的直接动作能产生 confirmed」，评审 🟡#5）。
     - **口径落在 `normalizeAtom`（审计 D6）**：只对机器来源（`source` 取 `:` 前那段 ∈ agent|miner|hook）缺 `status` 的原子补 `draft`；**人工/历史来源缺 `status` 就保持无 `status`**——无差别补 `draft` 会把 owner 手写的 decision 标成机器草稿（违反不变量③/§3.2）。显式 `status` 永不被覆盖。
@@ -127,13 +127,14 @@
     ```
     或 CLI 覆盖：`lore doctor --capture-rate-min 5 --gap-days-max 30`。**任一阈值被配置（config 或 flag）→ 闸门生效**；未配置 → `gate:{ok:true,reason:'not-configured'}` 且 exit 0。阈值非法（越界/非数字）→ 判红并写明 `invalid`，绝不静默失效（否则又是「安静地不工作」）。
   - **unknown 判红**：闸门生效时，取不到的数字（非 git → commits unknown；无 hook 原子 → gapDays unknown）**算不通过**（unknown 不是健康证据），reason 写明 unknown；未配置阈值时 unknown 照旧只显示不拦。
-  - **per-backend 采样口径**（评审 🔴#2；本期落口径与报告格式，不追求统计显著）：每个后端（claude / codex / opencode）各跑 **5 个会话**，每个会话给**同一组 3 个决策任务**（选型 / 否决 / 权衡各一）；逐会话记 `{backend, session, decisions_made, atoms_captured, status_draft, anchors_attached}`；报告形状 `{schemaVersion, generated_at, per_backend:[…], gate:{ok,reason}}`，其中 `rate = atoms_captured / decisions_made`，闸门阈值同 X。**采样脚本本身未排进本阶段文件清单**（清单无 `scripts/`）——口径与报告格式先落此节，脚本作为 S8 的显式待办。
+  - **per-backend 采样口径**（评审 🔴#2；实现见 scripts/capture-matrix.mjs（可配 --sessions / --backends，不可用后端标 skipped），不追求统计显著）：每个后端（claude / codex / opencode）各跑 **5 个会话**，每个会话给**同一组 3 个决策任务**（选型 / 否决 / 权衡各一）；逐会话记 `{backend, session, decisions_made, atoms_captured, status_draft, anchors_attached}`；报告形状 `{schemaVersion, generated_at, per_backend:[…], gate:{ok,reason}}`，其中 `rate = atoms_captured / decisions_made`，闸门阈值同 X。**采样脚本本身未排进本阶段文件清单**（清单无 `scripts/`）——口径与报告格式先落此节，脚本作为 S8 的显式待办。
 - **文件**：`lib/resident.js`、`lib/note.js`、`lib/doctor.js`、`lib/cli.js`、`CLAUDE.md`、`AGENTS.md`、`test/resident.test.js`、`test/note.test.js`、`test/doctor.test.js`
 - **验收**：
   - resident 区块出现该约定，且 CLAUDE.md 与 AGENTS.md 渲染一致（同源）。
-  - `lore note --draft` 产出的原子 `status:'draft'`，过 S1 的「机器来源 ⇒ draft」规则。
+  - `lore note --draft` 产出的原子 `status:'draft'`、`source:'agent'`，过 S1 的「机器来源 ⇒ draft」规则。
+  - **语义边界**：`--draft` → 写 `status:'draft'`；不带该旗标 → 不写 status 键（「默认行为不变」指这个）；`noteAtom` 的 `source` 固定 `agent`（评审 🟡#3）。
   - `doctor` 在低于阈值时**非零退出**；`--json` 含 `gate:{ok,reason}`。
-  - **per-backend 矩阵**：至少覆盖 claude / codex / opencode 三后端下"约定是否被遵守"的采样口径（本期只落采样脚本与报告格式，不追求统计显著）。
+  - **per-backend 矩阵**：至少覆盖 claude / codex / opencode 三后端下"约定是否被遵守"的采样口径（scripts/capture-matrix.mjs 可跑并输出 {schemaVersion, per_backend, gate}）。
   - 阈值 X / N 与采样口径写进本节后再动手（评审 🔴#2 要求现在定死，不能留到 ②）。
 - **自检**：`node --test test/resident.test.js test/note.test.js test/doctor.test.js`
 

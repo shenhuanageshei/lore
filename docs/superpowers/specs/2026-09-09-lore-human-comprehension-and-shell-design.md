@@ -103,7 +103,7 @@
 ### 3.6 两个被评审点名的术语（先定义再排期）
 
 - **agent 代捕获约定**：在 CLAUDE.md / AGENTS.md 的 resident 区块里加一条规则——"做出非显然决策时，追加一条 `kind:decision` 的 **draft** 原子（附 `why` 与源码锚点）"，并给出 `lore note --draft` 的 CLI 示例。它是**指令文件 + CLI 的标准约定**，不依赖任何宿主特性。
-- **成本账本**：每次 LLM 调用追加一行 `{ts, page, backend, tokens, ms, ok}` 到 `.lore/.state/cost.ndjson`（per-machine、gitignored）；**预算上限** = 每版本 token 上限，超限则自动档不启动、等人工放行。账本只记录会变成验尸报告，**必须配预算闸**。
+- **成本账本**：每次 LLM 调用追加一行 `{ts, page, backend, tokens, ms, ok}` 到 `.lore/.state/cost.ndjson`（per-machine、gitignored）；**预算上限** = 每版本上限，维度 `tokens|calls|ms`（后端不回报 token 数时回退 `calls`），超限则自动档不启动、原因经 `/api/sync/status` 与壳状态行可见。账本只记录会变成验尸报告，**必须配预算闸**。
 
 ---
 
@@ -220,9 +220,9 @@
 
 | 期 | 内容 | 验收（可今天跑） |
 |---|---|---|
-| **⓪ 数据与证据地基** | 五类 + pitfall 的**完整 schema**；写入侧纪律 + 会红的 lint；agent 代捕获约定 **+ 捕获召回率闸门**；**壳打开传感器**（一行代码，最便宜的 go/no-go）；per-human 存储边界与 CLI；成本账本**定义 + 预算上限**；接线或摘掉 `claude_md_pitfalls` 死声明 | 新提交的 why 无 trailer-only；下 N 个提交中 ≥X% 的真实决策落成原子（**per-backend 测试矩阵**）；`lore visit` 有数据 |
+| **⓪ 数据与证据地基** | 五类 + pitfall 的**完整 schema**；写入侧纪律 + 会红的 lint；agent 代捕获约定 **+ 捕获召回率闸门**；**壳打开传感器**（一行代码，最便宜的 go/no-go）；per-human 存储边界与 CLI（`lore check` 的 verb 延后至 ④，⓪ 只落存储）；成本账本**定义 + 预算上限（tokens/calls/ms）**；接线或摘掉 `claude_md_pitfalls` 死声明 | 新提交的 why 无 trailer-only；下 N 个提交中 ≥X% 的真实决策落成原子（**per-backend 测试矩阵**）；`lore visit` 有数据 |
 | **① 证据清洗与确认** | 噪音分类器（trailer / 模板 / 重复摘要降权）；`lore confirm` + 已阅 @ 版本；证据账本（结论 / 来源 / 定位 / 时间 / 置信 / 确认人） | 每条决策可在裸终端确认；机器重写不改人的原子 |
-| **② 一条端到端理解切片** | 再入简报 + 证据 + 一个模块，端到端打通 | 用 85 天断流期夹具或 `--as-of`，10 分钟内回答"它做什么 / 为何这样 / 哪里会错 / 证据在哪" |
+| **② 一条端到端理解切片** | 再入简报 + 证据 + 一个模块，端到端打通；**锚点漂移语义**（行号变动 → 标 stale 还是重解析）在本期定案 | 用 85 天断流期夹具或 `--as-of`，10 分钟内回答"它做什么 / 为何这样 / 哪里会错 / 证据在哪" |
 | **③ 机械化扩展** | docs 索引化 + 痛点雷达 + digest 骨架 + auto 追版本 + 版本切分 | 无 LLM 产物过 schema 校验；版本切分可复现（不变量 ⑤） |
 | **④ 理解检查与回归** | 任务式检查（opt-in，带死亡条款）+ 变更影响回归（源码 / 决策变化后哪些卡片失效） | 关闭检查后被动模式仍可用；失效项可追踪 |
 | **⑤ 答辩与扩展** | `lore prep` 事件驱动 + 持续答辩（不等最后） | 每组答案带出处 |

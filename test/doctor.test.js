@@ -9,8 +9,8 @@ import { join, resolve } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  DOCTOR_SCHEMA_VERSION, UNKNOWN, diagnose, evaluateGate, formatReport, hookHealth, parseGateConfig,
-  readJournalStats, resolveGateThresholds,
+  DEFAULT_CAPTURE_WINDOW, DOCTOR_SCHEMA_VERSION, UNKNOWN, diagnose, evaluateGate, formatReport, gitWindow,
+  hookHealth, parseGateConfig, readJournalStats, resolveGateThresholds, windowCapture,
 } from '../lib/doctor.js';
 import { renderHookStub } from '../lib/migrate.js';
 import { main } from '../lib/cli.js';
@@ -117,10 +117,11 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     assert.deepEqual(doc.gate, { ok: true, reason: 'not-configured' });   // 未配阈值 → 不阻断
     assert.deepEqual(Object.keys(doc.repo), ['root', 'isGit', 'head', 'version', 'commits']);
     assert.deepEqual(Object.keys(doc.hook), ['status', 'ok', 'hookPath', 'target', 'expected']);
-    // 键集只增不改：pitfalls 是新增（按 kind 计），既有键名/语义一律不动
+    // 键集只增不改：pitfalls / window 是新增，既有键名/语义一律不动
     assert.deepEqual(Object.keys(doc.capture),
       ['atoms', 'badLines', 'decisions', 'pitfalls', 'trailerOnly', 'refsPitfall', 'commits', 'captureRate',
-        'captureRatePct', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays']);
+        'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays']);
+    assert.deepEqual(Object.keys(doc.capture.window), ['size', 'commits', 'decisions', 'startTs', 'rate', 'ratePct']);
     assert.equal(doc.repo.root, resolve(dir));       // --json 后跟 --root 未被吞掉
     assert.equal(doc.capture.atoms, 6);
     assert.equal(doc.capture.badLines, 2);
@@ -314,7 +315,7 @@ test('闸门：阈值来自 .lore/config.yml 的 doctor: 子块（CLI 旗标可�
   const config = 'axes:\n  component:\n    code_roots: [lib]\ndoctor:\n  capture_rate_min: 50   # 百分数\n  gap_days_max: 3\nlanguage:\n  default: zh\n';
   const dir = gateRepo([DECISION, HOOK_OLD], config);          // 捕获率 100%（过），断流 252 天（不过）
   try {
-    assert.deepEqual(parseGateConfig(config), { captureRateMinPct: 50, gapDaysMax: 3, invalid: [] });
+    assert.deepEqual(parseGateConfig(config), { captureRateMinPct: 50, gapDaysMax: 3, captureWindowCommits: null, invalid: [] });
     const r = diagnose(dir, { now: NOW });
     assert.deepEqual(r.gate, { ok: false, reason: 'gap 252d > 3d' });
     const sink = [];
@@ -340,7 +341,8 @@ test('闸门：非法阈值判红并写明（绝不静默回落成「未配置�
   const dir = gateRepo([DECISION, HOOK_NOW]);
   try {
     assert.deepEqual(resolveGateThresholds('', { captureRateMinPct: 'abc' }),
-      { captureRateMinPct: null, gapDaysMax: null, invalid: [{ name: 'captureRateMinPct', key: '--capture-rate-min', raw: 'abc' }] });
+      { captureRateMinPct: null, gapDaysMax: null, captureWindowCommits: DEFAULT_CAPTURE_WINDOW,
+        invalid: [{ name: 'captureRateMinPct', key: '--capture-rate-min', raw: 'abc' }] });
     const r = diagnose(dir, { now: NOW, gate: { captureRateMinPct: 'abc' } });
     assert.deepEqual(r.gate, { ok: false, reason: 'invalid --capture-rate-min: abc' });
     const sink = [];
@@ -380,3 +382,116 @@ test('无 .lore 但有 git：atoms 等仍为 unknown（不是 0）', () => {
     assert.equal(r.capture.gapDays, UNKNOWN);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ---------- S8 修订：窗口捕获率（评审 🟡#2 —— 前向窗口 vs 全仓累计率） ----------
+const commitAt = (dir, iso, msg = 'c') =>
+  execFileSync('git', ['commit', '-q', '--allow-empty', '-m', msg], {
+    cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: iso, GIT_COMMITTER_DATE: iso },
+  });
+
+// 夹具：20 个历史提交（2026-01，零决策原子）+ 5 个近期提交（2026-09-05..09），近期两条决策原子。
+// 累计率 = 2/25 = 8%；窗口 N=5 的窗口率 = 2/5 = 40% ——「历史差、近期好」两口径必须分离。
+function splitRepo() {
+  const dir = tmp();
+  gitInit(dir);
+  for (let i = 1; i <= 20; i++) commitAt(dir, `2026-01-${String(i).padStart(2, '0')}T00:00:00Z`, `old ${i}`);
+  for (let i = 5; i <= 9; i++) commitAt(dir, `2026-09-0${i}T00:00:00Z`, `new ${i}`);
+  mkdirSync(join(dir, '.lore', 'journal', '2026', '09'), { recursive: true });
+  writeFileSync(join(dir, '.lore', 'journal', '2026', '09', '2026-09-09.ndjson'), [
+    jAtom({ id: 'decision:d1', ts: '2026-09-06T00:00:00Z', kind: 'decision', source: 'agent', title: 't1', why: 'w' }),
+    jAtom({ id: 'decision:d2', ts: '2026-09-08T00:00:00Z', kind: 'decision', source: 'agent', title: 't2', why: 'w' }),
+  ].join('\n') + '\n');
+  return dir;
+}
+
+test('窗口率与累计率分离：历史零原子 + 近期有决策 → 窗口过闸而累计仍红', () => {
+  const dir = splitRepo();
+  try {
+    // 未配置 → 默认窗口 N=50；提交数 25 ≤ 50 → 下界开放（窗口 = 全史），此时窗口率与累计率同值
+    const def = diagnose(dir, { now: NOW });
+    assert.equal(def.capture.window.size, DEFAULT_CAPTURE_WINDOW);
+    assert.equal(def.capture.window.ratePct, 8);
+
+    // N=5：窗口下界 = 第 6 个提交（2026-01-20，窗口之外那个）的 committer 时间
+    const win5 = gitWindow(dir, 5);
+    assert.equal(win5.commits, 5);
+    assert.equal(win5.shas.length, 5);
+    assert.equal(Date.parse(win5.startTs), Date.parse('2026-01-20T00:00:00Z'));
+
+    const r = diagnose(dir, { now: NOW, gate: { captureRateMinPct: 10, captureWindowCommits: 5 } });
+    assert.equal(r.capture.commits, 25);
+    assert.equal(r.capture.decisions, 2);
+    assert.equal(r.capture.captureRatePct, 8);            // 累计 8% < 10%：按累计判必红
+    assert.deepEqual(r.capture.window,
+      { size: 5, commits: 5, decisions: 2, startTs: win5.startTs, rate: 0.4, ratePct: 40 });
+    assert.deepEqual(r.gate, { ok: true, reason: 'ok' });  // 窗口 40% ≥ 10%：按窗口判过闸
+    const txt = formatReport(r);
+    assert.match(txt, /window 40%（2 decision \/ 5 commits，N=5）/);
+    assert.match(txt, /累计 8%（2 decision \/ 25 commits）/);
+
+    // 同一份数据把窗口放宽到全史 → 窗口率跌回 8%，闸门转红：证明闸门真的用窗口率而非累计率
+    const wide = diagnose(dir, { now: NOW, gate: { captureRateMinPct: 10, captureWindowCommits: 25 } });
+    assert.equal(wide.capture.window.ratePct, 8);
+    assert.deepEqual(wide.gate, { ok: false, reason: 'capture-rate 8% < 10%' });
+
+    // 配置键 doctor.capture_window_commits 与 CLI 旗标 --capture-window 都能定窗口大小
+    assert.deepEqual(parseGateConfig('doctor:\n  capture_window_commits: 5\n'),
+      { captureRateMinPct: null, gapDaysMax: null, captureWindowCommits: 5, invalid: [] });
+    writeFileSync(join(dir, '.lore', 'config.yml'), 'doctor:\n  capture_rate_min: 10\n  capture_window_commits: 5\n');
+    const cfg = diagnose(dir, { now: NOW });
+    assert.equal(cfg.capture.window.size, 5);
+    assert.equal(cfg.capture.window.ratePct, 40);
+    assert.deepEqual(cfg.gate, { ok: true, reason: 'ok' });
+
+    const sink = [];
+    assert.equal(main(['doctor', '--json', '--capture-rate-min', '10', '--capture-window', '5', '--root', dir],
+      { cwd: ROOT, out: s => sink.push(s), err: () => {} }), 0);
+    const doc = JSON.parse(sink.join('\n'));
+    assert.equal(doc.capture.window.ratePct, 40);
+    assert.equal(doc.capture.captureRatePct, 8);          // 两个口径同时输出，且确实分离
+    assert.deepEqual(doc.gate, { ok: true, reason: 'ok' });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('窗口率：纯判定（ts 下界 / 开放下界 / commit 指纹命中）与非 git 降级 unknown', () => {
+  const stats = { decisionAtoms: [
+    { ts: '2026-09-01T00:00:00Z', commit: null },      // 窗口内（ts ≥ 下界）
+    { ts: '2026-01-01T00:00:00Z', commit: null },      // 窗口外（ts 早于下界）
+    { ts: null, commit: 'abc1234def' },                // 窗口内（commit 指纹命中，rebase 后 ts 不可靠）
+  ] };
+  assert.deepEqual(windowCapture(stats, { commits: 2, shas: ['abc1234def00'], startTs: '2026-08-01T00:00:00Z' }, 2),
+    { size: 2, commits: 2, decisions: 2, startTs: '2026-08-01T00:00:00Z', rate: 1, ratePct: 100 });
+  // 下界开放（提交数 ≤ N）→ 窗口 = 全史：三条都算（ts 早的那条也回到窗口内）
+  assert.equal(windowCapture(stats, { commits: 3, shas: ['abc1234def00'], startTs: null }, 3).decisions, 3);
+  // 测不出（非 git / 无 journal）→ 全 unknown（不是 0）
+  assert.deepEqual(windowCapture(null, null, 5),
+    { size: 5, commits: UNKNOWN, decisions: UNKNOWN, startTs: UNKNOWN, rate: UNKNOWN, ratePct: UNKNOWN });
+
+  const dir = tmp();
+  try {
+    assert.deepEqual(diagnose(dir, { now: NOW }).capture.window,
+      { size: DEFAULT_CAPTURE_WINDOW, commits: UNKNOWN, decisions: UNKNOWN, startTs: UNKNOWN, rate: UNKNOWN, ratePct: UNKNOWN });
+    // 闸门生效时 unknown 判红（unknown 不是健康证据），且 reason 与窗口口径同源
+    assert.deepEqual(diagnose(dir, { now: NOW, gate: { captureRateMinPct: 5 } }).gate,
+      { ok: false, reason: 'capture-rate unknown < 5%' });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('窗口大小非法（0 / 越界 / 非数字 / 旗标缺值）判红，绝不静默回落默认 50', () => {
+  assert.equal(resolveGateThresholds('', { captureWindowCommits: '0' }).invalid.length, 1);
+  assert.equal(resolveGateThresholds('', { captureWindowCommits: 10001 }).invalid.length, 1);
+  const dir = gateRepo([DECISION, HOOK_NOW]);
+  try {
+    assert.deepEqual(diagnose(dir, { now: NOW, gate: { captureWindowCommits: 'abc' } }).gate,
+      { ok: false, reason: 'invalid --capture-window: abc' });
+    const sink = [];
+    assert.equal(main(['doctor', '--capture-window', 'abc', '--root', dir],
+      { cwd: ROOT, out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    // 旗标给了却没值 → 用法错误（不静默变成默认窗口）
+    const bad = [];
+    assert.equal(main(['doctor', '--root', dir, '--capture-window'],
+      { cwd: ROOT, out: s => bad.push(s), err: s => bad.push(s) }), 1);
+    assert.match(bad.join('\n'), /--capture-window requires <commits>/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+

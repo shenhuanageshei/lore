@@ -166,6 +166,22 @@ test('budgetStatus：未配置不阻断；超限 exceeded；窗口外条目不�
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('budgetStatus：非法预算没有 invalid 死分支——非正/非数字一律按「未配置」处理（归一在配置层）', () => {
+  const dir = tmp();
+  try {
+    appendCost(dir, { ts: 't', page: 'p', backend: 'claude', ms: 1, ok: true, version: 'v1.0.0' });
+    for (const budget of [0, -5, 'lots', NaN, null, undefined]) {
+      const st = budgetStatus({ stateDir: dir, version: 'v1.0.0', budget });
+      assert.equal(st.configured, false, 'budget=' + String(budget));
+      assert.equal(st.exceeded, false, 'budget=' + String(budget));
+      assert.equal('invalid' in st, false, 'budget=' + String(budget));   // 死分支已删（评审 🔵#6）
+    }
+    assert.equal('invalid' in budgetStatus({ stateDir: dir, version: 'v1.0.0', tokenBudget: 5 }), false);
+    assert.deepEqual(Object.keys(budgetStatus({ stateDir: dir, version: 'v1.0.0', budget: 5 })),
+      ['configured', 'dimension', 'budget', 'version', 'used', 'counted', 'unknownTokens', 'skipped', 'exceeded']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // ---------- 计量维度（审计 D3：闸必须能被触发） ----------
 test('meterUsage：calls/ms/tokens 三维度口径；缺省与未知维度都回 calls 兜底', () => {
   const entries = [

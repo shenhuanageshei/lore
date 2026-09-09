@@ -286,6 +286,26 @@ test('runAuto: 非不可用类错误（timeout）不 failover', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('runAuto: 账本 I/O 失败（appendCost 抛错）不中断整轮——页面照写、历史照记、finalize 照触发', async () => {
+  const { root, lore } = autoRepo();
+  try {
+    const state = join(lore, '.state');
+    mkdirSync(state, { recursive: true });
+    mkdirSync(join(state, 'cost.ndjson'), { recursive: true });      // 目录占位 → appendFileSync EISDIR（确定性注入）
+    appendRewriteRequest(state, { page: 'component/lib.md' });
+    const spawned = [];
+    const backend = { rewritePage: async () => FAKE_OK };
+    const res = await runAuto(lore, { backend, maxPages: 5, now: () => new Date('2026-06-10T12:00:00'),
+      spawnFn: (cmd, args) => { spawned.push([cmd, args]); return { unref() {}, once() {} }; } });
+    assert.equal(res.pages[0].ok, true);                              // 页面照写（账本是证据不是运行前提）
+    assert.match(rf(join(lore, 'wiki', 'component', 'lib.md'), 'utf8'), /新正文/);
+    assert.equal(readAutoRuns(state).length, 1);                      // 运行历史照记
+    assert.equal(spawned.length, 1);                                  // finalize 照触发
+    assert.match(spawned[0][0], /sync\.js$/);
+    assert.equal(spawned[0][1][0], 'finalize');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('runAuto: 全链不可用 → 单条 fail 且 reason 带全链 tried', async () => {
   const { root, lore } = autoRepo();
   try {

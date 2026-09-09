@@ -248,6 +248,36 @@ test('未知 verb / 缺参数 / 非法取值：打印用法并 exit 1', () => {
 });
 
 
+test('旗标吞旗标：非布尔旗标的下一个 token 是旗标 → 明确报错 exit 1（不静默吞成值）', () => {
+  const root = tmp();
+  try {
+    mkdirSync(loreOf(root), { recursive: true });
+    const cases = [
+      [['doctor', '--capture-rate-min', '--json'], /flag --capture-rate-min requires a value/],
+      [['doctor', '--gap-days-max', '--json'], /flag --gap-days-max requires a value/],
+      [['visit', 'p', '--root', '--json'], /flag --root requires a value/],
+      [['budget', '5', '--dimension', '--clear'], /flag --dimension requires a value/],
+      [['human', 'export', '--out', '--root', 'x'], /flag --out requires a value/],
+    ];
+    for (const [args, re] of cases) {
+      const r = run(...args);
+      assert.equal(r.status, 1, args.join(' '));
+      assert.match(r.stderr, re, args.join(' '));
+      assert.match(r.stderr, /usage: node lib\/cli\.js/, args.join(' '));
+      assert.equal(r.stdout, '', args.join(' '));           // 解析失败 → 一个 verb 都不跑
+    }
+    // 值确实被消费时照常工作：--capture-rate-min 5 进的是阈值，不是 '--json'
+    const ok = run('doctor', '--json', '--capture-rate-min', '5', '--root', root);
+    const report = JSON.parse(ok.stdout);
+    assert.equal(report.gate.ok, false);                    // 空仓库 → 捕获率 unknown → 闸门红
+    assert.match(report.gate.reason, /unknown < 5%/);       // 阈值真的读成了 5
+    // 直调 main() 同语义（不依赖测试壳）
+    const sink = [];
+    assert.equal(main(['doctor', '--capture-rate-min', '--json'], { cwd: process.cwd(), out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.match(sink.join('\n'), /flag --capture-rate-min requires a value/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('--root 给了却没值 → 用法 + exit 1（不静默回落 cwd）', () => {
   const r = run('doctor', '--json', '--root');
   assert.equal(r.status, 1);

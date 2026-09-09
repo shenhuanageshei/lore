@@ -245,7 +245,7 @@ import {
   stripFrontmatter, renderMarkdown, buildPageIndex, preprocessWikilinks,
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
   baseFromPathname, buildConsoleModel, pollDecide, buildDocsRows, buildCrossRepoIndex,
-  buildThemeRows,
+  buildThemeRows, budgetNotice,
 } from './shell.mjs';
 
 // per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
@@ -746,10 +746,13 @@ function renderSyncLight() {
   const m = buildConsoleModel(MANIFEST, SYNC_STATUS);
   const light = document.getElementById('sync-light');
   light.className = m.light === 'fresh' ? '' : m.light;          // '' | 'stale' | 'off'
-  document.getElementById('sync-light-text').textContent =
+  const lightText =
     m.light === 'off' ? `手动 · ${m.staleTotal} 待写`
     : m.light === 'busy' ? '自动重写中…'
     : m.staleTotal ? `${m.staleTotal} 待重写` : '全新鲜';
+  // 预算超限是 auto 档停摆的唯一原因出口（S6）——没超限/没配置就一个字都不加（遥测位不塞噪音）。
+  const budget = budgetNotice(SYNC_STATUS);
+  document.getElementById('sync-light-text').textContent = budget ? `${lightText} · ${budget}` : lightText;
   const autoInfo = document.getElementById('sync-auto-info');
   autoInfo.hidden = m.mode !== 'auto';
   if (m.mode === 'auto') {

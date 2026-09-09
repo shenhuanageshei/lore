@@ -238,7 +238,7 @@ test('baseFromPathname: 无 /site 段 → "/" 兜底', () => {
   assert.equal(baseFromPathname('/'), '/');
 });
 
-import { buildConsoleModel, pollDecide } from '../site/shell.mjs';
+import { buildConsoleModel, pollDecide, budgetNotice } from '../site/shell.mjs';
 
 const mkManifest = pages => ({ axes: [{ id: 'component', label: 'Component', pages }] });
 
@@ -284,6 +284,23 @@ test('buildConsoleModel: runner_running → busy 灯（优先于 stale/fresh，�
   assert.equal(m.light, 'busy');
   const off = buildConsoleModel(mkManifest([]), { mode: 'manual', last_finalize: null, runner_running: true });
   assert.equal(off.light, 'off');   // manual 优先（runner 不该在 manual 下跑，防御性显示）
+});
+
+// 预算闸读数（S6 的 /api/sync/status → budget）：状态行只报「超限」，其余一律静默。
+test('budgetNotice: exceeded → 「预算超限（used/budget dimension）」；未超限/未配置/无 API → 空串（不塞噪音）', () => {
+  assert.equal(budgetNotice({ budget: { configured: true, exceeded: true, used: 12, budget: 10, dimension: 'calls' } }),
+    '预算超限（12/10 calls）');
+  assert.equal(budgetNotice({ budget: { configured: true, exceeded: true, used: 0.5, budget: 1, dimension: 'ms' } }),
+    '预算超限（0.5/1 ms）');
+  assert.equal(budgetNotice({ budget: { configured: true, exceeded: true, used: 3, budget: 2 } }), '预算超限（3/2 calls）');  // 维度缺省
+  assert.equal(budgetNotice({ budget: { configured: true, exceeded: true, used: 'x', budget: null, dimension: 'tokens' } }),
+    '预算超限（?/? tokens）');                                                                            // 取不到的数不渲染成 0
+  assert.equal(budgetNotice({ budget: { configured: true, exceeded: false, used: 1, budget: 10, dimension: 'calls' } }), '');
+  assert.equal(budgetNotice({ budget: { configured: false, exceeded: false, used: 0, budget: null, dimension: 'calls' } }), '');
+  assert.equal(budgetNotice({ budget: { configured: false, exceeded: true, used: 1, budget: 1, dimension: 'calls' } }), '');  // 未配置不报
+  assert.equal(budgetNotice({}), '');
+  assert.equal(budgetNotice(null), '');
+  assert.equal(budgetNotice(), '');
 });
 
 test('pollDecide: generated 未变 → 全 false；变了 → 重建；当前页变了 → 提示条', () => {
@@ -370,7 +387,7 @@ test('buildThemeRows buckets an ungrouped child under an empty group name', () =
 
 // --- S7 壳打开传感器：打开/切换页 → POST /api/human/visit；失败静默、不阻塞阅读 ---
 import {
-  VISIT_ENDPOINT, VISIT_DEDUPE_MS, buildVisitPathIndex, firstVisitKey, visitKey,
+  VISIT_ENDPOINT, buildVisitPathIndex, firstVisitKey, visitKey,
   createVisitSensor, installVisitSensor,
 } from '../site/shell.mjs';
 
@@ -444,20 +461,13 @@ test('record: portal 形态（BASE=/<repo>/）URL 带前缀；manifest 只取一
   ]);
 });
 
-test('record: 同一页短窗内重复打开 → deduped 不发第二次请求；窗口外再记', async () => {
+test('record: 每次打开都发（壳侧无去重窗口）——同页短窗重复由服务端 lib/human.js 的 windowMs 权威判定', async () => {
   const { posts, fetchFn } = visitFetch();
-  const clock = { t: 1_000_000 };
-  const sensor = createVisitSensor({ fetchFn, now: () => clock.t });
+  const sensor = createVisitSensor({ fetchFn });
   assert.equal((await sensor.record('#component/lib')).sent, true);
-  assert.deepEqual(await sensor.record('#component/lib'), { sent: false, reason: 'deduped', page: 'component/lib.md' });
-  assert.equal(posts().length, 1);
-  clock.t += VISIT_DEDUPE_MS;                                       // 窗口边界外
   assert.equal((await sensor.record('#component/lib')).sent, true);
-  assert.equal(posts().length, 2);
-  const off = createVisitSensor({ fetchFn, dedupeMs: 0, now: () => clock.t });
-  await off.record('#component/lib');
-  await off.record('#component/lib');
-  assert.equal(posts().length, 4);                                  // dedupeMs:0 = 关闭壳侧去重（服务端仍兜底）
+  assert.equal(posts().length, 2);                                  // 不去重：权威判定只有服务端一处
+  assert.deepEqual(JSON.parse(posts()[1].opts.body), { page: 'component/lib.md' });
 });
 
 test('record: console / 未知页键 / 空 manifest → 不记，且不抛', async () => {

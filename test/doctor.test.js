@@ -223,6 +223,24 @@ test('计数口径：trailer-only / decision / refs.pitfall / 坏行 / lastHook 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('断流天数只算一次：报告字段与闸门判定同源（now.getTime() 只被调一次）', () => {
+  const dir = tmp();
+  try {
+    gitInit(dir);
+    mkdirSync(join(dir, '.lore', 'journal', '2026', '09'), { recursive: true });
+    writeFileSync(join(dir, '.lore', 'journal', '2026', '09', '2026-09-09.ndjson'), ATOMS);
+    let getTimeCalls = 0;
+    const now = {
+      toISOString: () => '2026-09-05T00:00:00.000Z',
+      getTime: () => { getTimeCalls++; return Date.parse('2026-09-05T00:00:00Z'); },
+    };
+    const r = diagnose(dir, { now, gate: { gapDaysMax: 3 } });
+    assert.equal(r.capture.gapDays, 3);                 // 2026-09-02 → 09-05
+    assert.equal(getTimeCalls, 1);                      // 合并前会算两次（评审 🔵#5）
+    assert.deepEqual(r.gate, { ok: true, reason: 'ok' });   // 边界 3 > 3 不成立 → 不误判
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // ---------- S8：捕获闸门（评审 🔴#2；阈值用注入值，不依赖本仓库真实数字） ----------
 const NOW = new Date('2026-09-10T00:00:00Z');
 const jAtom = o => JSON.stringify(o);

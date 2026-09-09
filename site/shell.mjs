@@ -252,9 +252,10 @@ export function buildThemeRows(pages) {
 // 壳在浏览器里跑、写不进 .lore → 必须走 server 的 localhost-only API（POST /api/human/visit）。
 // 整条链路只碰本机同源 URL（wiki/.manifest.json + api/human/visit）：不引宿主依赖、不发外部网络。
 // 任何一步失败都静默返回（record 自身不抛），绝不阻塞阅读——调用方 fire-and-forget。
+// 去重**只有一处定义**：服务端 lib/human.js 的 DEDUPE_WINDOW_MS（appendHuman 的 windowMs 覆盖）。
+// 壳侧不再自带窗口常量/参数——两处窗口必然漂移（评审 🔵#10）；壳只管「每次打开都发」，权威判定在服务端。
 export const VISIT_ENDPOINT = 'api/human/visit';   // 相对 BASE：per-repo "/" · portal "/<repo>/"
 export const VISIT_MANIFEST = 'wiki/.manifest.json';
-export const VISIT_DEDUPE_MS = 30 * 60 * 1000;     // 与 lib/human.js DEDUPE_WINDOW_MS 同窗；服务端仍是权威去重
 const VISIT_CONSOLE_KEY = 'console';               // 控制台不是 wiki 页，不记
 
 // 页键（axis/id）→ wiki 相对路径。必须以 manifest 为真源：HOME/HOME → HOME.md 这类不满足 `${key}.md`。
@@ -284,15 +285,13 @@ export function visitKey(hash, manifest) {
 }
 
 // 传感器：record(hash) → {sent, reason, page?}（返回值只为测试/诊断，阅读路径不必 await）。
+// 每次都发：同页短窗重复由服务端 appendHuman 的窗口判定（唯一真源），壳不再做第二次去重。
 export function createVisitSensor({
   base = '/',
   manifestUrl = VISIT_MANIFEST,
   endpoint = VISIT_ENDPOINT,
-  dedupeMs = VISIT_DEDUPE_MS,
   fetchFn = (...args) => globalThis.fetch(...args),
-  now = () => Date.now(),
 } = {}) {
-  const seen = new Map();          // page → ts（壳侧短窗去重，省一次网络；服务端去重兜底）
   let cachedManifest = null;
 
   // manifest 成功才缓存：取不到（未 init / 静态服务 / 服务端重启中）返回 null 且不缓存，
@@ -322,10 +321,6 @@ export function createVisitSensor({
         page = buildVisitPathIndex(fresh)[key];
       }
       if (!page) return { sent: false, reason: 'unknown-page' };
-      const t = now();
-      if (dedupeMs > 0 && seen.has(page) && t - seen.get(page) < dedupeMs) {
-        return { sent: false, reason: 'deduped', page };
-      }
       try {
         const res = await fetchFn(base + endpoint, {
           method: 'POST',
@@ -333,7 +328,6 @@ export function createVisitSensor({
           body: JSON.stringify({ page }),
         });
         if (!res?.ok) return { sent: false, reason: 'api-unavailable', page };
-        seen.set(page, t);         // 只有真记上才进壳侧窗口（API 不可用时下次照试）
         return { sent: true, page };
       } catch {
         return { sent: false, reason: 'api-unavailable', page };   // 无 .lore / 静态服务 → 静默降级
@@ -343,7 +337,7 @@ export function createVisitSensor({
     }
   }
 
-  return { record, reset: () => seen.clear() };
+  return { record };
 }
 
 // 浏览器自装配：壳（site/index.html）import 本模块即生效——打开落地页 + 每次 hash 切换各记一次。
@@ -363,3 +357,12 @@ export function installVisitSensor({ win = globalThis, ...opts } = {}) {
 
 installVisitSensor();
 
+// ---------- 预算闸读数（设计 §7 ⓪ 期 S6 / §5.5 状态行） ----------
+// 只报「超限」这一种状态：状态行是遥测位不是仪表盘——未配置（configured:false）/ 未超限都返回 ''，
+// 不往状态行塞噪音。超限时 auto 档不启动，这条读数就是「为什么没跑」的唯一可见出口。
+export function budgetNotice(status) {
+  const b = status?.budget;
+  if (!b || b.configured !== true || b.exceeded !== true) return '';
+  const num = v => (Number.isFinite(v) ? v : '?');
+  return `预算超限（${num(b.used)}/${num(b.budget)} ${b.dimension ?? 'calls'}）`;
+}

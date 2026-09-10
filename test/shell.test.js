@@ -1,6 +1,7 @@
 // test/shell.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { stripFrontmatter, renderMarkdown } from '../site/shell.mjs';
 
 test('stripFrontmatter removes the leading --- block', () => {
@@ -986,4 +987,98 @@ test('buildStatusLine: 排队条数取不到 → 提示语不许出现「0 条�
   const omitted = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, now: AT_1402 });
   assert.equal(omitted.queue_hint.includes('0 条'), false);
   assert.match(omitted.queue_hint, /排队请求 unknown/);
+});
+
+// ---------- 调用点回归（D13）：site/index.html 不许把「取不到的队列数」伪造成 0 ----------
+// 为什么这里抽源码来跑、而不是只断言字样：`buildStatusLine` 上一轮已删掉 `queued = 0` 形参默认值，
+// 把「取不到冒充 0」从纯函数里堵掉——但**读数是调用点在 site/index.html 里产生的**。调用点若把
+// 「rewrite-requests 失败」写成 `QUEUED_PAGES = new Set()` 再传 `.size`，纯函数的修复就被整体架空：
+// 只列表端点失败、status 其实成功时，状态行会理直气壮地报「0 条排队请求」——正是 D13 点名的反模式。
+// 壳是 SPA、内联脚本依赖 DOM，本仓零依赖无 jsdom，故把 index.html 里**真正的**那几块源码
+// （状态声明 / fetchSyncStatus / 两个读数出口）抽出来在 Node 里执行：测行为，不测字样。
+const SHELL_HTML = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+
+// 从 header 起按花括号配对切出整段函数（跳过字符串/模板/行注释里的花括号）。
+// 抽不到就直接失败：抽取器静默失真 = 测试假装通过，比不测更糟。
+function sliceShellFn(header) {
+  const at = SHELL_HTML.indexOf(header);
+  assert.notEqual(at, -1, `site/index.html 里找不到「${header}」——抽取器失效，需同步更新本测试`);
+  let depth = 0, quote = null, i = SHELL_HTML.indexOf('{', at);
+  for (; i < SHELL_HTML.length; i++) {
+    const c = SHELL_HTML[i];
+    if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; continue; }
+    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
+    if (c === '/' && SHELL_HTML[i + 1] === '/') { i = SHELL_HTML.indexOf('\n', i); if (i === -1) break; continue; }
+    if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) { i++; break; }
+  }
+  return SHELL_HTML.slice(at, i);
+}
+
+function buildShellQueueApi(fetchStub) {
+  const decls = SHELL_HTML.match(/let SYNC_STATUS = null;[\s\S]*?let SYNC_RUNS = \[\];/);
+  assert.ok(decls, 'site/index.html 的状态声明块抽取失败——需同步更新本测试');
+  const body = [
+    decls[0],
+    sliceShellFn('async function fetchSyncStatus'),
+    sliceShellFn('function queuedArg'),
+    sliceShellFn('function queuedCountText'),
+    'return { fetchSyncStatus, queuedArg, queuedCountText, snap: () => ({ ok: QUEUED_OK, size: QUEUED_PAGES.size, apiOk: SYNC_API_OK }) };',
+  ].join('\n');
+  return new Function('fetch', 'BASE', body)(fetchStub, '/');
+}
+
+function shellQueueFixture({ statusOk = true, list, runs = { runs: [] } } = {}) {
+  const ok = body => ({ ok: true, json: async () => body });
+  const fetchStub = async url => {
+    if (url.endsWith('api/sync/status')) return statusOk ? ok({ fuel: okFuel }) : { ok: false, json: async () => ({}) };
+    if (url.endsWith('api/sync/rewrite-requests')) { if (list === 'throw') throw new Error('boom'); return ok(list); }
+    if (url.endsWith('api/sync/runs')) return ok(runs);
+    throw new Error('unexpected url: ' + url);
+  };
+  return buildShellQueueApi(fetchStub);
+}
+
+test('调用点：rewrite-requests 失败（status 成功）→ 队列读数传 undefined，状态行报 unknown 而非「0 条」（D13）', async () => {
+  const api = shellQueueFixture({ list: 'throw' });
+  await api.fetchSyncStatus();
+  assert.equal(api.snap().apiOk, true);                    // 主 status 成功不连坐（二次列表失败只清它自己那份）
+  assert.equal(api.queuedArg(), undefined);                // 取不到 → undefined，绝不是 0
+  const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: api.queuedArg(), now: AT_1402 });
+  assert.match(line.queue_hint, /排队请求 unknown/);
+  assert.equal(line.queue_hint.includes('0 条排队请求'), false);
+  assert.equal(api.queuedCountText().includes('0 条'), false);   // 控制台「已排队请求」同一读数，同样不许报 0 条
+  assert.match(api.queuedCountText(), /unknown/);
+});
+
+test('调用点：还没轮询到（初始态）→ 队列读数同样是 unknown，不许拿空 Set 的 size 充 0', () => {
+  const api = shellQueueFixture({ list: { requests: [] } });
+  assert.equal(api.queuedArg(), undefined);
+  assert.equal(api.queuedCountText().includes('0 条'), false);
+});
+
+test('调用点：确实读到列表 → 真值照报（含 0 条），不许一律降级成 unknown', async () => {
+  const one = shellQueueFixture({ list: { requests: [{ page: 'component/a.md' }] } });
+  await one.fetchSyncStatus();
+  assert.equal(one.queuedArg(), 1);
+  assert.equal(one.queuedCountText(), '1 条');
+  assert.match(buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: one.queuedArg(), now: AT_1402 }).queue_hint, /1 条排队请求/);
+
+  const zero = shellQueueFixture({ list: { requests: [] } });
+  await zero.fetchSyncStatus();
+  assert.equal(zero.queuedArg(), 0);                       // 测出来是零 → 必须原样报 0（别把真值修成 unknown）
+  assert.equal(zero.queuedCountText(), '0 条');
+  assert.match(buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: zero.queuedArg(), now: AT_1402 }).queue_hint, /0 条排队请求/);
+});
+
+// 行为之外还要盯住「接线」：上面三条测的是读数出口本身，若调用点留着出口不用、
+// 回退成 `queued: QUEUED_PAGES.size`（控制台回退成 `${QUEUED_PAGES.size} 条`），
+// 出口的行为测试照样全绿——而 bug 恰恰出在接线上。故这里直接盯调用点。
+test('调用点接线：状态行与控制台都必须走队列读数出口，不许直接读 QUEUED_PAGES.size', () => {
+  assert.match(SHELL_HTML, /buildStatusLine\(\{[^}]*queued: queuedArg\(\)/, '状态行的 queued 必须来自 queuedArg()（取不到 → undefined）');
+  assert.equal(/queued:\s*QUEUED_PAGES\.size/.test(SHELL_HTML), false, '状态行不得直接传 QUEUED_PAGES.size');
+  assert.match(SHELL_HTML, /\$\{queuedCountText\(\)\}/, '控制台「已排队请求」必须来自 queuedCountText()');
+  const consoleRow = SHELL_HTML.split('\n').find(l => l.includes('已排队请求'));   // 控制台「状态」小节那一行
+  assert.ok(consoleRow, 'site/index.html 里找不到「已排队请求」那一行');
+  assert.equal(consoleRow.includes('QUEUED_PAGES.size'), false, '控制台那一行不得直接渲染 QUEUED_PAGES.size 条');
 });

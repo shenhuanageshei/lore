@@ -833,7 +833,7 @@ function renderConsolePage() {
       <h3>状态</h3>
       <table>
         <tr><td style="color:var(--fg-dim)">上次机械刷新</td><td>${m.lastFinalize ? new Date(m.lastFinalize).toLocaleString() : '—'}</td></tr>
-        <tr><td style="color:var(--fg-dim)">已排队请求</td><td>${QUEUED_PAGES.size} 条 —— ${m.mode === 'auto' ? '后台 runner 自动消化' : '下次会话 /lore:sync 优先消化'}</td></tr>
+        <tr><td style="color:var(--fg-dim)">已排队请求</td><td>${queuedCountText()}${QUEUED_OK ? ` —— ${m.mode === 'auto' ? '后台 runner 自动消化' : '下次会话 /lore:sync 优先消化'}` : ''}</td></tr>
       </table>
     </div>
     <div class="console-sec">
@@ -928,16 +928,30 @@ async function wireRepoSwitch() {
 
 // 跨 repo 搜索（portal 余项兑现）：搜索词非空时懒加载其他 repo 的 manifest，
 // 命中列在侧栏底部「其他仓库」区，点击跳对应 repo（portal 相对 / per-repo 经 portal 绝对）。
-let CROSS_INDEX = null;       // 懒加载缓存；null=未加载
+// 缓存语义（两种 null 与两种空）：
+//   CROSS_INDEX === null  → 还没加载 **或** 上次全军覆没（可重试）；CROSS_INDEX === [] → 已加载、就是没有别的仓/没有命中。
+//   CROSS_INFLIGHT 管重入，不参与「加载过没有」的判定——混用就是上一轮那个「一次失败永不再试」的根因。
+let CROSS_INDEX = null;       // 懒加载缓存；null=未加载（**也等于「上次全军覆没，可重试」**）
+let CROSS_INFLIGHT = false;   // 在途标志：重入防护与「结果缓存」是两件事，必须分开记（见下）
 async function ensureCrossIndex() {
-  if (CROSS_INDEX !== null || !REPOS_INFO) return;
-  CROSS_INDEX = [];           // 占位防并发重入
-  const others = REPOS_INFO.repos.filter(r => r !== REPOS_INFO.cur);
-  const entries = await Promise.all(others.map(async repo => {
-    try { return { repo, manifest: await (await fetch(`${REPOS_INFO.portalRoot}${encodeURIComponent(repo)}/wiki/.manifest.json`, { cache: 'no-store' })).json() }; }
-    catch { return null; }
-  }));
-  CROSS_INDEX = buildCrossRepoIndex(entries.filter(Boolean));
+  if (CROSS_INFLIGHT || CROSS_INDEX !== null || !REPOS_INFO) return;
+  CROSS_INFLIGHT = true;
+  try {
+    const others = REPOS_INFO.repos.filter(r => r !== REPOS_INFO.cur);
+    const entries = await Promise.all(others.map(async repo => {
+      try { return { repo, manifest: await (await fetch(`${REPOS_INFO.portalRoot}${encodeURIComponent(repo)}/wiki/.manifest.json`, { cache: 'no-store' })).json() }; }
+      catch { return null; }
+    }));
+    const ok = entries.filter(Boolean);
+    // 为什么不能再用 `CROSS_INDEX = []` 当在途占位：portal 瞬时不可用（其它仓 manifest 全失败）时，
+    // 它会存下一个**看起来像结果**的空数组，而 `CROSS_INDEX !== null` 的守卫让跨仓搜索**永不再试**，
+    // 直到整页刷新——一次瞬时故障 = 该功能静默死掉（且没有任何提示）。
+    // 故：确有其它仓要拉、却一个都没成 → 复位 null（= 未加载）让下一次输入重试；
+    // 真的没有其它仓 / 拉到过 → 保留空数组语义（没有更多可拉，不必再试）。
+    CROSS_INDEX = (others.length > 0 && ok.length === 0) ? null : buildCrossRepoIndex(ok);
+  } finally {
+    CROSS_INFLIGHT = false;   // 成败都放行：否则一次抛错会把跨仓索引一起永久锁死
+  }
 }
 
 function renderCrossHits(term) {
@@ -1090,7 +1104,17 @@ function wireTheme() {
 let SYNC_STATUS = null;        // GET /api/sync/status 结果；API 不可用（python/portal）→ null
 let SYNC_API_OK = false;
 let QUEUED_PAGES = new Set();  // 已排队 page path（渲染「已排队 ✓」）
+// 「列表端点读到了吗」必须与「读到几条」分开记（D13）：只记条数的话，一次失败就只剩 size=0，
+// 而 0 是「测出来是零」、拿不到是「测不出来」——混同就会把「列表端点挂了」渲染成「0 条排队请求」。
+// 这正是 buildStatusLine 上一轮刚从纯函数里堵掉的反模式，调用点不许再把它放回来。
+let QUEUED_OK = false;         // false = 没读到（还没轮询到 / rewrite-requests 失败）→ 读数一律 unknown
 let SYNC_RUNS = [];            // auto 任务历史（console 表格消费）
+
+// 队列读数的两个出口，都按 D13 区分「测出来是零」与「测不出来」：
+//   ① 状态行的提示语形参 —— 取不到传 undefined，让 buildStatusLine 落到 unknown 分支（真值 0 必须显式传 0）；
+//   ② 控制台的「已排队请求」单元格 —— 取不到报 unknown，不报 0 条。
+function queuedArg() { return QUEUED_OK ? QUEUED_PAGES.size : undefined; }
+function queuedCountText() { return QUEUED_OK ? `${QUEUED_PAGES.size} 条` : 'unknown（列表端点读不到）'; }
 
 // 三段 fetch 各自独立失败，**不许连坐**：主 status 的 fetch+parse 在自己的 try 里，
 // 二次列表（rewrite-requests / runs）各在自己的嵌套 try 里。为什么必须拆开：原先一个 try 包住三段，
@@ -1109,7 +1133,8 @@ async function fetchSyncStatus() {
   try {
     const q = await (await fetch(BASE + 'api/sync/rewrite-requests')).json();
     QUEUED_PAGES = new Set((q.requests ?? []).map(x => x.page));
-  } catch { QUEUED_PAGES = new Set(); }
+    QUEUED_OK = true;                                          // 读到了：真值 0 也照报 0
+  } catch { QUEUED_PAGES = new Set(); QUEUED_OK = false; }     // 读不到：清空 + 标未读到（读数出口据此报 unknown）
   try { SYNC_RUNS = (await (await fetch(BASE + 'api/sync/runs')).json()).runs ?? []; }
   catch { SYNC_RUNS = []; }
 }
@@ -1167,7 +1192,7 @@ function showUpdateBar() {
 // 点不动就是装饰性遥测）、以及预算超限的显隐。SYNC_STATUS 为 null（python serve / portal / 未 init）时
 // 纯函数自然降级为静态读数（燃料 unknown + manifest 的页数/队列），不报错、不空白（验收 6）。
 function renderStatusLine() {
-  const line = buildStatusLine({ status: SYNC_STATUS, manifest: MANIFEST, queued: QUEUED_PAGES.size });
+  const line = buildStatusLine({ status: SYNC_STATUS, manifest: MANIFEST, queued: queuedArg() });
   const fill = (id, text, cls) => {
     const el = document.getElementById(id);
     el.textContent = text;

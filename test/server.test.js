@@ -8,6 +8,7 @@ import { appendCost } from '../lib/cost.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, createPortalServer } from '../server.js';
+import { buildCrossRepoIndex } from '../site/shell.mjs';
 import { execFileSync } from 'node:child_process';
 import net from 'node:net';
 
@@ -835,5 +836,116 @@ test('portal: 处理器内未预期抛错 → 500（portal 同样是长时进程
     assert.equal((await fetch(`http://127.0.0.1:${port}/repos.json`)).status, 200);
     assert.equal((await fetch(`http://127.0.0.1:${port}/ghost/site/`)).status, 404);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+// --- 代码评审 🔵#3：server.js 的未引用 import ---
+// 根因：`readSyncMode` / `readAutoPending` / `clearAutoPending` 被 import 进来却全文件无引用
+// （pending 状态实际由 lib/runner.js 读写）。死 import 会误导读者以为 server 读了 pending 状态，
+// 下次排查「谁改的 pending」会先来这里翻半天。故立一条**通用**不变量：server.js 里每个具名
+// import 都必须在 import 行以外真的出现过——不是只盯这三个名字，下次再冒出死 import 一样会被抓。
+test('server.js: 没有未被引用的 import（死 import 会误导读者以为 server 读了这些状态）', () => {
+  const src = readFileSync(new URL('../server.js', import.meta.url), 'utf8');
+  const withoutImports = src.replace(/^import[\s\S]*?from\s+'[^']+';$/gm, '');
+  const names = [...src.matchAll(/^import\s*\{([^}]*)\}\s*from/gm)]
+    .flatMap(m => m[1].split(','))
+    .map(s => s.trim().split(/\s+as\s+/).pop())
+    .filter(Boolean);
+  assert.ok(names.length > 5, '没解析出 server.js 的具名 import——解析器失效，需同步更新本测试');
+  for (const name of names) {
+    assert.equal(withoutImports.includes(name), true,
+      `server.js 的 import「${name}」在 import 行以外全文件无引用（死 import）`);
+  }
+});
+
+// --- 代码评审 🟡#2：跨仓索引一次失败即永死 ---
+// 注意：被测对象是**壳**的 site/index.html（ensureCrossIndex），与 server.js 无关——放在本文件
+// 只因它和上面的死 import 是同一次评审修复的两半，一起回归。壳是 SPA、内联脚本依赖 DOM，
+// 本仓零依赖无 jsdom，所以把 ensureCrossIndex 连同它的状态声明抽出来在 Node 里跑：测行为，不测字样。
+const SHELL_HTML_SRC = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+
+// 从 header 起按花括号配对切出整段函数（跳过字符串/模板/行注释里的花括号）。
+// 抽不到就直接失败：抽取器静默失真 = 测试假装通过，比不测更糟。
+function sliceShellFn(header) {
+  const at = SHELL_HTML_SRC.indexOf(header);
+  assert.notEqual(at, -1, `site/index.html 里找不到「${header}」——抽取器失效，需同步更新本测试`);
+  let depth = 0, quote = null, i = SHELL_HTML_SRC.indexOf('{', at);
+  for (; i < SHELL_HTML_SRC.length; i++) {
+    const c = SHELL_HTML_SRC[i];
+    if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; continue; }
+    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
+    if (c === '/' && SHELL_HTML_SRC[i + 1] === '/') { i = SHELL_HTML_SRC.indexOf('\n', i); if (i === -1) break; continue; }
+    if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) { i++; break; }
+  }
+  return SHELL_HTML_SRC.slice(at, i);
+}
+
+function buildCrossIndexApi(fetchStub, reposInfo) {
+  const decls = SHELL_HTML_SRC.match(/let CROSS_INDEX = null;[\s\S]*?let CROSS_INFLIGHT = false;/);
+  assert.ok(decls, 'site/index.html 的跨仓索引状态声明抽取失败——需同步更新本测试');
+  const body = [
+    decls[0],
+    sliceShellFn('async function ensureCrossIndex'),
+    'return { ensureCrossIndex, peek: () => CROSS_INDEX };',
+  ].join('\n');
+  return new Function('fetch', 'REPOS_INFO', 'buildCrossRepoIndex', body)(fetchStub, reposInfo, buildCrossRepoIndex);
+}
+
+const okManifest = { ok: true, json: async () => ({ axes: [{ id: 'docs', pages: [{ id: 'x', title: 'X' }] }] }) };
+
+test('ensureCrossIndex: 其它仓 manifest 全失败 → 复位为「未加载」，下一次输入真能重试（一次瞬时故障不永久停死）', async () => {
+  let calls = 0;
+  const api = buildCrossIndexApi(async () => { calls++; throw new Error('portal 瞬时不可用'); },
+    { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: '/' });
+  await api.ensureCrossIndex();
+  assert.equal(calls, 1);
+  assert.equal(api.peek(), null);            // 关键：不是「加载过的空结果」，而是「没拿到、可重试」
+  await api.ensureCrossIndex();              // 下一次输入
+  assert.equal(calls, 2);                    // 真的重试了（修复前这里永久停在 1）
+});
+
+test('ensureCrossIndex: 拿到过结果（含真的没有其它仓、含部分成功）→ 保留空数组语义，不再重复请求', async () => {
+  let calls = 0;
+  const api = buildCrossIndexApi(async () => { calls++; return okManifest; },
+    { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: '/' });
+  await api.ensureCrossIndex();
+  assert.equal(api.peek().length, 1);        // 索引真的建起来了
+  await api.ensureCrossIndex();
+  assert.equal(calls, 1);                    // 已加载 → 不重复请求
+
+  // 真的没有其它仓：空数组（不是 null）——没有更多可拉，不该每次输入都再试
+  let solo = 0;
+  const apiSolo = buildCrossIndexApi(async () => { solo++; throw new Error('nope'); },
+    { cur: 'alpha', repos: ['alpha'], portalRoot: '/' });
+  await apiSolo.ensureCrossIndex();
+  assert.deepEqual(apiSolo.peek(), []);
+  assert.equal(solo, 0);                     // 一个请求都不发
+  await apiSolo.ensureCrossIndex();
+  assert.equal(solo, 0);
+
+  // 部分成功 = 结果可用：不复位 null（否则失败的仓会被每次输入反复重拉 → 请求风暴）
+  let part = 0;
+  const apiPart = buildCrossIndexApi(async url => {
+    part++;
+    if (url.includes('beta')) throw new Error('beta down');
+    return okManifest;
+  }, { cur: 'alpha', repos: ['alpha', 'beta', 'gamma'], portalRoot: '/' });
+  await apiPart.ensureCrossIndex();
+  assert.equal(apiPart.peek().length, 1);
+  await apiPart.ensureCrossIndex();
+  assert.equal(part, 2);                     // 只发了一轮（beta + gamma），第二次输入不再请求
+});
+
+test('ensureCrossIndex: 重入防护仍生效——在途期间再输入不产生重复请求风暴', async () => {
+  let calls = 0, release;
+  const gate = new Promise(r => { release = r; });
+  const api = buildCrossIndexApi(async () => { calls++; await gate; return okManifest; },
+    { cur: 'alpha', repos: ['alpha', 'beta', 'gamma'], portalRoot: '/' });
+  const first = api.ensureCrossIndex();
+  const second = api.ensureCrossIndex();     // 在途期间的第二次输入（旧实现靠 CROSS_INDEX=[] 占位挡）
+  release();
+  await Promise.all([first, second]);
+  assert.equal(calls, 2);                    // 每个其它仓各一次：并发输入没有翻倍
+  assert.equal(api.peek().length, 2);
 });
 

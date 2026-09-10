@@ -6,8 +6,8 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
-import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
-  readSyncConfig, readBudgetConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
+import { writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
+  readSyncConfig, readBudgetConfig, runnerAlive, readAutoRuns } from './lib/syncstate.js';
 import { budgetStatus, versionStamp } from './lib/cost.js';
 import { fuelReadout } from './lib/doctor.js';
 import { isAlive } from './lib/serve.js';

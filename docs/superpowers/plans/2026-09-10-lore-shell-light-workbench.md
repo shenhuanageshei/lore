@@ -347,4 +347,22 @@
 
 **证据**（自检命令与结果，逐 stage）：Stage 1 `node --test test/server.test.js` → 37/37 通过（新增 1 项：同 root 不同 exec 不共享缓存）；Stage 2 `node --test test/shell.test.js test/server.test.js` → 121/121 通过（新增 1 项：列表中间夹散文不进表格）；Stage 3 `node --test test/server.test.js` → 39/39 通过（新增 2 项：per-repo / portal 注入 fs 抛错回 500 且进程存活）。另跑 `node --test test/serve.test.js` → 20/20（server.js 被它 spawn，防回归）。
 
-**未做 / 已知边界**：`fetchSyncStatus` 的隔离行为**没有入库测试**——壳是 SPA、内联脚本在 `site/index.html` 里，本仓零依赖无 jsdom，测它要额外造 DOM 桩（属新增机制）。当前用一次性的 Node 注入验证（status 成功 + `rewrite-requests` 抛错 → `SYNC_STATUS` 保留、`SYNC_API_OK` 仍为 true）确认，**未留成回归测试**，记为后续可补项。
+**未做 / 已知边界**：`fetchSyncStatus` 的隔离行为**没有入库测试**——壳是 SPA、内联脚本在 `site/index.html` 里，本仓零依赖无 jsdom，测它要额外造 DOM 桩（属新增机制）。当前用一次性的 Node 注入验证（status 成功 + `rewrite-requests` 抛错 → `SYNC_STATUS` 保留、`SYNC_API_OK` 仍为 true）确认，**未留成回归测试**，记为后续可补项。**（该缺口已在 §9.7 补上：调用点回归测试用同一注入口径断言 `SYNC_API_OK` 仍为 true、且队列读数走 unknown。）**
+
+### 9.7 交付代码评审第二轮修复轮（2026-09-10，2 🟡 + 1 🔵）
+
+| # | 级别 | 根因 | 处置（file:line 为修复后位置） |
+|---|---|---|---|
+| 1 | 🟡 | **上一轮修复被调用点架空**：`buildStatusLine` 删了 `queued = 0` 形参默认值，但调用点 `site/index.html` 在列表端点失败时置 `QUEUED_PAGES = new Set()` 再传 `.size` ⇒ 只 rewrite-requests 失败（status 其实成功）时状态行会报「0 条排队请求」——正是 D13 与 `shell.mjs` 纪律注释点名的反模式 | `site/index.html:1110`（新增 `QUEUED_OK` 标志）/ `:1136-1137`（成功置真、失败置假）/ `:1116-1117`（两个读数出口 `queuedArg()`、`queuedCountText()`）/ `:1195`（状态行传 `queuedArg()`）/ `:836`（控制台「已排队请求」走 `queuedCountText()`）。**真值 0 仍渲染 0**：成功分支的 `SET` 大小原样输出，含空列表 |
+| 2 | 🟡 | `ensureCrossIndex` 拿 `CROSS_INDEX = []` 当**在途占位**：portal 瞬时不可用时各仓 manifest 全失败 → 存下空数组 → `CROSS_INDEX !== null` 的守卫让跨仓搜索**永不再试**，直到整页刷新，且无任何提示 | `site/index.html:935`（新增独立的 `CROSS_INFLIGHT` 在途标志）/ `:937-954`（重入防护改由它承担；**真有其它仓却一个都没拉到** → 复位 `null` 供下次输入重试；**真的没有其它仓 / 部分成功** → 保留空数组语义，不再重复请求）；`finally` 里放行，抛错也不会把索引永久锁死 |
+| 3 | 🔵 | `server.js:9-10` import 了 `readSyncMode` / `readAutoPending` / `clearAutoPending` 却全文件无引用（pending 实际由 `lib/runner.js` 读写）——死 import 会误导读者以为 server 读了 pending 状态 | `server.js:9-10`：删掉这三个，其余 import 不动 |
+
+**证据**（自检命令与结果，逐 stage；命令与 stage 约定一致）：
+- Stage 1 `node --test test/shell.test.js test/server.test.js` → **131/131 通过**（新增 4 项：调用点 3 项行为 + 1 项接线）。
+- Stage 2 `node --test test/server.test.js` → **43/43 通过**（新增 3 项：跨仓索引失败复位 / 结果缓存与部分成功 / 重入防护；另 1 项通用「server.js 无死 import」不变量）。
+- **变异对照（一次性，未入库）**：把状态行调用点改回 `queued: QUEUED_PAGES.size` → shell 测试 **1 失败**；把 `ensureCrossIndex` 改回旧实现 → server 测试 **3 失败**。两处复原后各自全绿——证明新测试不是恒真。
+- `node --check`：内联 module 脚本（自 `site/index.html` 抽出 921 行）与 `server.js` 均 parse 通过。
+
+**为什么这两条测试是「抽真实源码来跑」而不是「断言字样」**：壳的读数与跨仓守卫都写在 `site/index.html` 的内联脚本里，而本仓零依赖、无 jsdom。测试用花括号配对把 `fetchSyncStatus` / `queuedArg` / `queuedCountText` / `ensureCrossIndex` **连同它们的真实状态声明**抽出来在 Node 里执行，断的是行为；抽取失败会**直接断言失败**（抽取器静默失真 = 测试假装通过）。代价：测试与这几块源码的形状耦合，改形状必须同步改测试——这一步在测试里已写明「需同步更新本测试」。
+
+**未做 / 已知边界**：浏览器交互实证仍缺（§9.4 第 1 条不变）；跨仓索引的「复位后可重试」是在抽出的函数上验证的，**没有** portal 真机（多仓 + portal 短暂不可用）的端到端复现。

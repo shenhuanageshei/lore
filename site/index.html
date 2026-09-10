@@ -254,6 +254,33 @@
     border-left: 1px solid var(--bd); padding: 18px 14px; display: grid; gap: 12px; align-content: start; }
   #inspector[hidden] { display: none; }
 
+  /* ---- 阶段 C 视觉①：引出线注记（正文角标 ↔ 右栏注记，设计 §5.4）---- */
+  /* 角标（引出线的正文端）：renderAnchors 产出的 <sup class="anchor-ref">，点它高亮右栏对应注记 */
+  #content .anchor-ref { font: 500 10px/1 var(--mono); color: var(--acc); cursor: pointer;
+    margin-left: 2px; padding: 1px 5px; border-radius: 6px;
+    background: color-mix(in srgb, var(--acc) 12%, transparent); }
+  #content .anchor-ref:hover { background: color-mix(in srgb, var(--acc) 24%, transparent); }
+  #content .anchor-ref:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  /* 注记（引出线的右栏端）：一条一块，编号 = 正文出现顺序；anchor 原样显示（D7：不重解析、不改行号） */
+  #inspector .insp-title { font: 500 10px/1.4 var(--mono); text-transform: uppercase;
+    letter-spacing: .12em; color: var(--dim); }
+  #inspector .note { display: grid; gap: 5px; padding: 9px 10px; border-radius: 10px;
+    border: 1px solid var(--bd); background: var(--pan);
+    transition: transform 200ms var(--ease), opacity 200ms var(--ease); }
+  #inspector .note-n { font: 500 10.5px/1 var(--mono); color: var(--acc); }
+  #inspector .note-anchor { font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+    color: var(--fg); word-break: break-all; }
+  /* 点角标 → 高亮（验收 ③）：换色瞬时生效，transition 只挂 transform/opacity（§5.2「只动 transform/opacity」） */
+  #inspector .note.flash { border-color: var(--acc); transform: translateX(3px);
+    background: color-mix(in srgb, var(--acc) 9%, transparent); }
+
+  /* ---- 阶段 C 视觉②：决策史 = 修改记录表（设计 §5.4 / D6）---- */
+  /* 版本 / 日期是读数 → JetBrains Mono（§5.2 的字体分工）。class 由 route() 精确打在决策史那张表上，
+     不用文字启发式，别的表格不连坐。 */
+  #content .journal-table td:first-child, #content .journal-table td:nth-child(2) {
+    font-family: var(--mono); font-size: 11.5px; color: var(--mut); white-space: nowrap; }
+  #content .journal-table .dh-ver { color: var(--acc); }
+
   /* ---- 底部状态行（§5.3 / §5.5：可操作 + 燃料读数；D9：无 JS 时静态读数不空白）---- */
   #statusline { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 16px;
     flex-wrap: wrap; padding: 9px 16px; background: var(--pan); border-top: 1px solid var(--bd);
@@ -382,6 +409,7 @@ import {
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
   baseFromPathname, buildConsoleModel, pollDecide, buildDocsRows, buildCrossRepoIndex,
   buildThemeRows, budgetNotice, buildStatusLine,
+  renderAnchors, renderDecisionTable,
 } from './shell.mjs';
 
 // per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
@@ -421,6 +449,7 @@ async function boot() {
   wireSearch();
   wireTheme();
   wireShortcuts();   // 快捷键栏 F1–F5：只启用「本页真有内容」的键（D8）
+  wireInspector();   // 引出线注记：正文角标 ↔ 右栏注记的高亮交互（事件委托，正文重建不丢绑）
   wireLanguage();
   await fetchSyncStatus();
   wireSyncConsole();
@@ -536,6 +565,7 @@ async function route() {
   const page = FLAT[hash];
   if (hash === 'console') {
     document.querySelectorAll('#sidebar a').forEach(a => a.classList.remove('active'));
+    renderInspector([]);        // 切到控制台也要清空注记：残留上一页的注记比空栏更坏
     renderConsolePage();
     document.getElementById('main').scrollTop = 0;   // 仅导航时回顶；操作读回的重渲染保留滚动位
     return;
@@ -545,13 +575,23 @@ async function route() {
   if (!page) {
     document.getElementById('meta').innerHTML = '';
     document.getElementById('content').innerHTML = `<h1>404</h1><p>无此页：<code>${hash}</code></p>`;
+    renderInspector([]);        // 404 页没有任何锚点 → 注记栏必须清空并保持 hidden
     return;
   }
   const localized = resolveLocalizedPage(page, SELECTED_LANG);
   const raw = await (await fetch(BASE + 'wiki/' + localized.path, { cache: 'no-store' })).text();   // python serve 的启发式缓存会吃掉刚 finalize 的新内容
-  const html = preprocessWikilinks(renderMarkdown(stripFrontmatter(raw)), PAGE_INDEX);
+  // 阶段 C 的渲染管线（验收 ①）——顺序是硬约束，两步分别落在不同层次：
+  //   ① renderDecisionTable：**md 层次**的改造（决策史哨兵区的列表 → 三列表格 md，
+  //      内部就是 parseDecisionLog 的三列结果 + 空态判定：无决策史小节 / 无列表 → 原样返回，
+  //      所以无决策史的页不会长出空表头），必须发生在 renderMarkdown **之前**（表格渲染器吃 md）。
+  //   ② renderAnchors：**HTML 层次**的插标（给 `fn @ file:line` 插上标角标，并给出右栏注记模型），
+  //      必须发生在 renderMarkdown **之后**（它按标签切段、要跳过 <pre>/mermaid，md 源里没有标签）。
+  const { html, notes } = renderAnchors(
+    preprocessWikilinks(renderMarkdown(renderDecisionTable(stripFrontmatter(raw))), PAGE_INDEX));
   document.getElementById('meta').innerHTML = renderMeta(page) + renderTranslateState(page, localized);
   document.getElementById('content').innerHTML = html;
+  renderInspector(notes);       // 每次切页**重建**注记栏（验收 ⑤：不残留上一页注记）
+  tagDecisionTable();           // 决策史表的排版钩子（版本/日期用 mono）；没有该表就什么都不做
   const mNodes = document.querySelectorAll('#content .mermaid');
   if (mNodes.length) {
     const tNow = document.documentElement.getAttribute('data-theme');
@@ -597,6 +637,72 @@ async function route() {
     } catch { b.textContent = '⚠ 排队不可用（静态服务）'; }
   });
   document.getElementById('main').scrollTop = 0;
+}
+
+// --- 阶段 C 视觉①：引出线注记栏（#inspector，设计 §5.4 / D4 / D8）---
+// 为什么每次 route() 都**重建**而不是增量更新：注记是本页正文的派生数据（编号 = 正文出现顺序），
+// 切页残留上一页的注记会把读者引到不存在的行号上——比空栏更坏。故「无注记」与「清空」走同一条路径：
+// 先清空，再决定显示与否。
+// 空白态是硬要求（验收 ⑥）：notes 为空 → 保持 hidden，绝不出现空注记栏，也不占第三列宽度
+// （#app 的 :has(#inspector:not([hidden])) 只在真有内容时才让出 268px）。F4 的 enabled() 看的也是这个 hidden。
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const FLASH_MS = 1400;        // 验收 ③：约 1.4 秒后移除高亮
+let flashTimer = null;
+
+function cancelFlash() {
+  clearTimeout(flashTimer); flashTimer = null;
+  document.querySelectorAll('#inspector .note.flash').forEach(el => el.classList.remove('flash'));
+}
+
+function renderInspector(notes) {
+  const box = document.getElementById('inspector');
+  box.innerHTML = '';                              // 重建：先清空（切页不残留）
+  cancelFlash();                                   // 重建即撤销上一页遗留的高亮计时器
+  if (!notes.length) { box.hidden = true; return; }
+  // D7：anchor 逐字原样显示（生成时刻的 file:line）——不做 stale 标记、不重解析、不改写行号。
+  box.innerHTML = `<div class="insp-title">引出线注记 · ${notes.length}</div>`
+    + notes.map(n => `<div class="note" id="note-${n.n}" data-note-n="${n.n}">`
+      + `<span class="note-n">[${n.n}]</span>`
+      + `<code class="note-anchor">${escHtml(n.anchor)}</code></div>`).join('');
+  box.hidden = false;
+}
+
+// 点正文角标 → 对应注记高亮约 1.4s；点别处取消（验收 ③）。
+// 用 document 上的**事件委托**（而非逐角标绑）：正文每次 route() 整块重建，
+// 逐角标 addEventListener 会在重建后丢绑——那正是「点了没反应」的死键形态（D8 禁止）。
+function flashNote(n) {
+  cancelFlash();
+  const el = document.getElementById(`note-${n}`);
+  if (!el) return;                                 // 注记栏被清空（切页竞态）时静默无操作，不报错
+  el.classList.add('flash');
+  flashTimer = setTimeout(() => { el.classList.remove('flash'); flashTimer = null; }, FLASH_MS);
+}
+
+function wireInspector() {
+  document.addEventListener('click', e => {
+    const badge = e.target.closest?.('.anchor-ref');
+    if (badge) flashNote(badge.dataset.anchorN); else cancelFlash();   // 点角标=高亮；点任何别处=取消
+  });
+  // 角标是 role="button" tabindex="0"（renderAnchors 产出）：键盘也要能触发，否则它是死控件。
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const badge = e.target.closest?.('.anchor-ref');
+    if (!badge) return;
+    e.preventDefault();                            // 空格默认滚页；这里它是「按下按钮」
+    flashNote(badge.dataset.anchorN);
+  });
+}
+
+// 决策史表的排版钩子：md 表格渲染器不产 class，而版本/日期两列要按 §5.2 的字体分工用 mono。
+// 用「决策史小节里的第一张表」精确定位（不用文字启发式），别的表格不连坐；没有表则什么都不做。
+function tagDecisionTable() {
+  const h = decisionSection();
+  if (!h) return;
+  for (let el = h.nextElementSibling; el && el.tagName !== 'H2'; el = el.nextElementSibling) {
+    if (el.tagName === 'TABLE') { el.classList.add('journal-table'); return; }
+  }
 }
 
 const RO_ATTR = 'disabled title="只读模式（portal 或 python server）——本地 /lore:serve --node 可操作"';

@@ -3,6 +3,27 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.11.0] — 2026-09-10
+
+**人读理解层地基：⓪ 数据与证据地基 + ① 证据清洗与确认**
+
+- **六类原子 schema 与写前校验**（`lib/atom.js`）：`decision|rejected|correction|question|evidence|pitfall`（`commit` 保留为 legacy）；`status` 四态；机器来源写入恒为 `draft`，只有 owner 的直接动作能产生 `confirmed`；`ts` 收紧为补零 ISO-8601；所有原子经 `lib/journal.js` 统一校验，非法原子**拒绝落盘**并给可读错误。
+- **写入侧纪律**：`stripTrailers` 前移到写入侧——剥掉 commit trailer 后为空则**不写 `why` 键**；历史 127 条只降权、不删除、不做 LLM 回填。
+- **踩坑入库**：接线 config 里长期失效的 `journal.mine: [..., claude_md_pitfalls]`——CLAUDE.md / AGENTS.md 的「问题/修复/预防」抽成 `kind:pitfall` 原子（内容 hash 幂等、同源去重）。
+- **统一 CLI**：`node lib/cli.js <verb>`（`visit|read|blackbox|human export|human clear|confirm|evidence|doctor|budget`）+ `package.json` 的 `bin: lore`；旧 `lib/*.js` 入口行为不变。
+- **噪音分类器**（`lib/noise.js`）：给原子标 `none|low|high`（trailer-only / 模板文本 / 重复摘要），`doctor` 报分布。
+- **确认闭环**（`lib/confirm.js`）：`lore confirm <atom-id> [--by <who>] [--verdict confirm|dispute]` 以 `kind:'confirmation'` **追加**记录，原原子字节不变；有效状态由最新确认派生；默认署名 `unattributed`（**机器不可冒充 owner**），`doctor`/`evidence` 单列未署名与坏确认记录。
+- **证据账本**（`lib/evidence.js`）：`lore evidence [--json]` 为每条结论列来源 / 定位（`refs.anchors`）/ 时间 / 置信 / 确认人；无锚点显式标「未验证」。
+- **体检**（`lib/doctor.js`）：hook 指向、上次捕获、断流天数、决策捕获率（**窗口率 + 累计率**）、噪音分布、确认计数、坏行；`--json`；阈值可配，低于阈值**非零退出**。
+- **成本账本与预算闸**（`lib/cost.js`）：每次 LLM 调用记账（后端不回报 token 时留空不伪造）；每版本预算支持 `tokens|calls|ms`，超限时 auto 不启动，原因经 `/api/sync/status` 与壳状态灯可见。
+- **per-human 存储**（`lib/human.js`）：`.lore/human/{visits,read,blackbox,checks}.jsonl`，默认不进 git（自动 ignore），可导出（带 schemaVersion）、可清除。
+- **壳打开传感器**：`POST /api/human/visit`（localhost-only）+ 壳自动记录；portal 形态下 base 正确推导（修此前恒 `no-manifest`、零 visit）。
+- **agent 代捕获约定**：resident 区块（CLAUDE.md / AGENTS.md 同源渲染）新增「做出非显然决策时追加 `kind:decision` 的 draft 原子」规则与 `lore note --draft` 示例。
+- **resident 刷新域修复**：`alignResidentAssets` 改为刷新所有**已存在**的 instruction file（此前只刷已启用宿主，导致 AGENTS.md 统计长期停在旧值）。
+- **文档**：新增设计 `2026-09-09-lore-human-comprehension-and-shell-design.md`（含壳设计与 8 条不变量）、实施计划 ⓪/①、可交互壳原型 `notes/2026-09-09-lore-shell-light.html`。
+
+**本仓库自举实测**：522 原子 · decision 2 · pitfall 11 · trailer-only 127 · 噪音 high 131 / low 76 / none 315 · 未署名确认 1 · 坏确认 0；`node --test` 769 项 / 768 通过 / 0 失败。
+
 ## [0.10.0] — 2026-08-06
 
 - **主题多源深度页**（`axes.theme.deep`）：父主题下按分组声明多源子页（`theme/<parent>--<child>`，规范 id `parent--child`）。子页独立源级陈旧度、按 commit 触达源文件的决策史过滤、机制级质量门（`## 机制详解` + mermaid 架构图 + 父子双向链接 lint）；manifest / 图谱 contains 边 / INDEX 嵌套 / 侧栏嵌套 / MCP 元数据全链路可见。

@@ -109,6 +109,7 @@ node lib/host.js status                   # 查状态；node lib/host.js uninsta
 | `/lore:translate` | 双语 | 按需生成翻译 sidecar（语言切换器 + stale 检测） | agent |
 | `/lore:ask` | 消费 | 按关键词检索 wiki 页 → agent 从合成页答（resident-mode payoff） | agent |
 | `/lore:lint` | 检查 | 只读漂移报告（stale / orphan / missing / unfolded / **mermaid 语法五检**），不自动改 | 否 |
+| **`lore` CLI**（`node lib/cli.js <verb>`，或装了 bin 直接 `lore`） | 统一入口 | `visit`（壳打开痕迹）/ `read`（已阅 @ 版本）/ `blackbox`（黑盒自评）/ `human export|clear`（per-human 档案导出与清除）/ `confirm`（决策确认，追加式）/ `evidence`（证据账本）/ `doctor`（体检 + 捕获闸门）/ `budget`（成本预算闸）/ `note`（决策草稿） | 否（`note` 可为 agent） |
 | **auto 档**（壳里切） | 合成（自动） | commit 静默期后 runner 调只读 LLM CLI 重写 stale 页（后端链 failover），机械质量门过门才落盘，任务历史可查 | claude/codex/opencode CLI（`.state/sync.json` 的 `backend` 可选：auto 探测（含 provider 检查）或显式指定；控制台有下拉） |
 
 ## 架构
@@ -130,23 +131,31 @@ node lib/host.js status                   # 查状态；node lib/host.js uninsta
 └── .git/hooks/post-commit       # lore 装的唯一 .git 产物（引擎升级自动刷新 stub）
 ```
 
-**原子 schema**（ndjson 一行一原子）：`id · ts · kind(commit|decision) · commit · title · why · what_changed · facets{component,flow,theme} · refs{files,pitfall,related} · source(hook|agent|miner:commits) · enriched · confidence`。
+**原子 schema**（ndjson 一行一原子）：`id · ts · kind · title · why · what_changed · facets{component,flow,theme} · refs{files,related,pitfall,supersedes,evidence,anchors} · source · status · confirmed_by · confirmed_at · enriched · confidence`。
+
+- **六类 kind**：`decision | rejected | correction | question | evidence | pitfall`（`commit` 为 legacy 保留）。
+- **写入受契约约束**：所有原子经 `lib/journal.js` → `lib/atom.js` 的 `validateAtom`/`normalizeAtom`；非法原子**拒绝落盘**；机器来源（`agent|miner|hook`）写入恒为 `status:'draft'`——**只有 owner 的直接动作能产生 `confirmed`**。
+- **确认是追加记录**（`kind:'confirmation'`）：原原子字节不变，有效状态由最新确认派生；默认署名 `unattributed`（机器不可冒充 owner）。
+- **噪音分级**（`lib/noise.js`）：`none|low|high`（trailer-only / 模板文本 / 重复摘要）。
 
 **三轴打标**：component = 变更路径前缀匹配 `code_roots`；theme = `title+why` 含 config `match:` 关键词（子串，大小写无关）；flow = 原子的 component ∈ config flow 的 `spans`。
 
-**引擎文件**（`lib/`，全零依赖）：`config` `journal` `mine` `hook` `note` `sync` `fold` `fingerprint` `manifest` `graph` `docs` `home` `i18n` `translate` `syncstate` `runner` `serve` `portal` `repos` `registry` `lint` `ask` `mcp` `init` `host` `backend` + 根 `server.js`（静态壳 + 控制 API + auto ticker + 门户）。
+**引擎文件**（`lib/`，全零依赖）：`config` `journal` `atom` `confirm` `evidence` `noise` `doctor` `cost` `human` `cli` `mine` `hook` `note` `sync` `fold` `fingerprint` `manifest` `graph` `docs` `home` `i18n` `translate` `syncstate` `runner` `serve` `portal` `repos` `registry` `lint` `ask` `mcp` `init` `host` `backend` + 根 `server.js`（静态壳 + 控制 API + auto ticker + 门户）。
 
 ## 不变量（测试显式守）
 
 - **零侵入**：跑完整 `init→mine→sync→serve` 后，`git status` 对业务源码 0 改动；唯一写入 = `.lore/` + `.git/hooks/post-commit`。
 - **物化视图**：nuke `wiki/` 重 sync → 同结构页 + 同 `.manifest.json`。
 - **best-effort hook**：hook 失败/坏 repo → exit 0，绝不阻断 commit。
-- **journal 神圣**：append-only，永不覆写。
+- **journal 神圣**：append-only，永不覆写（确认、纠错一律追加；机器可置 `superseded`，不得改写内容）。
+- **来源诚实**：机器推断永不冒充人类宣告——机器写入恒 `draft`，`lore confirm` 默认署名 `unattributed`，未署名的确认在 `doctor`/`evidence` 单列。
+- **证据锚定**：无 `refs.anchors` 的结论在证据账本里显式标「未验证」。
+- **per-human 边界**：`.lore/human/*.jsonl`（阅读痕迹 / 已阅 / 黑盒 / 检查）默认不进 git、可导出、可清除。
 
 ## 开发
 
 ```bash
-node --test test/*.test.js        # 全部测试（420+，零外部依赖）
+node --test                       # 全部测试（769 项，零外部依赖）
 ```
 
 - 流程：每功能走 brainstorming → spec（`docs/superpowers/specs/`）→ plan（`docs/superpowers/plans/`）→ TDD → 双审 → 合并。

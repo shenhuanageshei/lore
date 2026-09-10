@@ -11,6 +11,20 @@ lore 必须**同时**服务两类读者，任何 roadmap 项都按「是否同�
 1. **人读友好的代码仓库 wiki** —— 一眼看懂：为什么这么设计、关键决策怎么来的、**时间线**（演进顺序）、**最新架构**、**各类数据流**。读文档像读一本活的项目史，不用 grep 源码。
 2. **agent 友好的 wiki + graph** —— 不只是给人看的页面，还是机器可遍历的**结构**：节点（页 / 原子 / 组件）+ 边（wikilink / facet / refs / 决策关系），让 agent 检索、问答、顺图谱推理，而非重读代码。
 
+## 当前迭代（2026-09-09/10）：人读理解层 —— 从「生成 wiki」到「项目记忆 + 你的理解档案」
+
+**背景**：harness 厂商（ZCode 等）原生内置「仓库 wiki」，**生成侧已被免费商品化**。lore 的差异化转向厂商结构上拿不到的两样：**时间轴（为什么这么做）** 与 **per-human 理解状态（你懂什么、何时懂的、何时过期）**。
+设计：`docs/superpowers/specs/2026-09-09-lore-human-comprehension-and-shell-design.md`（含 **8 条不变量**、记录层 schema、理解层五件、壳设计 tokens 与分期）；实施计划见同目录 `plans/2026-09-09-lore-comprehension-phase{0,1}.md`。
+
+- **⓪ 数据与证据地基** ✅（2026-09-09，8 阶段）：六类原子 schema + **写前校验**（`lib/atom.js` / `lib/journal.js`，非法原子拒绝落盘）· 写入侧 trailer 纪律（剥净后不写 why）· **踩坑入库**（接线长期失效的 `claude_md_pitfalls` → `kind:pitfall`）· **统一 CLI**（`lib/cli.js` + `package.json` 的 `bin: lore`）· per-human 存储与边界（`.lore/human/`，不进 git、可导出可清除）· **体检与捕获闸门**（`lib/doctor.js`：hook 指向 / 断流天数 / 窗口率 + 累计捕获率 / 阈值可配且非零退出）· **成本账本与预算闸**（`lib/cost.js`：tokens/calls/ms 三维度）· 壳打开传感器 · **agent 代捕获约定**（resident 区块规则 + `lore note --draft`）。
+- **① 证据清洗与确认** ✅（2026-09-10，4 阶段）：**噪音分类器**（`lib/noise.js`：trailer-only / 模板 / 重复摘要 → none|low|high）· **确认闭环**（`lib/confirm.js`：`kind:'confirmation'` 追加记录、原原子字节不变、有效状态派生、默认署名 `unattributed` 使**机器不可冒充 owner**）· **证据账本**（`lib/evidence.js`：来源 / 定位 / 时间 / 置信 / 确认人，无 `refs.anchors` 显式标「未验证」）。
+- **② 一条端到端理解切片**（下一步）：再入简报（离开 N 天回来：变了什么 / 哪些认知过期 / 先读哪三页）+ 证据 + 一个模块端到端打通；**锚点漂移语义**（行号变动 → 标 stale 还是重解析）在本期定案。
+- **③ 机械化扩展**：docs 轴**索引化**（82 页镜像 → 索引页）· **痛点雷达**（TODO/lint/缺陷/flaky）· **digest 骨架**（零 LLM、随代码入库，fresh clone 也有可读文档）· auto 追版本 + 版本切分（确定性聚类）· graph 接消费者（否则重演翻译层）· 翻译层删除（0/94 实测）。
+- **④ 理解检查与回归**：任务式检查（给场景、定位入口、解释决策、指出风险；opt-in、带预立死亡条款）· 变更影响回归（源码/决策变化后哪些卡片失效）；`lore check` verb 在本期落地。
+- **⑤ 答辩与扩展**：`lore prep` **事件驱动**（owner 说「两周后要答辩」才烧钱；5 组 × 5 题 + 追问链，答案四段式：结论 → 机制 → 数字/证据 → 反方案对比）· 持续答辩（不等最后）。
+
+**本期硬约束**：捕获与确认先于消费类功能——瓶颈是**日历时间**不是工程时间（实证：hook 曾静默断流 3 个月、85 个提交零原子）。
+
 ## 已完成（v0.2 → v0.5，均 spec→plan→TDD→两段审查→opus 终审→合并）
 
 - **v0.2.0** mermaid 架构/数据流图（vendored、客户端渲染、securityLevel strict）· 可安装为 Claude Code 插件 · installHook hooksPath 修复 · sync token exactly-once。

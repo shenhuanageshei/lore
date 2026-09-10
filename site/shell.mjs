@@ -433,3 +433,167 @@ export function buildStatusLine({ status = null, manifest = null, queued = 0, no
     text: [capture_text, rate_text, gap_text, pages_text, queue_text, stamp_text].join(' · '),
   };
 }
+
+// ---------- §5.4 视觉①：源码锚点 = 引出线注记（壳阶段 C） ----------
+// 纯函数（无 DOM，Node 可直测）：从**正文 HTML**里认出 `fn @ file:line`（例 `runAuto @ lib/runner.js:77`）
+// 形态的锚点 → 在正文对应位置插上标角标 `[n]`，并给出右栏注记模型 `notes:[{n, anchor}]`。
+// 点角标的交互（高亮对应注记、再点取消）在 site/index.html——本函数只答「标什么、标几号」，不碰 DOM。
+//
+// D7（本期锚点漂移口径，计划 §2）：锚点**按生成时刻的 file:line 原样渲染**——正则只做识别与编号，
+// 不重解析源码、不校验符号是否还在、**绝不静默改写行号**；notes 里的 anchor 就是正文里那串字面量。
+// （行号变动 → 标 stale 还是重解析，是 ② 期的语义定案，本期明确不做。）
+//
+// 编号：按**正文首次出现顺序**从 1 发号；同一锚点（字符串逐字相等）**复用同一编号**——
+// 既不一号多义，也不一义多号。重复出现处同样插角标（同一号有多处角标正是引出线的语义：
+// 一个注记可以被正文多处引用）。确定性：只看输入字符串，不读挂钟；Map 只按 key 取号，
+// 发号顺序由 notes 数组钉死，与 Map 迭代顺序无关。
+//
+// 不插角标的位置：
+//   · HTML 标签内部（属性里的 `@` 不是 anchors）；
+//   · `<pre>` 代码块（字面代码样本，插进去是污染）；
+//   · mermaid 图源（`div.mermaid` 的 textContent 会被 route() 读回去当图源渲染，插角标直接画坏图）。
+const ANCHOR_RE = /(?<![\w$./-])(\/?[A-Za-z_$][\w$]*(?:[./][\w$]+)*(?:\(\))?) @ ([A-Za-z0-9_][\w./-]*\.[A-Za-z0-9]+):(\d+)/g;
+
+const anchorBadge = n =>
+  `<sup class="anchor-ref" data-anchor-n="${n}" role="button" tabindex="0" aria-label="引出线注记 ${n}">[${n}]</sup>`;
+
+// html → { html, notes:[{n, anchor}] }。零锚点时 notes 为空数组且 **html 原样返回**（不插任何角标、
+// 不产生空注记栏——空态判定交给调用方看 notes.length）。
+export function renderAnchors(html) {
+  if (typeof html !== 'string' || html === '') return { html, notes: [] };
+  const notes = [];
+  const numbered = new Map();
+  // 按标签切成「文本 / 标签」交替段（偶数下标文本、奇数下标标签）——只在文本段里替换，
+  // 标签属性里的 `@`（如 title="a @ b.js:1"）永远碰不到。
+  const parts = html.split(/(<[^>]*>)/);
+  let preDepth = 0, mermaidDepth = 0;
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {                                  // 标签：只维护「字面区」深度
+      const tag = parts[i];
+      if (/^<pre\b/i.test(tag)) preDepth++;
+      else if (/^<\/pre\s*>$/i.test(tag)) preDepth = Math.max(0, preDepth - 1);
+      else if (/^<div\b/i.test(tag) && /\bmermaid\b/.test(tag)) mermaidDepth++;
+      else if (/^<\/div\s*>$/i.test(tag)) mermaidDepth = Math.max(0, mermaidDepth - 1);
+      continue;
+    }
+    if (!parts[i] || preDepth > 0 || mermaidDepth > 0) continue;
+    parts[i] = parts[i].replace(ANCHOR_RE, (match) => {
+      if (!numbered.has(match)) {
+        numbered.set(match, notes.length + 1);          // 首次出现才发号（号序 = 正文顺序）
+        notes.push({ n: notes.length + 1, anchor: match });
+      }
+      return match + anchorBadge(numbered.get(match));
+    });
+  }
+  if (notes.length === 0) return { html, notes: [] };   // 零锚点：返回原串，连重建都不做
+  return { html: parts.join(''), notes };
+}
+
+// ---------- §5.4 视觉②：决策史 = 修改记录表（壳阶段 C） ----------
+// 列表格式的**唯一真源**是 lib/sync.js 的 renderDecisionHistory：`- **title** — why (sha, date)`；
+// 无 sha 的原子是 `(date)`（并在壳阶段 C 起附加 atom id 载体）。本段只做「识别 + 排版」：
+// 绝不改写语义、绝不重算版本、绝不丢行。
+//
+// 版本列规则（计划 D6，设计评审 🔴 的修复项，严格执行）：
+//   · 有 sha → 用短 sha（生成侧已截 7 位，这里原样取用）；
+//   · 无 sha 的原子 → **用 atom id 兜底**。理由已实测：525 原子 / 513 提交，commit 型原子每个 sha
+//     恰好 1 条（天然唯一），唯一的多原子提交是 13 条**没有 sha** 的原子——只靠日期它们会互相撞车。
+//     兜底顺序：atom id（生成侧附的载体）→ 日期（仅当页面是改造前的旧物化内容、载体还不存在时；
+//     这是能力边界不是设计选择，重物化一次即消失）。
+//   · 解析失败（没有 `(…)` 元信息 / 元信息形态不认识）→ **降级：整行进「变更与原因」、日期列 `—`，
+//     绝不丢行**（版本列同样 `—`：既然身份没解析出来，就不猜）。
+export const DECISION_EMPTY = '暂无 journal 原子（跑 /lore:mine 补全）。';
+
+// 决策史小节标题（与 site/index.html 的 F3 判定同口径：英文 / 三种中文写法）
+const DECISION_HEADING_RE = /^##\s+(?:Decision history\b|决策史|决策历史|决策与时间线)/;
+const DECISION_SHA_DATE = /^([0-9a-f]{4,40}),\s*(\d{4}-\d{2}-\d{2})$/i;
+const DECISION_DATE_ONLY = /^(\d{4}-\d{2}-\d{2})$/;
+// 生成侧只对**无 sha** 原子附加的 atom id 载体（lib/sync.js renderDecisionHistory）
+const DECISION_ID_SPAN = / ?<span class="atom-id" title="([^"]*)"[^>]*>[\s\S]*?<\/span>\s*$/;
+
+function unescapeAttrValue(s) {
+  return String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+}
+
+// 单行 → 三列。行首 `- ` 是列表语法不是内容，剥掉；atom id 载体是元数据载体，剥掉后单独返回。
+function parseDecisionRow(line) {
+  let text = line.replace(/^[-*]\s+/, '').trim();
+  let atom_id = null;
+  const idm = DECISION_ID_SPAN.exec(text);
+  if (idm) { atom_id = unescapeAttrValue(idm[1]); text = text.slice(0, idm.index).trim(); }
+  const meta = /\(([^()]*)\)\s*$/.exec(text);                 // 末尾元信息 `(sha, date)` / `(date)`
+  const fields = meta ? meta[1].trim() : '';
+  const shaDate = DECISION_SHA_DATE.exec(fields);
+  const dateOnly = DECISION_DATE_ONLY.exec(fields);
+  if (meta && (shaDate || dateOnly)) {
+    const change = text.slice(0, meta.index).trim();           // `**title** — why`（保留 md 标记，交 inline() 渲染）
+    if (shaDate) return { version: shaDate[1], date: shaDate[2], change, atom_id };
+    return { version: atom_id ?? dateOnly[1], date: dateOnly[1], change, atom_id };
+  }
+  return { version: '—', date: '—', change: text, atom_id };   // 降级（整行进 change 列，绝不丢行）
+}
+
+// 决策史列表 md → [{version, date, change, atom_id}]。空态提示串 → 空数组（不是一条"行"）。
+export function parseDecisionLog(md) {
+  const rows = [];
+  for (const raw of String(md ?? '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;                                       // 空行
+    if (line.startsWith('<!--')) continue;                     // LORE_JOURNAL 哨兵注释
+    if (/^#{1,6}\s/.test(line)) continue;                      // 标题行不是条目
+    if (line === DECISION_EMPTY) continue;                     // 空态提示不是条目（→ 空数组）
+    rows.push(parseDecisionRow(line));
+  }
+  return rows;
+}
+
+// 单元格文本里只中和 `|`（表格分隔符）——不转义 `&`/`<`：change 列要留给 renderMarkdown 的 inline()
+// 处理 `**粗体**` / `` `代码` `` / 链接与生成侧附加的 HTML（模块顶部的 raw-passthrough 口径不变）。
+const decisionCell = s => String(s ?? '').replace(/\|/g, '&#124;');
+const decisionAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// D6 的交叉引用落点：atom id 必须**能在渲染结果里取到**——挂进版本格的 title 属性，
+// 用户据此对照 `lore confirm <atom-id>`。没有载体（有 sha 的原子 / 旧内容）就不加属性，不编造。
+const decisionVersionCell = r => (r.atom_id
+  ? `<span class="dh-ver" title="${decisionAttr(r.atom_id)}">${decisionCell(r.version)}</span>`
+  : decisionCell(r.version));
+
+function decisionTableMd(rows) {
+  return [
+    '| 版本 | 日期 | 变更与原因 |',
+    '|---|---|---|',
+    ...rows.map(r => `| ${decisionVersionCell(r)} | ${decisionCell(r.date)} | ${decisionCell(r.change)} |`),
+  ];
+}
+
+// 整页 md → 决策史小节里的列表换成三列表格 md（其余字节原样）。喂给既有 renderMarkdown 的表格渲染。
+// 不渲染的情形（**都返回原串**，避免每页挂一堆空壳）：
+//   · 没有决策史小节（无决策史的页 → 不得出现空表）；
+//   · 小节里没有列表（空态提示 / 手写自管内容 → 不得渲染出空表头）。
+export function renderDecisionTable(md) {
+  if (typeof md !== 'string' || md === '') return md;
+  const lines = md.split('\n');
+  let head = -1, fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^```/.test(lines[i])) { fence = !fence; continue; }   // 围栏代码块里的 `## …` 不是标题
+    if (fence) continue;
+    if (DECISION_HEADING_RE.test(lines[i])) { head = i; break; }
+  }
+  if (head === -1) return md;
+  let end = lines.length;
+  fence = false;
+  for (let i = head + 1; i < lines.length; i++) {
+    if (/^```/.test(lines[i])) { fence = !fence; continue; }
+    if (!fence && /^##\s/.test(lines[i])) { end = i; break; }
+  }
+  let first = -1, last = -1;
+  for (let i = head + 1; i < end; i++) {
+    if (/^[-*]\s/.test(lines[i])) { if (first === -1) first = i; last = i; }
+  }
+  if (first === -1) return md;
+  const rows = parseDecisionLog(lines.slice(first, last + 1).join('\n'));
+  if (rows.length === 0) return md;
+  return [...lines.slice(0, first), ...decisionTableMd(rows), ...lines.slice(last + 1)].join('\n');
+}

@@ -658,6 +658,220 @@ test('buildStatusLine: 预算超限复用既有 budgetNotice()（独立读数，
   assert.equal(line.text.includes('预算超限'), false);               // 读数是独立 span（超限才出现），不进规范一行
 });
 
+// --- 壳阶段 C 视觉①：源码锚点 = 引出线注记（设计 §5.4 / D7）---
+// 纯函数（无 DOM）：renderAnchors(html) → { html, notes:[{n, anchor}] }；点角标的交互在 site/index.html。
+import { renderAnchors } from '../site/shell.mjs';
+
+test('renderAnchors: 多个锚点 → 按正文出现顺序编号 1..N，角标落在锚点后，notes 与之一一对应', () => {
+  const html = '<p>入口 <code>runAuto @ lib/runner.js:77</code>，再看 <code>planSync @ lib/sync.js:21</code>。</p>';
+  const { html: out, notes } = renderAnchors(html);
+  assert.deepEqual(notes, [
+    { n: 1, anchor: 'runAuto @ lib/runner.js:77' },
+    { n: 2, anchor: 'planSync @ lib/sync.js:21' },
+  ]);
+  assert.match(out, /runAuto @ lib\/runner\.js:77<sup class="anchor-ref" data-anchor-n="1"/);
+  assert.match(out, /planSync @ lib\/sync\.js:21<sup class="anchor-ref" data-anchor-n="2"/);
+  assert.match(out, /\[1\]<\/sup>/);
+  assert.match(out, /\[2\]<\/sup>/);
+});
+
+test('renderAnchors: 同一锚点重复出现 → 复用同一编号（不一号多义、不一义多号）', () => {
+  const html = '<p>a <code>renderDecisionHistory @ lib/sync.js:162</code> b <code>foldJournal @ lib/sync.js:185</code> '
+    + 'c <code>renderDecisionHistory @ lib/sync.js:162</code></p>';
+  const { html: out, notes } = renderAnchors(html);
+  assert.equal(notes.length, 2);                                   // 唯一锚点只有两个
+  assert.deepEqual(notes.map(n => n.n), [1, 2]);
+  assert.equal((out.match(/data-anchor-n="1"/g) || []).length, 2); // 重复出现处都插角标，且同号
+  assert.equal((out.match(/data-anchor-n="2"/g) || []).length, 1);
+  assert.equal((out.match(/\[1\]<\/sup>/g) || []).length, 2);
+});
+
+test('renderAnchors: 零锚点 → notes 空数组且 html 原样返回（不插角标、不产生空注记栏）', () => {
+  const html = '<h1>标题</h1><p>没有锚点的一段话 <code>foo()</code>。</p>';
+  const r = renderAnchors(html);
+  assert.deepEqual(r.notes, []);
+  assert.equal(r.html, html);                                      // 严格同一串（不是"看起来一样"）
+  assert.equal(renderAnchors('').html, '');
+  assert.deepEqual(renderAnchors('').notes, []);
+});
+
+test('renderAnchors: 确定性——同一输入两次调用结果逐字段相同（不读挂钟、不依赖 Map 迭代顺序）', () => {
+  const html = '<p><code>b @ z/z.js:2</code><code>a @ a/a.js:1</code><code>b @ z/z.js:2</code></p>';
+  const one = renderAnchors(html), two = renderAnchors(html);
+  assert.deepEqual(one, two);
+  assert.equal(one.html, two.html);
+  assert.deepEqual(one.notes.map(n => n.anchor), ['b @ z/z.js:2', 'a @ a/a.js:1']);   // 号序 = 正文顺序
+});
+
+test('renderAnchors: D7 —— 锚点按生成时刻的 file:line 原样渲染，不重解析、不改写行号', () => {
+  const { html: out, notes } = renderAnchors('<p><code>route() @ site/index.html:413</code></p>');
+  assert.equal(notes[0].anchor, 'route() @ site/index.html:413');  // 逐字原样（含圆括号形态）
+  assert.match(out, /site\/index\.html:413/);                      // 正文里仍是同一个行号
+  assert.equal(/stale|重解析|已更新/.test(out), false);
+  // 前导斜杠的路径形态（wiki 表里真实存在：`/api/sync/finalize @ server.js:190`）
+  assert.deepEqual(renderAnchors('<td><code>/api/sync/finalize @ server.js:190</code></td>').notes,
+    [{ n: 1, anchor: '/api/sync/finalize @ server.js:190' }]);
+});
+
+test('renderAnchors: 不碰标签属性、<pre> 代码块与 mermaid 图源（插进去会污染样本 / 画坏图）', () => {
+  const attr = renderAnchors('<p title="runAuto @ lib/runner.js:77">正文无锚点</p>');
+  assert.deepEqual(attr.notes, []);
+  assert.equal(attr.html, '<p title="runAuto @ lib/runner.js:77">正文无锚点</p>');
+  const pre = renderAnchors('<pre><code>runAuto @ lib/runner.js:77\n</code></pre>');
+  assert.deepEqual(pre.notes, []);
+  assert.equal(/anchor-ref/.test(pre.html), false);
+  const mer = renderAnchors('<div class="mermaid">A[runAuto @ lib/runner.js:77] --&gt; B</div>');
+  assert.deepEqual(mer.notes, []);
+  assert.equal(/anchor-ref/.test(mer.html), false);
+  // <pre> 之外仍照常编号（跳过是局部的，不是把整页静音）
+  const mixed = renderAnchors('<pre><code>x @ a/a.js:1\n</code></pre><p><code>y @ b/b.js:2</code></p>');
+  assert.deepEqual(mixed.notes, [{ n: 1, anchor: 'y @ b/b.js:2' }]);
+});
+
+// --- 壳阶段 C 视觉②：决策史 = 修改记录表（设计 §5.4 / D6；生成侧 = lib/sync.js renderDecisionHistory）---
+import { parseDecisionLog, renderDecisionTable, DECISION_EMPTY } from '../site/shell.mjs';
+import { renderDecisionHistory } from '../lib/sync.js';
+
+const DH_LINE = '- **fix crawler** — anti data blowup (abc1234, 2026-06-01)';
+
+test('parseDecisionLog: 正常行 → {version: 短 sha, date, change} 三列', () => {
+  assert.deepEqual(parseDecisionLog(DH_LINE), [
+    { version: 'abc1234', date: '2026-06-01', change: '**fix crawler** — anti data blowup', atom_id: null },
+  ]);
+});
+
+test('parseDecisionLog: 无 why 的行（`- **title** (sha, date)`）→ change 只有标题', () => {
+  assert.deepEqual(parseDecisionLog('- **add site** (def4567, 2026-05-30)'), [
+    { version: 'def4567', date: '2026-05-30', change: '**add site**', atom_id: null },
+  ]);
+});
+
+test('parseDecisionLog: 无 sha 的原子 → 版本列用 atom id 兜底（D6），且 atom_id 可取', () => {
+  const md = renderDecisionHistory([
+    { id: 'decision:2026-06-03-use-zset', ts: '2026-06-03T08:00:00Z', kind: 'decision', commit: null,
+      title: 'use ZSET', why: 'range queries' },
+  ]);
+  assert.match(md, /\(2026-06-03\)/);                                   // 仍是无 sha 形态
+  assert.match(md, /title="decision:2026-06-03-use-zset"/);             // 载体在 md 里就有
+  assert.deepEqual(parseDecisionLog(md), [{
+    version: 'decision:2026-06-03-use-zset',                            // 版本列 = atom id（不是日期）
+    date: '2026-06-03',
+    change: '**use ZSET** — range queries',
+    atom_id: 'decision:2026-06-03-use-zset',
+  }]);
+});
+
+test('parseDecisionLog: D6 的撞车场景——同一天 13 条无 sha 原子，版本列两两不同', () => {
+  const atoms = Array.from({ length: 13 }, (_, i) => ({
+    id: `decision:2026-06-03-item-${i}`, ts: '2026-06-03T08:00:00Z', kind: 'decision', commit: null,
+    title: `决定 ${i}`, why: 'why',
+  }));
+  const rows = parseDecisionLog(renderDecisionHistory(atoms));
+  assert.equal(rows.length, 13);
+  assert.equal(new Set(rows.map(r => r.version)).size, 13);             // 只靠日期会全撞成一列
+  assert.equal(rows.every(r => r.version.startsWith('decision:')), true);
+});
+
+test('parseDecisionLog: 解析失败 → 降级（整行进 change 列、日期列 —），绝不丢行', () => {
+  const md = [
+    DH_LINE,
+    '- **no meta at all** — why without parenthetical',
+    '- **weird meta** — why (deadbeef, 不是日期)',
+    '- 裸行（连标题都没有）',
+  ].join('\n');
+  const rows = parseDecisionLog(md);
+  assert.equal(rows.length, 4);                                          // 四行进四行出
+  assert.deepEqual(rows[0], { version: 'abc1234', date: '2026-06-01', change: '**fix crawler** — anti data blowup', atom_id: null });
+  assert.deepEqual(rows[1], { version: '—', date: '—', change: '**no meta at all** — why without parenthetical', atom_id: null });
+  assert.deepEqual(rows[2], { version: '—', date: '—', change: '**weird meta** — why (deadbeef, 不是日期)', atom_id: null });
+  assert.deepEqual(rows[3], { version: '—', date: '—', change: '裸行（连标题都没有）', atom_id: null });
+});
+
+test('parseDecisionLog: 空态提示 → 空数组（不是一条"行"）；哨兵注释/空行/标题都不算条目', () => {
+  assert.deepEqual(parseDecisionLog(DECISION_EMPTY), []);
+  assert.deepEqual(parseDecisionLog(`\n${DECISION_EMPTY}\n`), []);
+  assert.deepEqual(parseDecisionLog('<!-- LORE_JOURNAL:START -->\n' + DECISION_EMPTY + '\n<!-- LORE_JOURNAL:END -->'), []);
+  assert.deepEqual(parseDecisionLog('## Decision history\n\n'), []);
+  assert.deepEqual(parseDecisionLog(''), []);
+  assert.deepEqual(parseDecisionLog(null), []);
+});
+
+test('parseDecisionLog: 旧物化内容（无 atom id 载体、只有日期）→ 版本列退化为日期，不丢行', () => {
+  assert.deepEqual(parseDecisionLog('- **use ZSET** — range queries (2026-06-03)'), [
+    { version: '2026-06-03', date: '2026-06-03', change: '**use ZSET** — range queries', atom_id: null },
+  ]);
+});
+
+test('renderDecisionTable: 决策史列表 → 三列表格 md（版本/日期/变更与原因），其余字节原样', () => {
+  const page = [
+    '---', 'title: P', '---', '# P', '', '正文一段。', '',
+    '## Decision history', '', '<!-- LORE_JOURNAL:START -->',
+    DH_LINE,
+    '- **add site** (def4567, 2026-05-30)',
+    '<!-- LORE_JOURNAL:END -->', '', '## 下一节', '尾巴。',
+  ].join('\n');
+  const out = renderDecisionTable(page);
+  assert.match(out, /\| 版本 \| 日期 \| 变更与原因 \|/);
+  assert.match(out, /\| abc1234 \| 2026-06-01 \| \*\*fix crawler\*\* — anti data blowup \|/);
+  assert.match(out, /\| def4567 \| 2026-05-30 \| \*\*add site\*\* \|/);
+  assert.equal(/- \*\*fix crawler\*\*/.test(out), false);                // 列表行已被表格取代
+  assert.match(out, /正文一段。/);                                       // 别的字节没动
+  assert.match(out, /## 下一节\n尾巴。/);
+  // 表格 md 交给既有 renderMarkdown，就是真三列表格（表头文案 = §5.4 的三列名）
+  const html = renderMarkdown(out);
+  assert.match(html, /<th>版本<\/th><th>日期<\/th><th>变更与原因<\/th>/);
+  assert.match(html, /<b>fix crawler<\/b>/);                            // change 列仍走 inline()
+});
+
+test('renderDecisionTable: atom id 必须能在渲染结果里取到（title 属性，供对照 lore confirm <atom-id>）', () => {
+  const page = '## Decision history\n\n<!-- LORE_JOURNAL:START -->\n'
+    + renderDecisionHistory([{ id: 'decision:2026-06-03-use-zset', ts: '2026-06-03T08:00:00Z', kind: 'decision', commit: null, title: 'use ZSET', why: 'range queries' }])
+    + '\n<!-- LORE_JOURNAL:END -->\n';
+  const out = renderDecisionTable(page);
+  assert.match(out, /title="decision:2026-06-03-use-zset"/);            // D6 的交叉引用没被丢掉
+  assert.match(out, /\| <span class="dh-ver" title="decision:2026-06-03-use-zset">decision:2026-06-03-use-zset<\/span> \| 2026-06-03 \|/);
+  assert.match(renderMarkdown(out), /<span class="dh-ver" title="decision:2026-06-03-use-zset">/);
+});
+
+test('renderDecisionTable: 无决策史小节 / 空态 → 原样返回（不得渲染出空表头）', () => {
+  const noSection = '# P\n\n只有正文，没有决策史。\n';
+  assert.equal(renderDecisionTable(noSection), noSection);
+  const empty = `## Decision history\n\n<!-- LORE_JOURNAL:START -->\n${DECISION_EMPTY}\n<!-- LORE_JOURNAL:END -->\n`;
+  assert.equal(renderDecisionTable(empty), empty);                      // 空态：空数组 → 一个字都不改
+  assert.equal(/版本/.test(renderDecisionTable(empty)), false);
+  // 围栏代码块里的 `## Decision history` 不是小节（页面正文常引用这个标题）
+  const fenced = '```md\n## Decision history\n- **x** — y (abc1234, 2026-06-01)\n```\n';
+  assert.equal(renderDecisionTable(fenced), fenced);
+  // 手写自管小节（标题 + 散文，无列表）→ 不碰
+  const prose = '## Decision history\n\n这里是人写的说明。\n';
+  assert.equal(renderDecisionTable(prose), prose);
+});
+
+test('renderDecisionTable: 确定性——同一输入两次调用结果相同；表格里的 `|` 不撕表', () => {
+  const page = '## Decision history\n\n<!-- LORE_JOURNAL:START -->\n'
+    + '- **a | b** — why (abc1234, 2026-06-01)\n<!-- LORE_JOURNAL:END -->\n';
+  assert.equal(renderDecisionTable(page), renderDecisionTable(page));
+  const cells = renderDecisionTable(page).split('\n').find(l => l.includes('abc1234'));
+  assert.equal(cells.split('|').length, 5);                             // 首尾空 + 三格：`|` 被中和，没多裂一格
+  assert.match(cells, /&#124;/);
+});
+
+test('生成侧契约（lib/sync.js）：只对无 sha 且有 id 的原子附加 atom id，有 sha 的逐字节不变', () => {
+  const withSha = renderDecisionHistory([
+    { id: 'commit:a', ts: '2026-06-01T08:00:00Z', kind: 'commit', commit: 'abc1234567', title: 't', why: 'w' },
+  ]);
+  assert.equal(withSha, '- **t** — w (abc1234, 2026-06-01)');            // 有 sha：零噪音
+  const noId = renderDecisionHistory([
+    { ts: '2026-06-03T08:00:00Z', kind: 'decision', commit: null, title: 'd', why: 'w' },
+  ]);
+  assert.equal(noId, '- **d** — w (2026-06-03)');                       // 无 id 可附：保持原输出
+  const escaped = renderDecisionHistory([
+    { id: 'decision:a"b<c', ts: '2026-06-03T08:00:00Z', kind: 'decision', commit: null, title: 'd', why: '' },
+  ]);
+  assert.match(escaped, /title="decision:a&quot;b&lt;c"/);               // 属性值转义，不撕 markdown
+  assert.deepEqual(parseDecisionLog(escaped)[0].atom_id, 'decision:a"b<c');   // 读回来仍是原 id
+});
+
 test('buildStatusLine: 「队列 N」提示语带上已排队条数（QUEUED_PAGES 口径），供面板入口的 title', () => {
   const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: 2, now: AT_1402 });
   assert.match(line.queue_hint, /1 页待重写/);

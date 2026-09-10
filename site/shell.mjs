@@ -23,6 +23,12 @@ function inline(t) {
       `<a href="${String(href).replace(/"/g, '&quot;')}">${text}</a>`);
 }
 
+// 输入前提：**假定 LF 换行**。wiki 正文由生成侧 lib/sync.js 统一以 LF 写出，页面经 route() 的
+// fetch → serveStatic 原样返回，不经过任何 CRLF 转换路径，故当前不可触发。
+// 若将来有人**手编 wiki 页存成 CRLF**，本函数的行级正则只按 '\n' 切行、行尾会留一个 `\r`，
+// 而 `\r` 不在任何字符类里（如 `/^> ?/` 认得下 `>\r`，随后的 `replace(/^> ?/,'')` 便只剩一个 `\r`
+// 残段）。届时需与下方 DECISION_HEADING_RE 同口径把 `\r` 收进字符类——那处已为同类坑处理过
+// （见该正则上方的注释）。此处只显式化前提，不改行为。
 export function renderMarkdown(src) {
   const lines = src.split('\n');
   let html = '', i = 0;

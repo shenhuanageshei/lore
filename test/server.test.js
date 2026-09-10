@@ -916,24 +916,11 @@ test('server.js: 没有未被引用的 import（死 import 会误导读者以为
 // 注意：被测对象是**壳**的 site/index.html（ensureCrossIndex），与 server.js 无关——放在本文件
 // 只因它和上面的死 import 是同一次评审修复的两半，一起回归。壳是 SPA、内联脚本依赖 DOM，
 // 本仓零依赖无 jsdom，所以把 ensureCrossIndex 连同它的状态声明抽出来在 Node 里跑：测行为，不测字样。
-const SHELL_HTML_SRC = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
-
-// 从 header 起按花括号配对切出整段函数（跳过字符串/模板/行注释里的花括号）。
-// 抽不到就直接失败：抽取器静默失真 = 测试假装通过，比不测更糟。
-function sliceShellFn(header) {
-  const at = SHELL_HTML_SRC.indexOf(header);
-  assert.notEqual(at, -1, `site/index.html 里找不到「${header}」——抽取器失效，需同步更新本测试`);
-  let depth = 0, quote = null, i = SHELL_HTML_SRC.indexOf('{', at);
-  for (; i < SHELL_HTML_SRC.length; i++) {
-    const c = SHELL_HTML_SRC[i];
-    if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; continue; }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-    if (c === '/' && SHELL_HTML_SRC[i + 1] === '/') { i = SHELL_HTML_SRC.indexOf('\n', i); if (i === -1) break; continue; }
-    if (c === '{') depth++;
-    else if (c === '}' && --depth === 0) { i++; break; }
-  }
-  return SHELL_HTML_SRC.slice(at, i);
-}
+// 壳源码 + 抽取器从共享 helper 导入（遗留 🔵#18 的**后半**）：这两样原先在本文件与
+// test/shell.test.js 里逐字复制了两份，壳里被封装的函数一改形状（或抽取器本身要修边界）就得改两处，
+// 而漏一处的后果不是「测试报错」而是**静默失真**——另一份照旧切出旧形状、断言照旧全绿。
+// 本地别名 SHELL_HTML_SRC 保留，故下方两个调用点（buildCrossIndexApi / wireRepoSwitch 一处）零改动。
+import { SHELL_HTML as SHELL_HTML_SRC, sliceShellFn } from './helpers/shell-slice.js';
 
 function buildCrossIndexApi(fetchStub, reposInfo, { urls = [] } = {}) {
   const decls = SHELL_HTML_SRC.match(/let CROSS_INDEX = null;[\s\S]*?const CROSS_BACKOFF_MS = \d+;/);

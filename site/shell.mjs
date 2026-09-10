@@ -8,16 +8,19 @@ export function stripFrontmatter(md) {
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// NOTE: inline() escapes ONLY code spans, not surrounding text. renderMarkdown
-// intentionally passes raw HTML through (the synthesis emits <div> timeline markup
-// that must render). Safe here: content is machine-generated and served on
-// 127.0.0.1 only. If this renderer is ever reused for UNTRUSTED input, add an
-// HTML-escape pass over the non-construct text in inline() and drop raw-div passthrough.
+// 注：inline() 只转义代码 span，**不转义周边文本**——renderMarkdown 刻意放行裸 HTML
+// （合成产物里的 <div> 时间线标记必须原样渲染）。此处安全的前提是「内容由机器生成、
+// 且只经 127.0.0.1 提供服务」。若此渲染器将来复用于**不可信输入**，要补的是这几处：
+//   ① inline() 里非构造文本的 HTML 转义 + 去掉裸 div 放行；
+//   ② 链接的 href 属性值——属性里一个裸 `"` 就能闭掉引号，把后面的文本变成标签。
+// ②这条**当下就修**（遗留 🔵#12），不等「将来复用于不可信输入」：它是属性逃逸的**唯一**字符，
+// 转义成本是一行；其余字符（`<` `>` `&`）落在带引号的属性值里不构成逃逸，仍归上面的清单。
 function inline(t) {
   return t
     .replace(/`([^`]+)`/g, (_, c) => `<code>${esc(c)}</code>`)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) =>
+      `<a href="${String(href).replace(/"/g, '&quot;')}">${text}</a>`);
 }
 
 export function renderMarkdown(src) {
@@ -51,7 +54,15 @@ export function renderMarkdown(src) {
     if (/^### /.test(ln)) { html += `<h3>${inline(ln.slice(4))}</h3>`; i++; continue; }
     if (/^## /.test(ln))  { html += `<h2>${inline(ln.slice(3))}</h2>`; i++; continue; }
     if (/^# /.test(ln))   { html += `<h1>${inline(ln.slice(2))}</h1>`; i++; continue; }
-    if (/^> /.test(ln))   { html += `<blockquote>${inline(ln.slice(2))}</blockquote>`; i++; continue; }
+    // 连续多行引用合成为**一个** blockquote：逐行产出会把一段引用切成多个各自带左边框 /
+    // 圆角 / 底色的独立盒子（引用被切碎）。与紧邻的 ul 分支同构：while 累积，再一次性包壳。
+    // 判定用 `/^> ?/`（标准引用标记允许省掉标记后那个空格）：否则引用中间的 `>` 空行会把
+    // 盒子重新切断，「多行引用不再被切碎」这个修复就漏掉最常见的一半。
+    if (/^> ?/.test(ln)) {
+      const parts = [];
+      while (i < lines.length && /^> ?/.test(lines[i])) { parts.push(inline(lines[i].replace(/^> ?/, ''))); i++; }
+      html += `<blockquote>${parts.join('\n')}</blockquote>`; continue;
+    }
     if (/^---\s*$/.test(ln)) { html += '<hr>'; i++; continue; }
     if (/^[-*] /.test(ln)) {
       let buf = '<ul>';
@@ -556,8 +567,33 @@ export function renderNoteHtml(note) {
 //     绝不丢行**（版本列同样 `—`：既然身份没解析出来，就不猜）。
 export const DECISION_EMPTY = '暂无 journal 原子（跑 /lore:mine 补全）。';
 
-// 决策史小节标题（与 site/index.html 的 F3 判定同口径：英文 / 三种中文写法）
-const DECISION_HEADING_RE = /^##\s+(?:Decision history\b|决策史|决策历史|决策与时间线)/;
+// 决策史小节标题的**唯一口径**（遗留 🔵#10 的三处统一）——下列三处判定必须给出同一个答案：
+//   · lib/sync.js 的 DH_HEADING_RE（生成侧定位，判整行 md）；
+//   · site/index.html 的 decisionSection()（壳侧 F3 可用性，判 h2 的**文本**）；
+//   · 本文件 renderDecisionTable（壳侧转表，判整行 md）。
+// 统一后的口径 = 变体集（英文 `Decision history` + 决策史 / 决策历史 / 决策与时间线）
+//   + **大小写不敏感** + 标题名后必须是**空白或行尾**。
+// 为什么要大小写不敏感：此前只有 index.html 带 `/i`——小写 `## decision history` 会让 F3 亮起，
+//   而 renderDecisionTable 认不出来、不转表：同一个标题在两处得到相反答案，而 shell.mjs 那句
+//   「与 site/index.html 的 F3 判定同口径」正是假注释（本次连注释一起修正）。
+// 为什么要边界：纯前缀匹配会把 `## 决策历史附录` / `## Decision history中文` 也认成决策史小节
+//   （前者还会被整段换成表格），而生成侧 lib/sync.js 一直按「不是」处理（test/sync.test.js 把
+//   这两个 lookalike 钉住了）——一边严一边松就不叫统一口径。
+// 为什么 lib/sync.js 不 import 这里的常量：分层方向是 壳 → lib（site/ 是物化产物），lib 反向依赖
+//   site/ 会缠住初始化；两处一致性改由 test/shell.test.js 的**交叉断言**守住——同一样本集分别喂
+//   foldJournal（生成侧）与本文件的判定，逐条比对结论，谁改歪了都会红。
+const DECISION_HEADING_NAMES = 'Decision history|决策史|决策历史|决策与时间线';
+// 标题**文本**口径（供 h2 的 textContent 判定；也是其余两个正则的唯一样本集来源）
+export const DECISION_HEADING_TEXT_RE = new RegExp(`^(?:${DECISION_HEADING_NAMES})(?:[ \\t\\r]|$)`, 'i');
+// 整行 md 口径：由上面那份变体集拼出，**不另写一套**（两个正则各写各的正是本 bug 的成因）。
+// `[ \t\r]` 里带上 `\r`：CRLF 页面按 '\n' 切行后行尾会留一个 `\r`。
+const DECISION_HEADING_RE = new RegExp(`^##[ \\t]+(?:${DECISION_HEADING_NAMES})(?:[ \\t\\r]|$)`, 'i');
+
+// 标题文本是否是决策史小节标题（site/index.html 的 F3 判定与 renderDecisionTable 共用同一判据）。
+export function isDecisionHeading(text) {
+  return DECISION_HEADING_TEXT_RE.test(String(text ?? '').trim());
+}
+
 const DECISION_SHA_DATE = /^([0-9a-f]{4,40}),\s*(\d{4}-\d{2}-\d{2})$/i;
 const DECISION_DATE_ONLY = /^(\d{4}-\d{2}-\d{2})$/;
 // 生成侧只对**无 sha** 原子附加的 atom id 载体（lib/sync.js renderDecisionHistory）
@@ -602,6 +638,12 @@ export function parseDecisionLog(md) {
 
 // 单元格文本里只中和 `|`（表格分隔符）——不转义 `&`/`<`：change 列要留给 renderMarkdown 的 inline()
 // 处理 `**粗体**` / `` `代码` `` / 链接与生成侧附加的 HTML（模块顶部的 raw-passthrough 口径不变）。
+// 已知角落（遗留 🔵#15，**刻意不改行为**，只记在案）：`&#124;` 落进**代码 span** 会被二次转义——
+// inline() 的 esc() 再把 `&` 变成 `&amp;`，于是 `` `|| true` `` 这类样本显示成字面的 `&#124;&#124; true`。
+// 触发条件是「why/title 里同时有反引号与竖线」，本仓 journal 实测 542 行里已有 1 条（why 含
+// `` `|| true` `` 的那个 commit 原子）——不是纯理论角落，但仍属显示瑕疵：要根治得让 decisionCell
+// 感知反引号区间（在代码 span 内不中和 `|`），代价是它得复制一份 markdown 行内语法知识，
+// 收益小于「表格被裸 `|` 撕成多格」的风险，故本轮只留痕。
 const decisionCell = s => String(s ?? '').replace(/\|/g, '&#124;');
 const decisionAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');

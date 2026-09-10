@@ -30,9 +30,14 @@ function sendJson(res, status, value) {
 
 // Only accept the local-loopback Host header on write APIs — blocks DNS-rebinding
 // (a remote page resolving a hostname to 127.0.0.1 to POST against this server).
+// 为什么**没有** `[::1]` 分支（遗留 🔵#9）：这里刻意不认 IPv6 回环。全仓所有监听都只绑 IPv4
+// 127.0.0.1（本文件 createServer 的 listen、lib/serve.js:115、lib/portal.js:110 同款），IPv6 回环
+// 请求根本到不了处理器——认它只是让读者以为存在一条 v6 面（「看起来比实际宽」）。而且 host 头是
+// `[::1]:port`，下面按 ':' 切分后取到的是 `[`，那个分支连语法上都命中不了（双重死代码）。
+// 将来若真绑 ::1，**必须**在这里同步加回判定，否则那条新监听会把写 API 暴露给任意 Host。
 function localHost(req) {
   const host = (req.headers.host || '').split(':')[0];
-  return host === '127.0.0.1' || host === 'localhost' || host === '[::1]';
+  return host === '127.0.0.1' || host === 'localhost';
 }
 
 // Resolve a wiki-relative page path, refusing anything that escapes <root>/wiki.
@@ -71,8 +76,12 @@ export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
   if (st.isDirectory()) {
     // 无尾斜杠先 301 补上（python http.server 同款）：文档 URL 不带斜杠时，
     // 浏览器把 ./shell.mjs 解析到上一级 → 404 → 整壳白屏。
+    // reqPath 是**解码后**的 pathname（createServer / portal 都用 decodeURIComponent），而 Location
+    // 是 header 值、必须是合法 URI——目录名含空格 / 非 ASCII 时，直接回写解码形态会写出一个
+    // 非法（且被浏览器按不同规则再解读）的 Location：`/my dir/`（遗留 🔵#17）。
+    // → 重新 encodeURI 回 percent-encoded 形态；`/` 不被编码，路径结构保持原样。
     if (!reqPath.endsWith('/')) {
-      res.writeHead(301, { location: reqPath + '/' });
+      res.writeHead(301, { location: encodeURI(reqPath) + '/' });
       return res.end();
     }
     full = join(full, 'index.html');
@@ -197,167 +206,167 @@ function versionStampCached(repoRoot, exec, ttlMs = VERSION_STAMP_TTL_MS, now = 
 }
 
 export async function handleApi(root, req, res, pathname, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync, fuelTtlMs = FUEL_CACHE_TTL_MS, versionTtlMs = VERSION_STAMP_TTL_MS } = {}) {
-    if (req.method === 'POST' && pathname.startsWith('/api/') && !localHost(req)) {
-      sendJson(res, 403, { error: 'forbidden host' });
-      return true;
+  if (req.method === 'POST' && pathname.startsWith('/api/') && !localHost(req)) {
+    sendJson(res, 403, { error: 'forbidden host' });
+    return true;
+  }
+  if (req.method === 'POST' && pathname === '/api/preferences') {
+    try {
+      const body = await readJson(req);
+      const lang = String(body.language ?? '');
+      if (!LANG_RE.test(lang)) return sendJson(res, 400, { error: 'invalid language' });
+      const out = join(root, '.state', 'preferences.json');
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, JSON.stringify({ language: lang }, null, 2) + '\n');
+      return sendJson(res, 200, { ok: true });
+    } catch {
+      return sendJson(res, 400, { error: 'bad json' });
     }
-    if (req.method === 'POST' && pathname === '/api/preferences') {
-      try {
-        const body = await readJson(req);
-        const lang = String(body.language ?? '');
-        if (!LANG_RE.test(lang)) return sendJson(res, 400, { error: 'invalid language' });
-        const out = join(root, '.state', 'preferences.json');
-        mkdirSync(dirname(out), { recursive: true });
-        writeFileSync(out, JSON.stringify({ language: lang }, null, 2) + '\n');
-        return sendJson(res, 200, { ok: true });
-      } catch {
-        return sendJson(res, 400, { error: 'bad json' });
-      }
-    }
+  }
 
-    if (req.method === 'POST' && pathname === '/api/translation-requests') {
+  if (req.method === 'POST' && pathname === '/api/translation-requests') {
+    try {
+      const body = await readJson(req);
+      const page = String(body.page ?? '');
+      const targetLang = String(body.target_lang ?? '');
+      const wikiPage = safeWikiPage(root, page);
+      if (!wikiPage || !LANG_RE.test(targetLang)) return sendJson(res, 400, { error: 'invalid request' });
+      const text = readFileSync(wikiPage, 'utf8');
+      const request = {
+        ts: new Date().toISOString(),
+        page,
+        target_lang: targetLang,
+        source_hash: translationSourceHash(text),
+      };
+      const out = join(root, '.state', 'translation-requests.ndjson');
+      mkdirSync(dirname(out), { recursive: true });
+      appendFileSync(out, JSON.stringify(request) + '\n');
+      return sendJson(res, 200, { ok: true, request });
+    } catch {
+      return sendJson(res, 400, { error: 'bad request' });
+    }
+  }
+
+  // --- S7 壳打开传感器（设计 2026-09-09 §7 / §4.4）：壳记 page-open，喂 ② 期再入简报与 wiki 健康度 ---
+  // 记录形状与写入纪律的唯一真源在 lib/human.js（S4 存储层），这里只做「校验 → 追加」。
+  // localHost 防护由上方统一 POST /api/* 闸门覆盖；page 沿用 safeWikiPage 白名单（仅 root/wiki 内的 .md）。
+  if (req.method === 'POST' && pathname === '/api/human/visit') {
+    let body;
+    try { body = await readJson(req); } catch { return sendJson(res, 400, { error: 'bad json' }); }
+    const page = String(body.page ?? '');
+    if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
+    try {
+      const r = appendHuman(root, 'visits', visitRecord({ page }));
+      return sendJson(res, 200, { ok: true, page, deduped: r.deduped });
+    } catch (e) {
+      // 未 init（无 .lore）→ 明确报错（绝不静默写散文件）；壳侧 catch 掉即降级，阅读不受影响。
+      if (e instanceof HumanStoreError) return sendJson(res, 404, { error: e.code });
+      return sendJson(res, 500, { error: 'visit failed' });
+    }
+  }
+
+  // --- B1 同步控制 API（spec 2026-06-09-lore-sync-console）---
+  if (req.method === 'GET' && pathname === '/api/sync/status') {
+    const stateDir = join(root, '.state');
+    const config = readSyncConfig(stateDir);
+    let lastFinalize = null;
+    try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
+    catch { /* 无 manifest（未 sync）→ null */ }
+    // 预算闸的**可见出口**（审计 D4）：auto 因超预算静默停摆时，壳状态行必须读得到原因。
+    // 未配置预算也照报（configured:false）——「为什么没跑」要能一眼看出是没配还是超了。
+    // repoRoot：createServer(root) 的 root **就是 .lore 目录本身**（test/server.test.js:420、lib/serve.js:219），
+    // 而预算版本戳与下面的 fuel 都要的是**仓库根**——统一从 root 的父目录推导，不猜、不"顺手修"传参。
+    const repoRoot = join(resolve(root), '..');
+    const budgetCfg = readBudgetConfig(stateDir);
+    // 版本戳（预算窗口键）：唯一剩余的 per-request git spawn 就在这里，走上面的 30s TTL 缓存。
+    // 传 `version` 进 budgetStatus 即让它跳过内部 versionStamp(repoRoot,{exec})——口径与 library 完全同一份。
+    const budgetVersion = versionStampCached(repoRoot, exec, versionTtlMs);
+    const bs = budgetStatus({
+      stateDir, repoRoot,
+      budget: budgetCfg.budget, dimension: budgetCfg.dimension, exec,
+      version: budgetVersion,
+    });
+    // 壳状态行的燃料读数（设计 §5.3 底部 / §5.5；壳阶段 B）。派生**唯一在 lib/doctor.js 的 fuelReadout**
+    // （计划 D3：同源同口径，绝不在 server.js 重写一套，否则与 `lore doctor` 漂移即可信度崩塌）。
+    // 取不到的数一律 'unknown'（UNKNOWN），**绝不用 0 冒充**；未 init / 非 git 也不崩（全 unknown）。
+    // 性能：fuelReadout 的窗口派生内部要 spawn 一次 `git log`（同步、约 1s）→ 走上面的 30s TTL 缓存，
+    // 否则壳每 15s 一次的状态轮询会各自阻塞事件循环一秒（审计 🟡#3）。
+    const fuel = fuelCached(repoRoot, exec, fuelTtlMs);
+    return sendJson(res, 200, {
+      mode: config.mode, last_finalize: lastFinalize, config,
+      runner_running: runnerAlive(stateDir, isAlive),
+      budget: {
+        configured: bs.configured, dimension: bs.dimension, budget: bs.budget,
+        used: bs.used, exceeded: bs.exceeded, version: bs.version,
+      },
+      fuel,
+    });
+  }
+
+  if (req.method === 'POST' && pathname === '/api/sync/config') {
+    try {
+      const body = await readJson(req);
+      const patch = {};
+      if ('debounce_minutes' in body) patch.debounce_minutes = Number(body.debounce_minutes);
+      if ('schedule' in body) patch.schedule = body.schedule === null || body.schedule === '' ? null : String(body.schedule);
+      if ('max_pages' in body) patch.max_pages = Number(body.max_pages);
+      if ('backend' in body) patch.backend = String(body.backend);
+      writeSyncConfig(join(root, '.state'), patch);      // 非法值 throw → 400
+      return sendJson(res, 200, { ok: true, config: readSyncConfig(join(root, '.state')) });
+    } catch { return sendJson(res, 400, { error: 'invalid config (debounce 0-1440, schedule HH:MM|null, max_pages 1-50, backend auto|claude|codex|opencode)' }); }
+  }
+
+  if (req.method === 'GET' && pathname === '/api/sync/runs') {
+    return sendJson(res, 200, { runs: readAutoRuns(join(root, '.state')) });
+  }
+
+  // per-repo 形态的仓库切换数据源：读中央注册表 + 报告 portal 端口（壳跳 portal 切仓库）。
+  if (req.method === 'GET' && pathname === '/repos.json') {
+    let entries = [];
+    try { entries = JSON.parse(readFileSync(reposPath, 'utf8')) ?? []; } catch { entries = []; }
+    const current = entries.find(e => slashLower(e.loreDir) === slashLower(root))?.name ?? null;
+    return sendJson(res, 200, { repos: entries.map(e => e.name), portal: PORTAL_PORT, current });
+  }
+
+  if (req.method === 'POST' && pathname === '/api/sync/mode') {
+    try {
+      const body = await readJson(req);
+      const mode = String(body.mode ?? '');
+      writeSyncMode(join(root, '.state'), mode);   // 非法值 throw → 400
+      return sendJson(res, 200, { ok: true, mode });
+    } catch {
+      return sendJson(res, 400, { error: 'invalid mode (B1: manual|notify; auto lands in B2)' });
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/api/sync/finalize') {
+    try {
+      // 与 hook.maybeRefresh 同款 detached finalize（A 接缝③）。不加防抖：finalize 幂等、最后写赢。
+      // 刻意不 gate mode：manual 档关的是「自动」刷新，手动 ⟳ 正是 manual 档的用法——别给这里补 mode 检查。
+      const child = spawnFn(process.execPath, [join(HERE, 'lib', 'sync.js'), 'finalize', root],
+        { detached: true, stdio: 'ignore', windowsHide: true });
+      child.once?.('error', () => {});   // 异步 spawn 失败（EMFILE 等）不能击落常驻 server
+      child.unref();
+      return sendJson(res, 200, { spawned: true });
+    } catch { return sendJson(res, 500, { error: 'spawn failed' }); }
+  }
+
+  if (pathname === '/api/sync/rewrite-requests') {
+    if (req.method === 'GET') {
+      return sendJson(res, 200, { requests: readRewriteRequests(join(root, '.state')) });
+    }
+    if (req.method === 'POST') {
       try {
         const body = await readJson(req);
         const page = String(body.page ?? '');
-        const targetLang = String(body.target_lang ?? '');
-        const wikiPage = safeWikiPage(root, page);
-        if (!wikiPage || !LANG_RE.test(targetLang)) return sendJson(res, 400, { error: 'invalid request' });
-        const text = readFileSync(wikiPage, 'utf8');
-        const request = {
-          ts: new Date().toISOString(),
-          page,
-          target_lang: targetLang,
-          source_hash: translationSourceHash(text),
-        };
-        const out = join(root, '.state', 'translation-requests.ndjson');
-        mkdirSync(dirname(out), { recursive: true });
-        appendFileSync(out, JSON.stringify(request) + '\n');
-        return sendJson(res, 200, { ok: true, request });
-      } catch {
-        return sendJson(res, 400, { error: 'bad request' });
-      }
+        if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
+        // 重写/改进：透传用户指令（截断防滥用）；无指令 = 排队/同步语义
+        const instruction = body.instruction != null && String(body.instruction).trim()
+          ? String(body.instruction).slice(0, 500) : undefined;
+        return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page, instruction }) });
+      } catch { return sendJson(res, 400, { error: 'bad json' }); }
     }
-
-    // --- S7 壳打开传感器（设计 2026-09-09 §7 / §4.4）：壳记 page-open，喂 ② 期再入简报与 wiki 健康度 ---
-    // 记录形状与写入纪律的唯一真源在 lib/human.js（S4 存储层），这里只做「校验 → 追加」。
-    // localHost 防护由上方统一 POST /api/* 闸门覆盖；page 沿用 safeWikiPage 白名单（仅 root/wiki 内的 .md）。
-    if (req.method === 'POST' && pathname === '/api/human/visit') {
-      let body;
-      try { body = await readJson(req); } catch { return sendJson(res, 400, { error: 'bad json' }); }
-      const page = String(body.page ?? '');
-      if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
-      try {
-        const r = appendHuman(root, 'visits', visitRecord({ page }));
-        return sendJson(res, 200, { ok: true, page, deduped: r.deduped });
-      } catch (e) {
-        // 未 init（无 .lore）→ 明确报错（绝不静默写散文件）；壳侧 catch 掉即降级，阅读不受影响。
-        if (e instanceof HumanStoreError) return sendJson(res, 404, { error: e.code });
-        return sendJson(res, 500, { error: 'visit failed' });
-      }
-    }
-
-    // --- B1 同步控制 API（spec 2026-06-09-lore-sync-console）---
-    if (req.method === 'GET' && pathname === '/api/sync/status') {
-      const stateDir = join(root, '.state');
-      const config = readSyncConfig(stateDir);
-      let lastFinalize = null;
-      try { lastFinalize = JSON.parse(readFileSync(join(root, 'wiki', '.manifest.json'), 'utf8')).generated ?? null; }
-      catch { /* 无 manifest（未 sync）→ null */ }
-      // 预算闸的**可见出口**（审计 D4）：auto 因超预算静默停摆时，壳状态行必须读得到原因。
-      // 未配置预算也照报（configured:false）——「为什么没跑」要能一眼看出是没配还是超了。
-      // repoRoot：createServer(root) 的 root **就是 .lore 目录本身**（test/server.test.js:420、lib/serve.js:219），
-      // 而预算版本戳与下面的 fuel 都要的是**仓库根**——统一从 root 的父目录推导，不猜、不"顺手修"传参。
-      const repoRoot = join(resolve(root), '..');
-      const budgetCfg = readBudgetConfig(stateDir);
-      // 版本戳（预算窗口键）：唯一剩余的 per-request git spawn 就在这里，走上面的 30s TTL 缓存。
-      // 传 `version` 进 budgetStatus 即让它跳过内部 versionStamp(repoRoot,{exec})——口径与 library 完全同一份。
-      const budgetVersion = versionStampCached(repoRoot, exec, versionTtlMs);
-      const bs = budgetStatus({
-        stateDir, repoRoot,
-        budget: budgetCfg.budget, dimension: budgetCfg.dimension, exec,
-        version: budgetVersion,
-      });
-      // 壳状态行的燃料读数（设计 §5.3 底部 / §5.5；壳阶段 B）。派生**唯一在 lib/doctor.js 的 fuelReadout**
-      // （计划 D3：同源同口径，绝不在 server.js 重写一套，否则与 `lore doctor` 漂移即可信度崩塌）。
-      // 取不到的数一律 'unknown'（UNKNOWN），**绝不用 0 冒充**；未 init / 非 git 也不崩（全 unknown）。
-      // 性能：fuelReadout 的窗口派生内部要 spawn 一次 `git log`（同步、约 1s）→ 走上面的 30s TTL 缓存，
-      // 否则壳每 15s 一次的状态轮询会各自阻塞事件循环一秒（审计 🟡#3）。
-      const fuel = fuelCached(repoRoot, exec, fuelTtlMs);
-      return sendJson(res, 200, {
-        mode: config.mode, last_finalize: lastFinalize, config,
-        runner_running: runnerAlive(stateDir, isAlive),
-        budget: {
-          configured: bs.configured, dimension: bs.dimension, budget: bs.budget,
-          used: bs.used, exceeded: bs.exceeded, version: bs.version,
-        },
-        fuel,
-      });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/sync/config') {
-      try {
-        const body = await readJson(req);
-        const patch = {};
-        if ('debounce_minutes' in body) patch.debounce_minutes = Number(body.debounce_minutes);
-        if ('schedule' in body) patch.schedule = body.schedule === null || body.schedule === '' ? null : String(body.schedule);
-        if ('max_pages' in body) patch.max_pages = Number(body.max_pages);
-        if ('backend' in body) patch.backend = String(body.backend);
-        writeSyncConfig(join(root, '.state'), patch);      // 非法值 throw → 400
-        return sendJson(res, 200, { ok: true, config: readSyncConfig(join(root, '.state')) });
-      } catch { return sendJson(res, 400, { error: 'invalid config (debounce 0-1440, schedule HH:MM|null, max_pages 1-50, backend auto|claude|codex|opencode)' }); }
-    }
-
-    if (req.method === 'GET' && pathname === '/api/sync/runs') {
-      return sendJson(res, 200, { runs: readAutoRuns(join(root, '.state')) });
-    }
-
-    // per-repo 形态的仓库切换数据源：读中央注册表 + 报告 portal 端口（壳跳 portal 切仓库）。
-    if (req.method === 'GET' && pathname === '/repos.json') {
-      let entries = [];
-      try { entries = JSON.parse(readFileSync(reposPath, 'utf8')) ?? []; } catch { entries = []; }
-      const current = entries.find(e => slashLower(e.loreDir) === slashLower(root))?.name ?? null;
-      return sendJson(res, 200, { repos: entries.map(e => e.name), portal: PORTAL_PORT, current });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/sync/mode') {
-      try {
-        const body = await readJson(req);
-        const mode = String(body.mode ?? '');
-        writeSyncMode(join(root, '.state'), mode);   // 非法值 throw → 400
-        return sendJson(res, 200, { ok: true, mode });
-      } catch {
-        return sendJson(res, 400, { error: 'invalid mode (B1: manual|notify; auto lands in B2)' });
-      }
-    }
-
-    if (req.method === 'POST' && pathname === '/api/sync/finalize') {
-      try {
-        // 与 hook.maybeRefresh 同款 detached finalize（A 接缝③）。不加防抖：finalize 幂等、最后写赢。
-        // 刻意不 gate mode：manual 档关的是「自动」刷新，手动 ⟳ 正是 manual 档的用法——别给这里补 mode 检查。
-        const child = spawnFn(process.execPath, [join(HERE, 'lib', 'sync.js'), 'finalize', root],
-          { detached: true, stdio: 'ignore', windowsHide: true });
-        child.once?.('error', () => {});   // 异步 spawn 失败（EMFILE 等）不能击落常驻 server
-        child.unref();
-        return sendJson(res, 200, { spawned: true });
-      } catch { return sendJson(res, 500, { error: 'spawn failed' }); }
-    }
-
-    if (pathname === '/api/sync/rewrite-requests') {
-      if (req.method === 'GET') {
-        return sendJson(res, 200, { requests: readRewriteRequests(join(root, '.state')) });
-      }
-      if (req.method === 'POST') {
-        try {
-          const body = await readJson(req);
-          const page = String(body.page ?? '');
-          if (!safeWikiPage(root, page)) return sendJson(res, 400, { error: 'invalid page' });
-          // 重写/改进：透传用户指令（截断防滥用）；无指令 = 排队/同步语义
-          const instruction = body.instruction != null && String(body.instruction).trim()
-            ? String(body.instruction).slice(0, 500) : undefined;
-          return sendJson(res, 200, { ok: true, ...appendRewriteRequest(join(root, '.state'), { page, instruction }) });
-        } catch { return sendJson(res, 400, { error: 'bad json' }); }
-      }
-    }
+  }
 
   return false;   // 非 API 路径
 }

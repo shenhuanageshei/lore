@@ -790,8 +790,8 @@ test('D15: 两形态混用 → 统一在一个编号空间递增（不重复、�
 });
 
 // --- 壳阶段 C 视觉②：决策史 = 修改记录表（设计 §5.4 / D6；生成侧 = lib/sync.js renderDecisionHistory）---
-import { parseDecisionLog, renderDecisionTable, DECISION_EMPTY } from '../site/shell.mjs';
-import { renderDecisionHistory } from '../lib/sync.js';
+import { parseDecisionLog, renderDecisionTable, DECISION_EMPTY, isDecisionHeading } from '../site/shell.mjs';
+import { renderDecisionHistory, foldJournal } from '../lib/sync.js';
 
 const DH_LINE = '- **fix crawler** — anti data blowup (abc1234, 2026-06-01)';
 
@@ -1052,24 +1052,9 @@ test('buildStatusLine: 排队条数取不到 → 提示语不许出现「0 条�
 // 只列表端点失败、status 其实成功时，状态行会理直气壮地报「0 条排队请求」——正是 D13 点名的反模式。
 // 壳是 SPA、内联脚本依赖 DOM，本仓零依赖无 jsdom，故把 index.html 里**真正的**那几块源码
 // （状态声明 / fetchSyncStatus / 两个读数出口）抽出来在 Node 里执行：测行为，不测字样。
-const SHELL_HTML = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
-
-// 从 header 起按花括号配对切出整段函数（跳过字符串/模板/行注释里的花括号）。
-// 抽不到就直接失败：抽取器静默失真 = 测试假装通过，比不测更糟。
-function sliceShellFn(header) {
-  const at = SHELL_HTML.indexOf(header);
-  assert.notEqual(at, -1, `site/index.html 里找不到「${header}」——抽取器失效，需同步更新本测试`);
-  let depth = 0, quote = null, i = SHELL_HTML.indexOf('{', at);
-  for (; i < SHELL_HTML.length; i++) {
-    const c = SHELL_HTML[i];
-    if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; continue; }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-    if (c === '/' && SHELL_HTML[i + 1] === '/') { i = SHELL_HTML.indexOf('\n', i); if (i === -1) break; continue; }
-    if (c === '{') depth++;
-    else if (c === '}' && --depth === 0) { i++; break; }
-  }
-  return SHELL_HTML.slice(at, i);
-}
+// 壳源码 + 抽取器走共享 helper（遗留 🔵#18）：原先这两样在本文件与 test/server.test.js 里
+// 各有一份逐字副本——抽取器修 bug（或壳里函数改形状）得改两处，漏一处就静默失真。
+import { SHELL_HTML, sliceShellFn } from './helpers/shell-slice.js';
 
 function buildShellQueueApi(fetchStub) {
   const decls = SHELL_HTML.match(/let SYNC_STATUS = null;[\s\S]*?let SYNC_RUNS = \[\];/);
@@ -1079,17 +1064,23 @@ function buildShellQueueApi(fetchStub) {
     sliceShellFn('async function fetchSyncStatus'),
     sliceShellFn('function queuedArg'),
     sliceShellFn('function queuedCountText'),
-    'return { fetchSyncStatus, queuedArg, queuedCountText, snap: () => ({ ok: QUEUED_OK, size: QUEUED_PAGES.size, apiOk: SYNC_API_OK }) };',
+    'return { fetchSyncStatus, queuedArg, queuedCountText, snap: () => ({ ok: QUEUED_OK, size: QUEUED_PAGES.size, apiOk: SYNC_API_OK, runs: SYNC_RUNS.length }) };',
   ].join('\n');
   return new Function('fetch', 'BASE', body)(fetchStub, '/');
 }
 
-function shellQueueFixture({ statusOk = true, list, runs = { runs: [] } } = {}) {
-  const ok = body => ({ ok: true, json: async () => body });
+// `listStatus` / `runsStatus` 只为「非 2xx + body 恰好是合法 JSON」这一形态存在（遗留 🔵#8）：
+// 旧实现的失败分支只由「fetch 抛错」触发，而真实中间层回的是 500 + 一个能解析的 JSON 体。
+function shellQueueFixture({ statusOk = true, list, runs = { runs: [] }, listStatus = 200, runsStatus = 200 } = {}) {
+  const ok = body => ({ ok: true, status: 200, json: async () => body });
+  const notOk = (status, body) => ({ ok: false, status, json: async () => body });
   const fetchStub = async url => {
-    if (url.endsWith('api/sync/status')) return statusOk ? ok({ fuel: okFuel }) : { ok: false, json: async () => ({}) };
-    if (url.endsWith('api/sync/rewrite-requests')) { if (list === 'throw') throw new Error('boom'); return ok(list); }
-    if (url.endsWith('api/sync/runs')) return ok(runs);
+    if (url.endsWith('api/sync/status')) return statusOk ? ok({ fuel: okFuel }) : notOk(500, { error: 'boom' });
+    if (url.endsWith('api/sync/rewrite-requests')) {
+      if (list === 'throw') throw new Error('boom');
+      return listStatus === 200 ? ok(list) : notOk(listStatus, list);
+    }
+    if (url.endsWith('api/sync/runs')) return runsStatus === 200 ? ok(runs) : notOk(runsStatus, runs);
     throw new Error('unexpected url: ' + url);
   };
   return buildShellQueueApi(fetchStub);
@@ -1539,3 +1530,109 @@ test('阶段 A：零外部资源引用（不引 CDN 字体 / 图标 / 脚本，D
   // 协议相对 URL（//cdn.example.com/...）是同一件事的另一种写法，别让它从缝里溜进来
   assert.equal(/<link\b[^>]*\bhref\s*=\s*["']?\/\//i.test(SHELL_HTML_NO_COMMENTS), false, '协议相对外链同样是外链');
 });
+
+// ---------- 遗留 🔵 清理第 1 批（2026-09-10，壳侧四条行为 + 两处补丁）----------
+// 口径同上：断言**行为**，不断言字样（§9.3 的教训：验字样只给虚假的通过感）。
+
+// #8：二次 fetch（rewrite-requests / runs）必须与主 status 同口径——先判 `res.ok` 再 `.json()`。
+// 为什么不能只看 json：真实中间层（python serve 的错误页 / 代理 / 未来某个回 {error:…} 的路由）
+// 回的正是「非 2xx + 能解析的 body」；旧实现会把 500 的 {requests:[…]} 当成队列读数、
+// 把 500 的 {runs:[…]} 当成任务史——「解析成功 ≠ 请求成功」。
+test('遗留#8：二次 fetch 的非 2xx（body 恰好是合法 JSON）不得被当成数据', async () => {
+  const api = shellQueueFixture({
+    listStatus: 500, list: { requests: [{ page: 'component/phantom.md' }] },
+    runsStatus: 503, runs: { runs: [{ id: 'phantom-run' }] },
+  });
+  await api.fetchSyncStatus();
+  assert.equal(api.snap().ok, false, '500 的合法 JSON body 被当成队列读数了');
+  assert.equal(api.snap().size, 0);
+  assert.equal(api.queuedArg(), undefined);          // 取不到 → unknown，不是「1 条」
+  assert.match(api.queuedCountText(), /unknown/);
+  assert.equal(api.snap().runs, 0, '503 的合法 JSON body 被当成任务史了');
+  assert.equal(api.snap().apiOk, true);              // 主 status 成功 → 不连坐（三段 fetch 各自独立）
+  // 对照组：同一夹具把状态码换成 200，同样的 body 必须照常读进读数（修的是「非 2xx」不是「JSON」）
+  const good = shellQueueFixture({ list: { requests: [{ page: 'component/real.md' }] }, runs: { runs: [{ id: 'r1' }] } });
+  await good.fetchSyncStatus();
+  assert.equal(good.snap().ok, true);
+  assert.equal(good.queuedArg(), 1);
+  assert.equal(good.snap().runs, 1);
+});
+
+// #10：决策史小节标题的三处判定必须同口径。
+// 三处各写各的正则正是本 bug 的形态：lib/sync.js 与 shell.mjs 大小写敏感、index.html 带 /i，
+// 外加 shell.mjs 那句「与 site/index.html 的 F3 判定同口径」（假注释）。断言方式 = 同一份样本集
+// 分别喂三个入口、逐条比对结论——比 grep 三处正则的字样强：字样相同不代表语义相同。
+const HEADING_SAMPLES = [
+  ['Decision history', true], ['decision history', true], ['DECISION HISTORY', true],
+  ['Decision history (legacy)', true], ['决策史', true], ['决策历史', true],
+  ['决策历史 (Decision history)', true], ['决策与时间线', true],
+  ['决策历史附录', false], ['Decision historybook', false], ['Decision history中文', false],
+  ['Decisions and timeline', false], ['决策', false],
+];
+
+test('遗留#10：决策史标题的生成侧定位 / 壳侧 F3 判据 / 壳侧转表，逐条同口径', () => {
+  for (const [text, expected] of HEADING_SAMPLES) {
+    const line = `## ${text}`;
+    // ① 壳侧 F3 判据（decisionSection 与 renderDecisionTable 共用的那一处）
+    assert.equal(isDecisionHeading(text), expected, `标题文本判据对「${line}」给出了不同答案`);
+    // ② 壳侧转表：认得出 → 列表变表格；认不出 → 逐字节原样返回
+    const md = `${line}\n\n- **a** — why (abc1234, 2026-06-01)\n`;
+    assert.equal(renderDecisionTable(md) !== md, expected, `renderDecisionTable 对「${line}」给出了不同答案`);
+    // ③ 生成侧定位：认得出 → fold 重建并写出规范标题；认不出 → 逐字节 no-op
+    const page = `# C\n\n${line}\n\n{{LORE_JOURNAL}}\n\n## Next\n`;
+    const folded = foldJournal(page, '- **a** (2026-06-01)', { page: 'c.md', warn: () => {} });
+    assert.equal(folded !== page, expected, `lib/sync.js 的 foldJournal 对「${line}」给出了不同答案`);
+    if (expected) assert.match(folded, /^## Decision history$/m, 'fold 必须写出规范标题');
+  }
+});
+
+test('遗留#10：F3 的小节判定走 shell.mjs 的唯一口径，不许再自带一份正则', () => {
+  const at = SHELL_HTML.indexOf('const decisionSection');
+  assert.notEqual(at, -1, 'site/index.html 里找不到 decisionSection——需同步更新本测试');
+  const decl = SHELL_HTML.slice(at, SHELL_HTML.indexOf(';', at) + 1);   // 到该声明的结尾（箭头函数体无分号提前出现）
+  assert.match(decl, /isDecisionHeading\(/, 'decisionSection 必须用共享判据（三处口径不得再分叉）');
+  assert.equal(/\.test\(/.test(decl), false, 'decisionSection 里还留着自带的正则判据');
+});
+
+// #12：inline() 的链接分支此前把 URL 原样塞进 href 属性。属性逃逸的**唯一**字符是 `"`——
+// 一个裸引号就能闭掉属性，把后面的文本变成标签。
+test('遗留#12：链接目标的 `"` 被转义（href 属性不得被撕开）', () => {
+  const html = renderMarkdown('[t](a"b)');
+  assert.match(html, /<a href="a&quot;b">t<\/a>/);
+  assert.equal(html.includes('href="a"b"'), false, '`"` 撕开了 href 属性（后面的文本会变成标签）');
+  // 正常 URL 逐字节不变：转义是补丁不是重写——不做 URL 编码、不碰 `&`（否则 `&amp;` 会被二次转义）
+  assert.match(renderMarkdown('[t](u?x=1&y=2)'), /<a href="u\?x=1&y=2">t<\/a>/);
+  assert.match(renderMarkdown('[t](u)'), /<a href="u">t<\/a>/);
+});
+
+// #11：blockquote 原本按**单行**产出——多行引用被切成多个各自带左边框 / 圆角 / 底色的独立盒子，
+// 引用被切碎。修法与紧邻的 ul 分支同构：while 累积成一个盒子。
+test('遗留#11：连续多行引用合成一个 blockquote', () => {
+  const html = renderMarkdown('> 第一行\n> 第二行\n> 第三行');
+  assert.equal((html.match(/<blockquote>/g) || []).length, 1, '多行引用被切成了多个引用盒子');
+  assert.match(html, /<blockquote>第一行\n第二行\n第三行<\/blockquote>/);
+  // 引用中间的 `>` 空行不切盒子（标准标记允许省掉标记后那个空格）
+  assert.equal((renderMarkdown('> a\n>\n> b').match(/<blockquote>/g) || []).length, 1);
+  // 单行引用逐字节不变（别顺手重排既有输出）
+  assert.equal(renderMarkdown('> a'), '<blockquote>a</blockquote>');
+  // while 不得越界吞行：引用结束后的正文仍是普通段落
+  assert.equal(renderMarkdown('> a\n\n正文'), '<blockquote>a</blockquote><p>正文</p>');
+});
+
+// #16：跨仓命中（repo 名 / 页标题 / 页键）来自**别的仓的 manifest**，补 esc 是纯一致性
+// （评审已认定不是漏洞：数据源同样是机器产物）。断言的是行为——渲染结果里不得出现裸标签。
+test('遗留#16：跨仓命中的 repo 名与页标题走 escapeHtml', () => {
+  const at = SHELL_HTML.indexOf('function renderCrossHits');
+  assert.notEqual(at, -1, 'site/index.html 里找不到 renderCrossHits——需同步更新本测试');
+  // 取到该函数结尾（file 是 CRLF：行尾 `\r\n`，别用 '\n}\n' 找——那样会切出空串，断言全变恒真）
+  const end = SHELL_HTML.slice(at).search(/\r?\n\}\r?\n/);
+  assert.notEqual(end, -1, 'renderCrossHits 的收尾行找不到——抽取器失效，需同步更新本测试');
+  const fn = SHELL_HTML.slice(at, at + end + 1);
+  for (const field of ['h.repo', 'h.title', 'h.key']) {
+    assert.equal(new RegExp(`\\$\\{${field.replace('.', '\\.')}\\}`).test(fn), false,
+      `renderCrossHits 里 ${field} 未转义就拼进 innerHTML`);
+  }
+  assert.match(fn, /escapeHtml\(h\.repo\)/);
+  assert.match(fn, /escapeHtml\(h\.title\)/);
+});
+

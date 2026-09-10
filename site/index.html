@@ -418,7 +418,7 @@ import {
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
   baseFromPathname, buildConsoleModel, pollDecide, buildDocsRows, buildCrossRepoIndex,
   buildThemeRows, budgetNotice, buildStatusLine,
-  renderAnchors, renderNoteHtml, renderDecisionTable,
+  renderAnchors, renderNoteHtml, renderDecisionTable, isDecisionHeading,
 } from './shell.mjs';
 
 // per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
@@ -1075,8 +1075,13 @@ function renderCrossHits(term) {
     box.id = 'cross-hits';
     document.getElementById('sidebar').appendChild(box);
   }
+  // 转义（遗留 🔵#16）：repo 名与页标题来自**别的仓的 manifest**，即本壳信任模型之外的另一份机器
+  // 产物（评审已认定这不是漏洞——数据源同样是机器写的注册表）。补 esc 的是**一致性**：本文件其余
+  // 拼 innerHTML 的地方（renderNotFound / renderLoadError / 侧栏）一律转义，唯独这里没有——
+  // 一处例外就是下一次「这块为什么不转义」的追问，以及某个仓名带 `<` 时的静默破版。
   box.innerHTML = `<div class="grp">🌐 其他仓库 (${hits.length})</div>` + hits.map(h =>
-    `<a href="${REPOS_INFO.portalRoot}${encodeURIComponent(h.repo)}/site/#${h.key}"><span class="cross-repo">${h.repo}</span>${h.title}</a>`).join('');
+    `<a href="${escapeHtml(REPOS_INFO.portalRoot)}${encodeURIComponent(h.repo)}/site/#${escapeHtml(h.key)}">`
+    + `<span class="cross-repo">${escapeHtml(h.repo)}</span>${escapeHtml(h.title)}</a>`).join('');
 }
 
 function wireSearch() {
@@ -1135,8 +1140,12 @@ const FKEY = {
 };
 
 // 本页的决策史小节：fold 物化的 `## Decision history` / `## 决策史`。没有 → F3 不注册。
+// 判定**不在这里**（遗留 🔵#10）：本行原先自带一个带 `/i` 的正则，与 shell.mjs 的大小写敏感
+// 版本、lib/sync.js 的前缀版本三方各说各话——小写 `## decision history` 会让 F3 亮起，而
+// renderDecisionTable 不转表。现在只有一处口径（shell.mjs 的 isDecisionHeading），
+// 三处一致由 test/shell.test.js 的交叉断言守住。
 const decisionSection = () => [...document.querySelectorAll('#content h2')]
-  .find(h => /^(决策史|决策历史|决策与时间线|Decision history\b)/i.test(h.textContent.trim())) ?? null;
+  .find(h => isDecisionHeading(h.textContent)) ?? null;
 
 // 「✏️ 重写这页」按钮由既有 renderMeta 产出、住 #meta（不在 #content）。F5 与顶栏按钮都
 // **委托它 .click()**——不复制一份排队逻辑（复制出来的第二套迟早与 route() 里那份漂移）。
@@ -1242,11 +1251,21 @@ async function fetchSyncStatus() {
     SYNC_STATUS = null; SYNC_API_OK = false;   // 主 status 失败：维持现状降级（状态行转静态读数）
   }
   try {
-    const q = await (await fetch(BASE + 'api/sync/rewrite-requests')).json();
-    QUEUED_PAGES = new Set((q.requests ?? []).map(x => x.page));
+    const q = await fetch(BASE + 'api/sync/rewrite-requests');
+    // 与主 status **同口径**：先判 `res.ok` 再 `.json()`（遗留 🔵#8）。此前只看 json 能不能解析——
+    // 于是任何「非 2xx + body 恰好是合法 JSON」的中间层（python serve 的错误页 / 代理 / 未来某个
+    // 返回 {error:…} 的路由）都会被当成真数据：队列读数会报一个不该存在的「0 条排队请求」。
+    // 解析成功 ≠ 请求成功，这两件事必须分开判。
+    if (!q.ok) throw new Error(String(q.status));
+    const qj = await q.json();
+    QUEUED_PAGES = new Set((qj.requests ?? []).map(x => x.page));
     QUEUED_OK = true;                                          // 读到了：真值 0 也照报 0
   } catch { QUEUED_PAGES = new Set(); QUEUED_OK = false; }     // 读不到：清空 + 标未读到（读数出口据此报 unknown）
-  try { SYNC_RUNS = (await (await fetch(BASE + 'api/sync/runs')).json()).runs ?? []; }
+  try {
+    const rr = await fetch(BASE + 'api/sync/runs');
+    if (!rr.ok) throw new Error(String(rr.status));             // 同上：非 2xx 的 JSON body 不是任务史
+    SYNC_RUNS = (await rr.json()).runs ?? [];
+  }
   catch { SYNC_RUNS = []; }
 }
 

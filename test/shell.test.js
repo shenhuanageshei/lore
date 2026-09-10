@@ -78,6 +78,73 @@ test('preprocessWikilinks: 带点的文件级页 id（如 server.js）也成链'
   assert.equal(preprocessWikilinks('[[a]]', {}).includes('href="#component/a"'), true);   // 单字符 id 仍可
 });
 
+test('preprocessWikilinks: 代码区（行内 span / 围栏块 / mermaid 源）里的 [[id]] 保持字面不成链（遗留 🔵#6）', () => {
+  const idx = buildPageIndex(MANIFEST);
+  // 走**完整渲染管线**（与壳 site/index.html 的调用点同形），而不是手写一段 html——
+  // 代码区是 renderMarkdown 产出的 `<code>` / `<pre><code>` / `div.mermaid`，手写 html 会假装通过。
+  const md = [
+    '正文里的 [[m3_nlp]] 成链。',
+    '',
+    '写作示例：`[[m3_nlp]]` 这样写。',
+    '',
+    '```',
+    '[[m3_nlp]]',
+    '```',
+    '',
+    '```mermaid',
+    'A[[m3_nlp]]B',
+    '```',
+  ].join('\n');
+  const out = preprocessWikilinks(renderMarkdown(md), idx);
+  // ① 代码区外：**行为一字不变**（仍成链、仍带 class/href）
+  assert.match(out, /<p>正文里的 <a class="wikilink" href="#component\/m3_nlp">m3_nlp<\/a> 成链。<\/p>/);
+  // ② 行内代码 span：字面样本
+  assert.match(out, /<code>\[\[m3_nlp\]\]<\/code>/);
+  // ③ 围栏代码块：字面样本
+  assert.match(out, /<pre><code>\[\[m3_nlp\]\]\n<\/code><\/pre>/);
+  // ④ mermaid 图源：字面样本（塞进 <a> 会被 route() 读回去当图源、画坏图）
+  assert.match(out, /<div class="mermaid">A\[\[m3_nlp\]\]B\n<\/div>/);
+  // ⑤ 全篇成链**恰好 1 处**——上面四条各自成立也可能同时多改了别处，这条把总数钉死
+  assert.equal(out.split('<a class="wikilink"').length - 1, 1);
+});
+
+test('preprocessWikilinks: 代码区里的未知 / 带点 id 也保持字面（不回退 component/…）', () => {
+  const out = preprocessWikilinks(renderMarkdown('`[[ghost]]` `[[server.js]]`'), {});
+  assert.equal(out.includes('wikilink'), false);
+  assert.match(out, /<code>\[\[ghost\]\]<\/code>/);
+  assert.match(out, /<code>\[\[server\.js\]\]<\/code>/);
+});
+
+test('preprocessWikilinks: 代码区外的未知 / 带点 id 经完整管线仍走既有回退（不因分段而回归）', () => {
+  const out = preprocessWikilinks(renderMarkdown('[[ghost]] 与 [[server.js]]'), {});
+  assert.match(out, /<a class="wikilink" href="#component\/ghost">ghost<\/a>/);
+  assert.match(out, /<a class="wikilink" href="#component\/server\.js">server\.js<\/a>/);
+});
+
+test('preprocessWikilinks: 标签属性里的 [[id]] 不参与替换（只扫文本段）', () => {
+  const html = '<a href="#x" title="[[m3_nlp]]">y</a>';
+  assert.equal(preprocessWikilinks(html, {}), html);
+});
+
+test('preprocessWikilinks: 落单的 <code>（正文里的渲染瑕疵）不得把后半页正文吞成字面区', () => {
+  const idx = buildPageIndex(MANIFEST);
+  // ① 直接构造：未闭合的 `<code>` 之后，正文 wikilink **仍须成链**——
+  //    只按深度累加的实现在这里会把后面整段当「字面区」，正文链接整片变死文本。
+  const raw = '<p>前文 <code>x</code> 一个落单的 <code> 之后 [[m3_nlp]] 仍成链</p>';
+  const out = preprocessWikilinks(raw, idx);
+  assert.match(out, /<a class="wikilink" href="#component\/m3_nlp">m3_nlp<\/a>/);
+  assert.equal(out.split('<a class="wikilink"').length - 1, 1);
+  // ② 真实来源（component/mine.md 第 104 行）：双反引号代码 span（`` `…` `` → `<code>`）
+  //    本渲染器认不出，会产出**没有闭合**的 `<code>`（该页实测 585 开 / 584 闭）。
+  const md = '| `pitfallKey` | `(entry) → string` | 身份键（`` `…` `` → `<code>`） |\n\n见 [[m3_nlp]] 页\n';
+  const html = renderMarkdown(md);
+  assert.ok((html.match(/<code\b/g) || []).length > (html.match(/<\/code>/g) || []).length,
+    '前置条件变了：该样本必须真的产出落单的 <code>，否则这条测不到东西（渲染器已修则改写本用例）');
+  const out2 = preprocessWikilinks(html, idx);
+  assert.match(out2, /<a class="wikilink" href="#component\/m3_nlp">m3_nlp<\/a>/);
+  assert.equal(out2.split('<a class="wikilink"').length - 1, 1);
+});
+
 test('buildNavModel passes axes through with pages', () => {
   const nav = buildNavModel(MANIFEST);
   assert.equal(nav.length, 2);

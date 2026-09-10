@@ -93,12 +93,76 @@ export function buildPageIndex(manifest) {
   return idx;
 }
 
+// 遗留 🔵#6：**代码区里**的 [[id]] 不得改写成链接（只对「代码区之外的文本段」做替换）。
+// 为什么：文档正是靠「代码样式的例子」教读者怎么写 wikilink——
+//   · 行内代码 span（`` `[[m3_nlp]]` ``）与围栏代码块（``` 里的 `[[id]]`）里的是**字面样本**；
+//   · 把它渲染成真链接 = 把「一段语法示例」显示成「一个能点的链接」，读者看到的是语义，
+//     不是写法——与 §5.5 / 不变量⑧ 的同型问题（不得把展示用的字面渲染成真的语义）。
+// 顺带同口径跳过 mermaid 图源：它的 textContent 会被 site/index.html 的 route() 读回去当图源渲染，
+//   往里塞 `<a>` 标签直接画坏图（renderAnchors 早已按此跳过 pre/mermaid——见本文件下方 renderAnchors）。
+// 分段思路取自 renderAnchors：按标签切成「文本 / 标签」交替段（偶数下标文本、奇数下标标签），
+//   只在**文本段**里替换——标签属性里的 `[[`（如 title="a [[b]]"）永远碰不到。
+// **比 renderAnchors 多一步「配对」**：它按朴素深度累加跳过 pre/mermaid，那一步在正文出现
+//   **落单的** `<code>` 时会把后半页正文整片吞掉（实测 `component/mine.md`；详见函数内注释）。
+//   本函数的硬约束是「代码区外行为一字不变」，吞正文直接违约，故只认**配到闭合标签**的字面区。
+// 为什么不抽公共 helper：renderAnchors 的既有行为受本项目硬约束保护（不得回归），
+//   把它改成共用实现的风险大于这几十行刻意的重复；两处口径若将来要合并，应作为独立重构+独立回归来做。
+// 硬约束（不得回归，test/shell.test.js 逐条钉住）：代码区**外**的 [[id]] 仍成链、未知 id 仍回退
+//   `component/${id}`、带点的文件级 id（如 [[server.js]]）仍可链。
 export function preprocessWikilinks(html, pageIndex) {
-  // id 允许 `.`：文件级页（如 server.js）的 wikilink；`.` 不在首尾防误吞省略号
-  return html.replace(/\[\[([a-zA-Z0-9_\-][a-zA-Z0-9_.\-]*[a-zA-Z0-9_\-]|[a-zA-Z0-9_\-])\]\]/g, (_, id) => {
-    const target = pageIndex[id] ?? `component/${id}`;
-    return `<a class="wikilink" href="#${target}">${id}</a>`;
-  });
+  // 按标签切段：`<code>` 行内 span、`<pre>` 围栏块（renderMarkdown 产出的 <pre><code>）、
+  // div.mermaid 图源都算「字面区」，其内的 [[id]] 保持字面。
+  const parts = html.split(/(<[^>]*>)/);
+  // 第一遍：把三类字面区的开/闭标签**配对**（栈），只有**配到闭合标签**的那一对才算字面区。
+  // 为什么必须配对、不能只累加深度（这是 renderAnchors 那份朴素深度的坑）：正文里可以出现
+  // **落单的** `<code>`——实测 `component/mine.md` 第 104 行用了双反引号代码 span（`` `…` ``），
+  // 本渲染器的 inline() 认不出双反引号语法，于是产出一个**没有闭合**的 `<code>`
+  // （该页实测 <code> 585 开 / 584 闭）。只按深度累加的话，这个落单的 `<code>` 会把**其后半页的
+  // 正文**一直吞进「字面区」：正文里 `[[lib]]` / `[[sync]]` 这些**改动前明明是链接**的真 wikilink
+  // 会整片变成死文本——那就不是修 🔵#6，而是制造了更大的回归（违反「代码区外行为一字不变」）。
+  // 配对扫描把配不到闭合标签的开放标签直接排除在字面区之外，宁可多替换一处、不少替换一处。
+  const stack = [];
+  const literalOpen = new Set();     // 已配对开标签的「段下标」
+  const literalClose = new Set();    // 已配对闭标签的「段下标」
+  for (let i = 1; i < parts.length; i += 2) {
+    const tag = parts[i];
+    const open = /^<([a-zA-Z][a-zA-Z0-9]*)\b/.exec(tag);
+    if (open) {
+      const name = open[1].toLowerCase();
+      if (name === 'code' || name === 'pre' || name === 'div') {
+        stack.push({ name, i, mermaid: name === 'div' && /\bmermaid\b/.test(tag) });
+      }
+      continue;
+    }
+    const close = /^<\/([a-zA-Z][a-zA-Z0-9]*)\s*>$/.exec(tag);
+    if (!close) continue;
+    const name = close[1].toLowerCase();
+    if (name !== 'code' && name !== 'pre' && name !== 'div') continue;
+    for (let k = stack.length - 1; k >= 0; k--) {
+      if (stack[k].name !== name) continue;
+      const hit = stack[k];
+      stack.length = k;                             // 连同未配对的内层开放标签一起丢弃
+      literalOpen.add(hit.i);
+      literalClose.add(i);
+      break;
+    }
+  }
+  // 第二遍：只在「字面区之外」的文本段里替换（深度只由上面配对过的那两组建出来）。
+  let depth = 0;
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      if (literalOpen.has(i)) depth++;
+      else if (literalClose.has(i)) depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (!parts[i] || depth > 0) continue;
+    // id 允许 `.`：文件级页（如 server.js）的 wikilink；`.` 不在首尾防误吞省略号
+    parts[i] = parts[i].replace(/\[\[([a-zA-Z0-9_\-][a-zA-Z0-9_.\-]*[a-zA-Z0-9_\-]|[a-zA-Z0-9_\-])\]\]/g, (_, id) => {
+      const target = pageIndex[id] ?? `component/${id}`;
+      return `<a class="wikilink" href="#${target}">${id}</a>`;
+    });
+  }
+  return parts.join('');
 }
 
 export function buildNavModel(manifest) {

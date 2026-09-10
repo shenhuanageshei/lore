@@ -112,17 +112,25 @@ const slashLower = p => normalize(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '
 // 只会在真实提交刚落地后晚 30 秒反映；换来的是轮询请求从 ~1s 降到毫秒级。
 // 只做缓存：派生逻辑仍**唯一在 lib/doctor.js 的 fuelReadout**（D3），这里绝不重写一套口径，
 // 缓存的就是那个函数的返回值本身（键名/取值原样，契约零改动）。
+// 键是 (exec, repoRoot) 两段、与下方 VERSION_STAMP_CACHE 同构：fuel 同样**由某个 exec 口径派生**
+// （fuelReadout → captureReadout → gitWindow 里那次 `git log` 走的就是这个 exec），
+// 同一个目录换一个 exec（测试注入 stub、或将来接入别的 git 封装）就应该重算，
+// 否则同一进程里两个 createServer（不同 exec stub、同 root）会互相读到对方口径的陈旧 fuel
+// ——那正是隔壁函数明文拒绝的事，这里不能自相矛盾。生产里 exec 恒为 execFileSync（同一函数对象），
+// WeakMap 按函数对象分桶，命中率不受影响。
 const FUEL_CACHE_TTL_MS = 30_000;
-const FUEL_CACHE = new Map();   // repoRoot → { at, value }；portal 形态下每个 repo 各一条
+const FUEL_CACHE = new WeakMap();   // exec → Map(repoRoot → { at, value })；portal 形态下每个 repo 各一条
 
 function fuelCached(repoRoot, exec, ttlMs = FUEL_CACHE_TTL_MS, now = Date.now()) {
+  let byRepo = FUEL_CACHE.get(exec);
+  if (!byRepo) { byRepo = new Map(); FUEL_CACHE.set(exec, byRepo); }
   const key = resolve(repoRoot);
-  const hit = FUEL_CACHE.get(key);
+  const hit = byRepo.get(key);
   if (hit && now - hit.at < ttlMs) return hit.value;
   const value = fuelReadout(key, { exec });
-  FUEL_CACHE.set(key, { at: now, value });
+  byRepo.set(key, { at: now, value });
   // 惰性清过期项：只在这一条 key 被访问时顺带扫一遍——portal 的 repo 数是个位数，够用且无需定时器。
-  for (const [k, v] of FUEL_CACHE) if (now - v.at >= ttlMs) FUEL_CACHE.delete(k);
+  for (const [k, v] of byRepo) if (now - v.at >= ttlMs) byRepo.delete(k);
   return value;
 }
 
@@ -142,7 +150,7 @@ function fuelCached(repoRoot, exec, ttlMs = FUEL_CACHE_TTL_MS, now = Date.now())
 //   发 tag 后 ≤30s 内，壳读到的可能是上一个版本的窗口键——可观察后果仅为「壳状态行的 used/exceeded 暂时按旧
 //   窗口显示」；而**真正的闸本身不受影响**（lib/runner.js:87 每轮自算新鲜 versionStamp，不经过这个缓存），
 //   且错报方向是保守（旧窗口条目只会让 used 更大，不会静默放行）。与 FUEL_CACHE_TTL_MS 同值，减少记忆负担。
-// 为什么键是 (exec, repoRoot) 两段、而 FUEL_CACHE 只有 repoRoot：版本戳是**由某个 exec 口径派生的**，
+// 为什么键是 (exec, repoRoot) 两段（FUEL_CACHE 同款同理由）：版本戳是**由某个 exec 口径派生的**，
 //   缓存必须与口径绑定——同一个目录换一个 exec（测试注入 stub、或将来接入别的 git 封装）就应该重算，
 //   否则会读到另一个口径的陈旧值。生产里 exec 恒为 execFileSync（同一函数对象），命中率不受影响。
 const VERSION_STAMP_TTL_MS = 30_000;
@@ -327,6 +335,15 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
   return false;   // 非 API 路径
 }
 
+// 顶层 catch 的统一收尾（代码评审 🔵#4）。这里**绝不能再抛**：响应可能已经开始/结束，
+// 二次抛错又变回 unhandledRejection，兜底就白加了。头没发就 500（客户端拿到明确失败），
+// 已发（流已开始 pipe）就只能结束响应；error 打进 stderr——长时进程里静默的 500 无法诊断。
+function failInternal(res, req, e) {
+  console.error(`lore: unhandled error on ${req.method} ${req.url}: ${e?.stack ?? e}`);
+  if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+  if (!res.writableEnded) res.end('internal error');
+}
+
 export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync, fuelTtlMs = FUEL_CACHE_TTL_MS, versionTtlMs = VERSION_STAMP_TTL_MS } = {}) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer(async (req, res) => {
@@ -334,10 +351,19 @@ export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedi
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
 
-    if (await handleApi(root, req, res, pathname, { spawnFn, reposPath, exec, fuelTtlMs, versionTtlMs })) return;
+    // 顶层兜底：这是 async 处理器，promise 一旦 reject 就是 unhandledRejection ——
+    // 长时运行的 serve 进程会整个挂掉（Node 默认把未处理的 rejection 当致命错误）。
+    // handleApi 内部只覆盖各自**预期**的错误（400/403/404/… 都是正常 return），
+    // fs 之类的意外抛错（readSyncConfig / readFileSync / readAutoRuns）会一路冒到这里。
+    // 注意：既有的显式分支本来就是正常返回，走不到 catch——兜底不吞任何正常路径。
+    try {
+      if (await handleApi(root, req, res, pathname, { spawnFn, reposPath, exec, fuelTtlMs, versionTtlMs })) return;
 
-    const rel = pathname.replace(/^\/+/, '');
-    return serveStatic(root, rel, res, pathname);
+      const rel = pathname.replace(/^\/+/, '');
+      return serveStatic(root, rel, res, pathname);
+    } catch (e) {
+      return failInternal(res, req, e);
+    }
   });
 }
 
@@ -378,38 +404,44 @@ sel.onchange=()=>{document.documentElement.setAttribute('data-theme',sel.value);
 export function createPortalServer(repoMapOrFn) {
   const getMap = typeof repoMapOrFn === 'function' ? repoMapOrFn : () => repoMapOrFn;
   return http.createServer(async (req, res) => {
-    const repoMap = getMap();
-    let pathname;
-    try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
-    catch { res.writeHead(400); return res.end('bad request'); }
+    // 顶层兜底（与 createServer 同款同理由）：portal 也是长时进程，未预期的抛错同样会以
+    // unhandledRejection 击落它。整段处理体都在 try 里——含 getMap()（注册表读取）与 handleApi 转发。
+    try {
+      const repoMap = getMap();
+      let pathname;
+      try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+      catch { res.writeHead(400); return res.end('bad request'); }
 
-    if (pathname === '/' || pathname === '') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      return res.end(renderRepoList(Object.keys(repoMap)));
-    }
+      if (pathname === '/' || pathname === '') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        return res.end(renderRepoList(Object.keys(repoMap)));
+      }
 
-    if (pathname === '/repos.json') {                // 只读列表：壳的 repo 切换下拉数据源（不破门户零写面铁律）
-      return sendJson(res, 200, { repos: Object.keys(repoMap) });
-    }
+      if (pathname === '/repos.json') {                // 只读列表：壳的 repo 切换下拉数据源（不破门户零写面铁律）
+        return sendJson(res, 200, { repos: Object.keys(repoMap) });
+      }
 
-    const m = pathname.match(/^\/([^/]+)(\/.*)?$/);
-    const name = m && m[1];
-    // hasOwnProperty（非 `in`）：避免 'constructor'/'__proto__' 这类继承键误判为已登记 repo。
-    if (!name || !Object.prototype.hasOwnProperty.call(repoMap, name)) {
-      res.writeHead(404); return res.end('not found');
+      const m = pathname.match(/^\/([^/]+)(\/.*)?$/);
+      const name = m && m[1];
+      // hasOwnProperty（非 `in`）：避免 'constructor'/'__proto__' 这类继承键误判为已登记 repo。
+      if (!name || !Object.prototype.hasOwnProperty.call(repoMap, name)) {
+        res.writeHead(404); return res.end('not found');
+      }
+      if (m[2] === undefined) {                        // "/<name>" 无尾斜杠 → 跳到壳
+        res.writeHead(302, { location: `/${name}/site/` });
+        return res.end();
+      }
+      const rel = m[2].replace(/^\/+/, '');
+      if (rel === 'api' || rel.startsWith('api/')) {
+        // v0.6「portal 只读」翻转（用户需求：portal 下控制台可操作）：API 按 repo 转发，
+        // localHost guard 在 handleApi 内同样生效，写面仍限对应 repo 的 .state。
+        if (await handleApi(repoMap[name], req, res, '/' + rel, {})) return;
+        res.writeHead(404); return res.end('not found');
+      }
+      return serveStatic(repoMap[name], rel, res, pathname);
+    } catch (e) {
+      return failInternal(res, req, e);
     }
-    if (m[2] === undefined) {                        // "/<name>" 无尾斜杠 → 跳到壳
-      res.writeHead(302, { location: `/${name}/site/` });
-      return res.end();
-    }
-    const rel = m[2].replace(/^\/+/, '');
-    if (rel === 'api' || rel.startsWith('api/')) {
-      // v0.6「portal 只读」翻转（用户需求：portal 下控制台可操作）：API 按 repo 转发，
-      // localHost guard 在 handleApi 内同样生效，写面仍限对应 repo 的 .state。
-      if (await handleApi(repoMap[name], req, res, '/' + rel, {})) return;
-      res.writeHead(404); return res.end('not found');
-    }
-    return serveStatic(repoMap[name], rel, res, pathname);
   });
 }
 

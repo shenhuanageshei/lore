@@ -645,7 +645,20 @@ export function renderDecisionTable(md) {
     if (/^[-*]\s/.test(lines[i])) { if (first === -1) first = i; last = i; }
   }
   if (first === -1) return md;
-  const rows = parseDecisionLog(lines.slice(first, last + 1).join('\n'));
+  // 只把列表行喂给 parseDecisionLog（段内非列表行跳过）：手工维护的决策史小节里，
+  // 两列表项之间常夹着一段散文（说明 / 分节语），原先 `slice(first, last+1)` 把整段散文也喂了进去
+  // → 散文被当成「解析失败的降级行」塞进表格（version/date 均为 —），不丢数据但版式误导。
+  // 「不丢行」原则不变：真正的列表行一条都不丢（含被散文隔开的下半段），只是散文不进表格。
+  const seg = [];
+  for (let i = first; i <= last; i++) if (/^[-*]\s/.test(lines[i])) seg.push(lines[i]);
+  const rows = parseDecisionLog(seg.join('\n'));
   if (rows.length === 0) return md;
-  return [...lines.slice(0, first), ...decisionTableMd(rows), ...lines.slice(last + 1)].join('\n');
+  // 表格落在第一条列表行的位置；段内非列表行**原位保留**（改造版式不该顺手删掉正文里的散文）。
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (i === first) out.push(...decisionTableMd(rows));
+    if (i >= first && i <= last && /^[-*]\s/.test(lines[i])) continue;   // 已并入表格
+    out.push(lines[i]);
+  }
+  return out.join('\n');
 }

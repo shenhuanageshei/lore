@@ -907,6 +907,33 @@ test('renderDecisionTable: 无决策史小节 / 空态 → 原样返回（不得
   assert.equal(renderDecisionTable(prose), prose);
 });
 
+// 代码评审 🔵#3：原先 `slice(first, last+1)` 把两列表项之间的整段散文也喂给 parseDecisionLog，
+// 散文被当成「解析失败的降级行」进表格（version/date 均为 —）——不丢数据，但版式误导。
+// 修法：只取连续列表段（从 first 起，段内非列表行跳过）。「不丢行」原则不变：真正的列表行一条不丢。
+test('renderDecisionTable: 列表中间夹散文 → 散文不得进表格，列表行一条不丢（评审 🔵#3）', () => {
+  const page = [
+    '## Decision history', '',
+    '- **a** — why a (abc1234, 2026-06-01)',
+    '',
+    '这一段是人工维护的说明：两个决定之间插了散文。',
+    '',
+    '- **b** — why b (def4567, 2026-05-30)',
+    '',
+    '## 下一节',
+  ].join('\n');
+  const out = renderDecisionTable(page);
+  const table = out.split('\n').filter(l => l.startsWith('|'));
+  assert.equal(table.length, 4, `表头+分隔+两条数据，实际：${JSON.stringify(table)}`);
+  assert.match(out, /\| abc1234 \| 2026-06-01 \| \*\*a\*\* — why a \|/);
+  assert.match(out, /\| def4567 \| 2026-05-30 \| \*\*b\*\* — why b \|/);   // 被散文隔开的下半段也不丢
+  assert.equal(table.some(l => l.includes('人工维护')), false);            // 散文没进表格
+  assert.equal(/\|\s*—\s*\|\s*—\s*\|/.test(out), false);                   // 没有 version/date 皆 — 的降级行
+  // 散文也没被从正文里删掉（原位保留），其余小节不受影响
+  assert.match(out, /这一段是人工维护的说明：两个决定之间插了散文。/);
+  assert.match(out, /## 下一节/);
+  assert.match(renderMarkdown(out), /<th>版本<\/th><th>日期<\/th><th>变更与原因<\/th>/);
+});
+
 test('renderDecisionTable: 确定性——同一输入两次调用结果相同；表格里的 `|` 不撕表', () => {
   const page = '## Decision history\n\n<!-- LORE_JOURNAL:START -->\n'
     + '- **a | b** — why (abc1234, 2026-06-01)\n<!-- LORE_JOURNAL:END -->\n';

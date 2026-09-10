@@ -335,3 +335,16 @@
 **未做**：浏览器交互实证仍缺（9.4 第 1 条不变）；`file` 形态的角标在正文里与行级形态**外观相同**
 （区别只在右栏注记的「源未给行号」标注）——D15 要求的是「区别渲染 = 不得显示行号 + 显式标注」，
 正文角标本身只承载编号，故未新增角标样式（也遵守「除两处外不改 CSS 值」的约束）。
+
+### 9.6 交付代码评审修复轮（2026-09-10，2 🟡 + 2 🔵）
+
+| # | 级别 | 根因 | 处置（file:line 为修复后位置） |
+|---|---|---|---|
+| 1 | 🟡 | `FUEL_CACHE` 只按 `repoRoot` 键控，而它缓存的是**某个 exec 口径派生**的读数；同进程两个 `createServer`（不同 exec、同 root）会互读陈旧 fuel——与同文件 `VERSION_STAMP_CACHE` 自己写明的不变量（server.js:153-155）直接矛盾 | `server.js:115-135`：改 `WeakMap<exec, Map<repoRoot, {at,value}>>`，与 `versionStampCached` 同构；TTL 30s、只缓存返回值（D3）不变 |
+| 2 | 🟡 | `fetchSyncStatus` 一个 try 包住 status + 两个二次 fetch：`rewrite-requests` 抛错会把**已解析好的 status 载荷整个丢掉**（`SYNC_STATUS=null` / `SYNC_API_OK=false`），状态行燃料读数无谓降级 | `site/index.html:1095-1115`：status 独立 try；`rewrite-requests` / `runs` 各自嵌套 try，失败只清自己的 `QUEUED_PAGES` / `SYNC_RUNS`；主 status 失败仍照旧降级 |
+| 3 | 🔵 | `renderDecisionTable` 把 `first..last` **整段**喂给 `parseDecisionLog`，两列表项之间的人工散文被当成降级行塞进表格（version/date 皆 `—`） | `site/shell.mjs:643-663`：只取连续列表段（段内非列表行跳过，原位保留），列表行一条不丢 |
+| 4 | 🔵 | per-repo / portal 两个 `http.createServer(async …)` 处理器无顶层 catch：未预期抛错 → promise reject → `unhandledRejection` → 长时 serve 进程直接挂掉 | `server.js:338-345`（`failInternal`）+ 两个处理器外层 try/catch（per-repo server.js:358-368、portal server.js:406-444）：未预期抛错回 500 并结束响应；既有 400/403/404 显式分支走正常 return，不进 catch |
+
+**证据**（自检命令与结果，逐 stage）：Stage 1 `node --test test/server.test.js` → 37/37 通过（新增 1 项：同 root 不同 exec 不共享缓存）；Stage 2 `node --test test/shell.test.js test/server.test.js` → 121/121 通过（新增 1 项：列表中间夹散文不进表格）；Stage 3 `node --test test/server.test.js` → 39/39 通过（新增 2 项：per-repo / portal 注入 fs 抛错回 500 且进程存活）。另跑 `node --test test/serve.test.js` → 20/20（server.js 被它 spawn，防回归）。
+
+**未做 / 已知边界**：`fetchSyncStatus` 的隔离行为**没有入库测试**——壳是 SPA、内联脚本在 `site/index.html` 里，本仓零依赖无 jsdom，测它要额外造 DOM 桩（属新增机制）。当前用一次性的 Node 注入验证（status 成功 + `rewrite-requests` 抛错 → `SYNC_STATUS` 保留、`SYNC_API_OK` 仍为 true）确认，**未留成回归测试**，记为后续可补项。

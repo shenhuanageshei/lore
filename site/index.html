@@ -1092,16 +1092,26 @@ let SYNC_API_OK = false;
 let QUEUED_PAGES = new Set();  // 已排队 page path（渲染「已排队 ✓」）
 let SYNC_RUNS = [];            // auto 任务历史（console 表格消费）
 
+// 三段 fetch 各自独立失败，**不许连坐**：主 status 的 fetch+parse 在自己的 try 里，
+// 二次列表（rewrite-requests / runs）各在自己的嵌套 try 里。为什么必须拆开：原先一个 try 包住三段，
+// 一旦 rewrite-requests 抛错（而 status 其实成功了），catch 会把**已经解析好的 status 载荷整个丢掉**
+// ——SYNC_STATUS=null / SYNC_API_OK=false，状态行与 sync 灯无谓地降级成 unknown/静态，
+// 而这正是本期核心交付（状态行的燃料读数）的数据源。二次列表失败只清它自己那一份读数。
 async function fetchSyncStatus() {
   try {
     const r = await fetch(BASE + 'api/sync/status');
     if (!r.ok) throw new Error();
     SYNC_STATUS = await r.json();
     SYNC_API_OK = true;
+  } catch {
+    SYNC_STATUS = null; SYNC_API_OK = false;   // 主 status 失败：维持现状降级（状态行转静态读数）
+  }
+  try {
     const q = await (await fetch(BASE + 'api/sync/rewrite-requests')).json();
     QUEUED_PAGES = new Set((q.requests ?? []).map(x => x.page));
-    try { SYNC_RUNS = (await (await fetch(BASE + 'api/sync/runs')).json()).runs ?? []; } catch { SYNC_RUNS = []; }
-  } catch { SYNC_STATUS = null; SYNC_API_OK = false; SYNC_RUNS = []; }
+  } catch { QUEUED_PAGES = new Set(); }
+  try { SYNC_RUNS = (await (await fetch(BASE + 'api/sync/runs')).json()).runs ?? []; }
+  catch { SYNC_RUNS = []; }
 }
 
 // --- manifest 轮询：15s 慢轮询常驻；操作后 1s×10 快轮询（秒级反馈）。纯 GET，三 serve 形态全兼容。

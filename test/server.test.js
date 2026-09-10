@@ -448,6 +448,58 @@ test('GET /api/sync/status: TTL 过期（fuelTtlMs=0）→ 每次请求都重新
   } finally { server.close(); cleanup(); }
 });
 
+// --- 代码评审 🟡#1：fuel 缓存键必须含 exec 维度 ---
+// 根因：FUEL_CACHE 原先只按 repoRoot 键控，而它派生的 fuelReadout 是**由某个 exec 口径算出来的**；
+// 同一进程里两个 createServer 用不同 exec stub 但同 root 时，后者会读到前者口径下的陈旧 fuel。
+// 这与同文件 VERSION_STAMP_CACHE 自己声明的不变量（server.js:145-147「同一个目录换一个 exec……就应该重算」）
+// 直接矛盾。修法：fuelCached 与 versionStampCached 同构（WeakMap<exec, Map<repoRoot, {at,value}>>）。
+// 断言方向：① 同 root 换 exec → 必须重算，不得串用；② 同一 (exec, repoRoot) 在 TTL 内仍命中（性能不回退）。
+test('GET /api/sync/status: fuel 缓存按 (exec, repoRoot) 键控 —— 同 root 不同 exec 不共享缓存', async () => {
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'decision:x', kind: 'decision', ts: '2026-09-01T00:00:00Z', source: 'hook', commit: 'sha1', title: 't', why: 'w' },
+  ] });
+  const mkExec = commits => {
+    const calls = { log: 0, describe: 0 };
+    return {
+      calls,
+      exec: (cmd, args) => {
+        if (args[0] === 'describe') { calls.describe += 1; return 'v9.9.9\n'; }
+        if (args[0] === 'log') {
+          calls.log += 1;
+          return commits.map((sha, i) => `${sha}\x1f2026-09-0${i + 1}T00:00:00+00:00`).join('\n') + '\n';
+        }
+        return '';
+      },
+    };
+  };
+  const a = mkExec(['sha1']);                       // 口径 A：窗口内 1 个提交
+  const b = mkExec(['sha1', 'sha2', 'sha3']);       // 口径 B：窗口内 3 个提交
+  const serverA = createServer(root, { exec: a.exec });
+  const serverB = createServer(root, { exec: b.exec });
+  const portA = await listen(serverA);
+  const portB = await listen(serverB);
+  const status = port => fetch(`http://127.0.0.1:${port}/api/sync/status`).then(r => r.json());
+  try {
+    const fa = (await status(portA)).fuel;
+    assertFuelShape(fa);
+    assert.equal(fa.window_commits, 1);
+    assert.equal(fa.capture_pct, 100);                       // 1 decision / 1 commit
+
+    // 同 root、换 exec → 必须按新村口径重新派生（读到 1 个提交就是串用了 A 的陈旧值）
+    const fb = (await status(portB)).fuel;
+    assertFuelShape(fb);
+    assert.equal(fb.window_commits, 3, `同 root 换 exec 必须重算，实测 window_commits=${fb.window_commits}`);
+    assert.equal(fb.capture_pct, 33.33);                     // 1 decision / 3 commits
+    assert.equal(b.calls.log, 1);
+
+    // 各自 (exec, repoRoot) 在 TTL 内仍命中：再各请求一次，派生次数不增、取值不变
+    assert.deepEqual((await status(portA)).fuel, fa);
+    assert.deepEqual((await status(portB)).fuel, fb);
+    assert.equal(a.calls.log, 1, `命中缓存不得重复派生，实测 ${a.calls.log} 次`);
+    assert.equal(b.calls.log, 1, `命中缓存不得重复派生，实测 ${b.calls.log} 次`);
+  } finally { serverA.close(); serverB.close(); cleanup(); }
+});
+
 // --- 窄修复：版本戳（预算窗口键）的短 TTL 缓存 ---
 // 根因：status 处理里除 fuel 外还有 budgetStatus → versionStamp（lib/cost.js:41）会**同步 spawn 一次
 // `git describe --tags`**；fuel 缓存命中后它成了热路径上唯一的 git 冷启动（实测 hot 仍有 ~850ms）。
@@ -744,6 +796,44 @@ test('POST /api/human/visit 坏 JSON body → 400', async () => {
     });
     assert.equal(r.status, 400);
     assert.equal(visitLines(root).length, 0);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+// --- 代码评审 🔵#4：请求处理器缺顶层 try/catch ---
+// 根因：per-repo 处理器是 async 的，处理体里 handleApi 的**未预期**抛错会让返回的 promise reject
+// → unhandledRejection → 长时运行的 serve 进程整个挂掉（Node 默认把未处理 rejection 当致命错误）。
+// 注入点用确定的 fs 错误，不依赖 exec stub：把 `.state/auto-runs.ndjson` 做成**目录**——
+// existsSync 为真、readFileSync 抛 EISDIR，而 readAutoRuns（lib/syncstate.js:203）只 catch 了
+// JSON.parse、没 catch 读取本身，于是抛出穿过 handleApi。修复后必须回 500，且进程照旧存活。
+const injectFsThrow = root => mkdirSync(join(root, '.state', 'auto-runs.ndjson'), { recursive: true });
+
+test('server: 处理器内未预期抛错 → 500 且响应结束（不变成 unhandledRejection 击落进程）', async () => {
+  const root = syncFixture();
+  injectFsThrow(root);
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/sync/runs`);
+    assert.equal(r.status, 500, `未预期抛错必须回 500，实际 ${r.status}`);
+    assert.equal(typeof (await r.text()), 'string');        // 响应已结束（可读体，连接可复用）
+    // 同一个 server 仍活着且正常路径未被兜底吞掉：显式 404 分支照旧 404、正常端点照旧 200
+    assert.equal((await fetch(`http://127.0.0.1:${port}/nope.md`)).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/sync/status`)).status, 200);
+  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('portal: 处理器内未预期抛错 → 500（portal 同样是长时进程，不能被打挂）', async () => {
+  const root = syncFixture();
+  injectFsThrow(root);
+  const server = createPortalServer({ alpha: root });
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/alpha/api/sync/runs`);
+    assert.equal(r.status, 500, `portal 转发的未预期抛错必须回 500，实际 ${r.status}`);
+    await r.text();
+    // portal 自身正常路径不受影响（首页 / repos.json / 未登记 repo 的 404）
+    assert.equal((await fetch(`http://127.0.0.1:${port}/repos.json`)).status, 200);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/ghost/site/`)).status, 404);
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 

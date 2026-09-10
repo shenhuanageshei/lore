@@ -447,9 +447,33 @@ function ensureMermaid() {
 }
 
 let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';
+// 首屏数据读取失败的原因（null = 正常）。非空 → route() 在正文区给出**可见**的失败提示，
+// 而不是把「取不到目录」伪装成「无此页」的 404（那会让读者以为是自己点错了页）。
+let BOOT_ERROR = null;
+
+// 首屏 manifest 读取。为什么单独抽出来：它是**唯一没有容错的第一跳数据源**——
+// pollTick / fetchSyncStatus / createVisitSensor 都各有 try/catch，唯独它裸奔：fetch 瞬时失败或
+// JSON 损坏 → 未处理拒绝 → boot() 断在第一条 await 上，侧栏 / 路由 / F 键全不启动，
+// 壳停在死骨架（F1–F5 全 disabled）直到手动刷新。口径必须与同文件其它数据源一致。
+// 顺带把「合法 JSON 但结构不对」也算失败：下游 firstPageKey / buildNavModel 都会裸访 MANIFEST.axes。
+async function loadManifest() {
+  const res = await fetch(BASE + 'wiki/.manifest.json', { cache: 'no-store' });   // 同 pollTick：绕开 python serve 的启发式缓存
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const m = await res.json();
+  if (!Array.isArray(m?.axes)) throw new Error('manifest 缺少 axes');
+  return m;
+}
 
 async function boot() {
-  MANIFEST = await (await fetch(BASE + 'wiki/.manifest.json')).json();
+  try {
+    MANIFEST = await loadManifest();
+  } catch (err) {
+    // 退到安全默认（空目录）+ 记下原因：其余接线照常执行，route() 把原因显示在正文区。
+    // 不在这里重试：重试要重跑下面那串 wire*，会重复绑定事件（同一个监听器叠两份）。
+    // 15s 轮询是既有的自愈路径——manifest 恢复后它会弹「内容已更新」提示条让读者一点回正文。
+    MANIFEST = { axes: [] };
+    BOOT_ERROR = err?.message || String(err);
+  }
   PAGE_INDEX = buildPageIndex(MANIFEST);
   FLAT = {};
   for (const ax of MANIFEST.axes) for (const p of ax.pages) FLAT[`${ax.id}/${p.id}`] = p;
@@ -569,7 +593,49 @@ function renderTranslateState(page, localized) {
   return `<button id="translate-page" class="chip stale" data-page="${page.path}" data-lang="${localized.lang}">🌐 ${text}</button>`;
 }
 
+// 往 innerHTML 里塞外部/运行时字符串（错误信息、hash）前的最小转义。**保持单行**：
+// test/shell.test.js 按整行抽它（花括号配对抽取器会被这里面的正则与对象字面量带偏）。
+const escapeHtml = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// 单调递增的导航序号：每次 route() 领一个，每个 await 之后比对——过期的那次渲染直接丢弃。
+// 为什么必须有：连续两次 hash 切换会并发跑两个 route()，慢的那个后落地会把新页整体覆盖回旧页
+// （经典 SPA 竞态：先点 A 后点 B，屏幕上却是 A）。序号在**函数第一行**就领，
+// 这样连「切到 #console」这种同步分支也能让在途的页渲染作废。
+let ROUTE_SEQ = 0;
+
+// 404 面板：**已知但取不到**的页走这里（hash 不在 manifest 里 / 页文件非 2xx）。
+// 两处入口共用一份文案，免得两处漂移。清空注记栏是硬要求：404 页没有锚点，
+// 残留上一页的注记会把读者引到不存在的行号上。
+function renderNotFound(hash) {
+  document.getElementById('meta').innerHTML = '';
+  document.getElementById('content').innerHTML = `<h1>404</h1><p>无此页：<code>${escapeHtml(hash)}</code></p>`;
+  renderInspector([]);
+}
+
+// manifest 没读到时的正文区提示（可见的错误，既不是死骨架、也不是误导性的 404）：
+// 外壳其余部分照常可用（搜索 / 主题 / sync 面板 / 状态行），15s 轮询若自愈会弹提示条让读者回来。
+function renderBootFailure() {
+  document.getElementById('meta').innerHTML = '';
+  document.getElementById('content').innerHTML =
+    '<h1>⚠ 页面目录加载失败</h1>'
+    + `<p>读取 <code>wiki/.manifest.json</code> 失败：<code>${escapeHtml(BOOT_ERROR)}</code></p>`
+    + '<p>侧栏目录与正文暂时为空；数据恢复后刷新本页即可。搜索 / 主题 / sync 面板仍可用。</p>';
+  renderInspector([]);
+}
+
+// 正文「核身」失败（网络断 / fetch 抛错）：必须显示**加载失败**，不许静默停在上页——
+// 停在上页会让读者以为当前 hash 就是屏幕上那份内容，比空白更坏的谎。
+function renderLoadError(hash, err) {
+  document.getElementById('meta').innerHTML = '';
+  document.getElementById('content').innerHTML =
+    '<h1>⚠ 页面加载失败</h1>'
+    + `<p><code>${escapeHtml(hash)}</code> 的正文没能取到：<code>${escapeHtml(err?.message || err)}</code></p>`
+    + '<p>网络恢复后点 F1 或左侧目录重进本页即可。</p>';
+  renderInspector([]);
+}
+
 async function route() {
+  const seq = ++ROUTE_SEQ;      // 领号：本函数每个 await 之后都要比对，过期就丢弃这一次渲染
   const hash = location.hash.slice(1) || firstPageKey();
   const page = FLAT[hash];
   if (hash === 'console') {
@@ -582,13 +648,23 @@ async function route() {
   document.querySelectorAll('#sidebar a').forEach(a =>
     a.classList.toggle('active', a.dataset.key === hash));
   if (!page) {
-    document.getElementById('meta').innerHTML = '';
-    document.getElementById('content').innerHTML = `<h1>404</h1><p>无此页：<code>${hash}</code></p>`;
-    renderInspector([]);        // 404 页没有任何锚点 → 注记栏必须清空并保持 hidden
+    if (BOOT_ERROR) renderBootFailure(); else renderNotFound(hash);
     return;
   }
   const localized = resolveLocalizedPage(page, SELECTED_LANG);
-  const raw = await (await fetch(BASE + 'wiki/' + localized.path, { cache: 'no-store' })).text();   // python serve 的启发式缓存会吃掉刚 finalize 的新内容
+  let raw;
+  try {
+    const res = await fetch(BASE + 'wiki/' + localized.path, { cache: 'no-store' });   // python serve 的启发式缓存会吃掉刚 finalize 的新内容
+    if (seq !== ROUTE_SEQ) return;                     // 过期：新的一次导航已经落地，丢弃这一次（并发防护）
+    // 页文件缺失时 serveStatic 回 404 + 正文 'not found'——不查 res.ok 就会把这行字符串
+    // 当 markdown 渲染成正文（读者看到「not found」四个字当页面），必须走既有 404 分支。
+    if (!res.ok) { renderNotFound(hash); return; }
+    raw = await res.text();
+    if (seq !== ROUTE_SEQ) return;                     // 正文 await 之后再比一次：慢的那份不许落地
+  } catch (err) {
+    if (seq !== ROUTE_SEQ) return;
+    renderLoadError(hash, err); return;
+  }
   // 阶段 C 的渲染管线（验收 ①）——顺序是硬约束，两步分别落在不同层次：
   //   ① renderDecisionTable：**md 层次**的改造（决策史哨兵区的列表 → 三列表格 md，
   //      内部就是 parseDecisionLog 的三列结果 + 空态判定：无决策史小节 / 无列表 → 原样返回，
@@ -610,6 +686,9 @@ async function route() {
     catch { /* missing asset or bad diagram: leave source text visible, page stays usable */ }
     mNodes.forEach(div => { if (div.querySelector('svg')) div.onclick = () => LB.open(div); });
   }
+  // mermaid 的 await 同样是一次让出点：这一段时间里读者可能已经切到别页，下面的接线读的是
+  // **当前 DOM**（`#meta button[data-rewrite-page]` 等），过期的这次不许再碰新页的元素。
+  if (seq !== ROUTE_SEQ) return;
   const translateBtn = document.getElementById('translate-page');
   if (translateBtn) {
     translateBtn.onclick = async () => {
@@ -1147,14 +1226,22 @@ async function pollTick() {
   let fresh;
   try { fresh = await (await fetch(BASE + 'wiki/.manifest.json', { cache: 'no-store' })).json(); }   // 绕过 python serve 启发式缓存
   catch { return; }
+  // 坏 manifest（合法 JSON 但缺 axes / axes 非数组 / 整个是 null）不得让 15s 轮询变成未处理拒绝风暴：
+  // 下一行曾是 `for (const ax of fresh.axes)` 裸访——每 15 秒一次 TypeError。这里放弃这一轮
+  // （与 buildVisitPathIndex / buildConsoleModel 的 `?? []` 同口径：测不出就什么都不做），
+  // 同时**不推进 LAST_GENERATED、不拿坏数据重建侧栏**——把读者正在看的目录清空比空转一轮坏得多。
+  // 下一轮 15s 后照常重试，天然自愈。
+  const axes = Array.isArray(fresh?.axes) ? fresh.axes : null;
+  if (!axes) return;
   const currentKey = location.hash.slice(1) || firstPageKey();   // 与 route 对齐：落地页（无 hash）也能出提示条
   const before = JSON.stringify(FLAT[currentKey] ?? null);
   const flatNew = {};
-  for (const ax of fresh.axes) for (const p of ax.pages) flatNew[`${ax.id}/${p.id}`] = p;
+  for (const ax of axes) for (const p of (ax?.pages ?? [])) flatNew[`${ax.id}/${p.id}`] = p;
   const d = pollDecide(LAST_GENERATED, fresh.generated, JSON.stringify(flatNew[currentKey] ?? null) !== before);
   LAST_GENERATED = fresh.generated;
   if (!d.changed) return;
   MANIFEST = fresh; PAGE_INDEX = buildPageIndex(MANIFEST); FLAT = flatNew;
+  BOOT_ERROR = null;   // 目录已经读到 → 首屏的失败态解除（状态行的页数/队列读数不再停在 unknown）
   if (d.rebuildSidebar) {
     buildSidebar();   // 全量重建 → 把瞬态 UI 状态接回来：active 高亮 + 搜索过滤
     const hash = location.hash.slice(1) || firstPageKey();
@@ -1192,7 +1279,10 @@ function showUpdateBar() {
 // 点不动就是装饰性遥测）、以及预算超限的显隐。SYNC_STATUS 为 null（python serve / portal / 未 init）时
 // 纯函数自然降级为静态读数（燃料 unknown + manifest 的页数/队列），不报错、不空白（验收 6）。
 function renderStatusLine() {
-  const line = buildStatusLine({ status: SYNC_STATUS, manifest: MANIFEST, queued: queuedArg() });
+  // manifest 没读到时不把安全默认的 `{axes: []}` 当成「测出来就是 0 页」喂进去：那是 D13 点名的
+  // 反模式（0 是「测出来是零」，取不到是「测不出」）。传 null 让页数/队列读数落到 unknown，
+  // 与正文区的失败提示一致；目录真读到之后（pollTick 恢复）BOOT_ERROR 会被清掉，读数自动回真值。
+  const line = buildStatusLine({ status: SYNC_STATUS, manifest: BOOT_ERROR ? null : MANIFEST, queued: queuedArg() });
   const fill = (id, text, cls) => {
     const el = document.getElementById(id);
     el.textContent = text;

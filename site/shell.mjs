@@ -624,24 +624,41 @@ function decisionTableMd(rows) {
 // 不渲染的情形（**都返回原串**，避免每页挂一堆空壳）：
 //   · 没有决策史小节（无决策史的页 → 不得出现空表）；
 //   · 小节里没有列表（空态提示 / 手写自管内容 → 不得渲染出空表头）。
+// **版式语义（这里写死，test/shell.test.js 逐行钉住）**：表格落在**第一条列表行**的位置；
+// 段内非列表行（散文 / 分节语）一行不丢，但会被移到整张表格**之后**——相对彼此的顺序不变，
+// 相对条目的位置变了。例：`- A` / `散文` / `- B` → `[表格(A,B)]` / `散文`，
+// 也就是说那句本意是 B 的引言会挂在整张表后面，**不是「原位保留」**（旧注释就是这么说错的）。
+// 为什么不做真·原位分段插表把它夹回两张表之间：那张表会有多个表头，而壳侧的
+// tagDecisionTable 只认小节里的第一张表（版本/日期的 mono 排版挂在它身上），拆表得连调用点一起改，
+// 超出这个渲染器的职责。
 export function renderDecisionTable(md) {
   if (typeof md !== 'string' || md === '') return md;
   const lines = md.split('\n');
-  let head = -1, fence = false;
+  // 全篇围栏位图：三处扫描（找小节 / 收集条目 / 拼回输出）必须**同一口径**。
+  // 中间那段收集列表行的循环原先漏了围栏追踪——手写决策史小节里夹代码块时，
+  // 块内 `- ` 开头的样本会被当条目抽进表格，反而把代码块本身抽掉一行。
+  const inFence = new Array(lines.length).fill(false);
+  {
+    let f = false;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^```/.test(lines[i])) { f = !f; continue; }   // 围栏行自身既不是条目也不是标题
+      inFence[i] = f;
+    }
+  }
+  let head = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (/^```/.test(lines[i])) { fence = !fence; continue; }   // 围栏代码块里的 `## …` 不是标题
-    if (fence) continue;
+    if (inFence[i]) continue;                            // 围栏代码块里的 `## …` 不是标题
     if (DECISION_HEADING_RE.test(lines[i])) { head = i; break; }
   }
   if (head === -1) return md;
   let end = lines.length;
-  fence = false;
   for (let i = head + 1; i < lines.length; i++) {
-    if (/^```/.test(lines[i])) { fence = !fence; continue; }
-    if (!fence && /^##\s/.test(lines[i])) { end = i; break; }
+    if (inFence[i]) continue;
+    if (/^##\s/.test(lines[i])) { end = i; break; }
   }
   let first = -1, last = -1;
   for (let i = head + 1; i < end; i++) {
+    if (inFence[i]) continue;
     if (/^[-*]\s/.test(lines[i])) { if (first === -1) first = i; last = i; }
   }
   if (first === -1) return md;
@@ -650,15 +667,16 @@ export function renderDecisionTable(md) {
   // → 散文被当成「解析失败的降级行」塞进表格（version/date 均为 —），不丢数据但版式误导。
   // 「不丢行」原则不变：真正的列表行一条都不丢（含被散文隔开的下半段），只是散文不进表格。
   const seg = [];
-  for (let i = first; i <= last; i++) if (/^[-*]\s/.test(lines[i])) seg.push(lines[i]);
+  for (let i = first; i <= last; i++) {
+    if (!inFence[i] && /^[-*]\s/.test(lines[i])) seg.push(lines[i]);
+  }
   const rows = parseDecisionLog(seg.join('\n'));
   if (rows.length === 0) return md;
-  // 表格落在第一条列表行的位置；段内非列表行**原位保留**（改造版式不该顺手删掉正文里的散文）。
   const out = [];
   for (let i = 0; i < lines.length; i++) {
-    if (i === first) out.push(...decisionTableMd(rows));
-    if (i >= first && i <= last && /^[-*]\s/.test(lines[i])) continue;   // 已并入表格
-    out.push(lines[i]);
+    if (i === first) out.push(...decisionTableMd(rows));                 // 表格落在第一条列表行处
+    if (i >= first && i <= last && !inFence[i] && /^[-*]\s/.test(lines[i])) continue;   // 已并入表格
+    out.push(lines[i]);                                                  // 其余字节（含散文、含围栏内样本）原样保留
   }
   return out.join('\n');
 }

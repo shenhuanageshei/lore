@@ -929,10 +929,66 @@ test('renderDecisionTable: 列表中间夹散文 → 散文不得进表格，列
   assert.match(out, /\| def4567 \| 2026-05-30 \| \*\*b\*\* — why b \|/);   // 被散文隔开的下半段也不丢
   assert.equal(table.some(l => l.includes('人工维护')), false);            // 散文没进表格
   assert.equal(/\|\s*—\s*\|\s*—\s*\|/.test(out), false);                   // 没有 version/date 皆 — 的降级行
-  // 散文也没被从正文里删掉（原位保留），其余小节不受影响
+  // 散文也没被从正文里删掉；它的**落位**由下一条测试逐行钉住（不是「原位保留」，见那里）
   assert.match(out, /这一段是人工维护的说明：两个决定之间插了散文。/);
   assert.match(out, /## 下一节/);
   assert.match(renderMarkdown(out), /<th>版本<\/th><th>日期<\/th><th>变更与原因<\/th>/);
+});
+
+// 代码评审 R3（第二轮）：注释声称段内非列表行「原位保留」，实现却是把它们全挪到整张表之后——
+// 注释与实现不符，而上面那条测试只断言散文「存在」，钉不住位置（用存在性冒充行为正确性的老毛病）。
+// 处置：选「整张表 + 散文移到表后」这一边（改成真·分段插表会让小节里出现多张表头，
+// 而壳侧 tagDecisionTable 只认第一张表 → 得连调用点一起改），并把该语义**逐行**钉在这里：
+// 以后谁再改落位，这条会红，逼他同时改注释与测试。
+test('renderDecisionTable: 散文的落位 = 整张表格之后（不是「原位」）——逐行钉住', () => {
+  const page = [
+    '## Decision history', '',
+    '- **a** — why a (abc1234, 2026-06-01)', '',
+    '这一段是人工维护的说明。', '',
+    '- **b** — why b (def4567, 2026-05-30)', '',
+    '## 下一节',
+  ].join('\n');
+  const out = renderDecisionTable(page);
+  const lines = out.split('\n');
+  assert.equal(lines[0], '## Decision history');
+  // 表格整体（表头 / 分隔 / 两条数据）落在**第一条列表行**的位置，连续不断
+  assert.deepEqual(lines.slice(2, 6), [
+    '| 版本 | 日期 | 变更与原因 |',
+    '|---|---|---|',
+    '| abc1234 | 2026-06-01 | **a** — why a |',
+    '| def4567 | 2026-05-30 | **b** — why b |',
+  ]);
+  // 散文在整张表**之后**（这正是旧注释说错的地方），且仍在小节内、下一节之前
+  assert.equal(lines[6], '');
+  assert.equal(lines[7], '这一段是人工维护的说明。');
+  assert.equal(lines[10], '## 下一节');
+  assert.equal(lines.filter(l => l.includes('人工维护')).length, 1, '散文不许丢，也不许复制');
+  assert.equal(lines.some(l => l === '- **a** — why a (abc1234, 2026-06-01)'), false);   // 列表行已被表格取代
+});
+
+// 代码评审 R3（第二轮）🔵：中间那段收集列表行的循环原先没有围栏追踪（首尾两个循环都有）。
+// 后果有两面：① 代码块里 `- ` 开头的样本被当条目抽进表格（假条目）；
+// ② 输出阶段按「列表行」跳过时把**围栏内的那一行**一并删掉（代码块少一行，样本被破坏）。
+test('renderDecisionTable: 决策史小节里夹围栏代码块 → 块内 `- ` 行不进表格、也不被删（评审 R3 🔵）', () => {
+  const page = [
+    '## Decision history', '',
+    '- **a** — why a (abc1234, 2026-06-01)', '',
+    '下面这段是样本，不是条目：', '',
+    '```md',
+    '- **示例条目** — 这只是代码块里的样本 (deadbee, 2026-01-01)',
+    '```', '',
+    '- **b** — why b (def4567, 2026-05-30)', '',
+    '## 下一节',
+  ].join('\n');
+  const out = renderDecisionTable(page);
+  const table = out.split('\n').filter(l => l.startsWith('|')).join('\n');
+  assert.equal(table.includes('示例条目'), false, '代码块里的 `- ` 行被当条目抽进表格了');
+  assert.equal(table.includes('deadbee'), false);
+  assert.match(table, /\| abc1234 \|/);
+  assert.match(table, /\| def4567 \|/);                       // 真条目一条不丢（围栏隔开的也收）
+  assert.match(out, /```md\n- \*\*示例条目\*\* — 这只是代码块里的样本 \(deadbee, 2026-01-01\)\n```/,
+    '代码块必须逐字保留（以前会被「列表行」跳过规则吃掉一行）');
+  assert.equal(out.split('\n').filter(l => /^```/.test(l)).length, 2);   // 开栏 + 闭栏都在
 });
 
 test('renderDecisionTable: 确定性——同一输入两次调用结果相同；表格里的 `|` 不撕表', () => {
@@ -1081,4 +1137,288 @@ test('调用点接线：状态行与控制台都必须走队列读数出口，�
   const consoleRow = SHELL_HTML.split('\n').find(l => l.includes('已排队请求'));   // 控制台「状态」小节那一行
   assert.ok(consoleRow, 'site/index.html 里找不到「已排队请求」那一行');
   assert.equal(consoleRow.includes('QUEUED_PAGES.size'), false, '控制台那一行不得直接渲染 QUEUED_PAGES.size 条');
+});
+
+// ---------- 首屏与导航的健壮性（代码评审 R3 ①③④）----------
+// boot 容错 / route 查 res.ok + 并发防护 / pollTick 坏 manifest。口径同上：抽 site/index.html 里
+// **真正的**源码在 Node 里跑，断言行为而不是字样——上一轮的教训正是「用存在性冒充行为正确性」。
+// 壳是 SPA、内联脚本依赖 DOM，而本仓零依赖、无 jsdom → 只把 DOM 世界当桩，被抽出来的函数是**真源码**；
+// 与它协作的模块函数按参数注入（真实函数照传，其余是「被调用即记录」的桩）。
+
+function fakeElement() {
+  return {
+    innerHTML: '', textContent: '', value: '', hidden: false, disabled: false, title: '',
+    className: '', scrollTop: 0, dataset: {}, style: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    addEventListener() {}, removeEventListener() {},
+    appendChild() {}, prepend() {}, remove() {}, after() {},
+    querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+    setAttribute() {}, getAttribute: () => null, focus() {}, select() {},
+    contains: () => false, scrollIntoView() {}, click() {},
+  };
+}
+
+function fakeDocument() {
+  const byId = new Map();
+  return {
+    hidden: false,
+    documentElement: { setAttribute() {}, getAttribute: () => 'light' },
+    head: fakeElement(), body: fakeElement(),
+    getElementById(id) { if (!byId.has(id)) byId.set(id, fakeElement()); return byId.get(id); },
+    querySelector: () => null, querySelectorAll: () => [],
+    createElement: () => fakeElement(), addEventListener() {},
+  };
+}
+
+// escapeHtml 是单行箭头函数，花括号配对抽取器会被它内部的正则/对象字面量带偏 → 按整行抽。
+function shellEscapeLine() {
+  const l = SHELL_HTML.split('\n').find(x => x.trim().startsWith('const escapeHtml'));
+  assert.ok(l, 'site/index.html 里找不到 escapeHtml 的一行式定义——抽取器失效，需同步更新本测试');
+  return l;
+}
+
+// boot()：抽 loadManifest + boot 的真源码，协作者注入成桩——测的是 boot 自己的控制流
+// （失败后是否仍然接线、是否退到安全默认、是否记下原因）。
+function buildShellBoot({ fetchStub }) {
+  const called = [];
+  const mk = name => () => { called.push(name); return Promise.resolve(); };
+  const body = [
+    "let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';",
+    'let BOOT_ERROR = null;',
+    'let LAST_GENERATED = null;',
+    sliceShellFn('async function loadManifest'),
+    sliceShellFn('async function boot'),
+    'return { boot, snap: () => ({ MANIFEST, PAGE_INDEX, FLAT, SELECTED_LANG, BOOT_ERROR, LAST_GENERATED }) };',
+  ].join('\n');
+  const build = new Function(
+    'fetch', 'BASE', 'localStorage', 'buildPageIndex', 'chooseInitialLanguage',
+    'buildSidebar', 'wireSearch', 'wireTheme', 'wireShortcuts', 'wireInspector', 'wireLanguage',
+    'fetchSyncStatus', 'wireSyncConsole', 'renderSyncLight', 'wireRepoSwitch', 'schedulePoll',
+    'window', 'route', body);
+  const scheduled = [];
+  const api = build(fetchStub, '/', { getItem: () => null, setItem() {} },
+    buildPageIndex, chooseInitialLanguage,
+    mk('buildSidebar'), mk('wireSearch'), mk('wireTheme'), mk('wireShortcuts'),
+    mk('wireInspector'), mk('wireLanguage'), mk('fetchSyncStatus'), mk('wireSyncConsole'),
+    mk('renderSyncLight'), mk('wireRepoSwitch'),
+    ms => scheduled.push(ms),
+    { addEventListener: ev => called.push('on:' + ev) },
+    () => called.push('route'));
+  api.called = called;
+  api.scheduled = scheduled;
+  return api;
+}
+
+const BOOT_FAILURES = {
+  'fetch 抛错（瞬时网络失败）': () => { throw new Error('network down'); },
+  'HTTP 404': async () => ({ ok: false, status: 404, json: async () => ({}) }),
+  'JSON 损坏（json() 抛错）': async () => ({ ok: true, json: async () => { throw new Error('bad json'); } }),
+  '合法 JSON 但缺 axes': async () => ({ ok: true, json: async () => ({ generated: '2026-09-10T00:00:00Z' }) }),
+};
+
+for (const [label, fetchStub] of Object.entries(BOOT_FAILURES)) {
+  test(`boot(): ${label} → 不 reject、退到安全默认、其余接线照常启动（评审 R3 ①）`, async () => {
+    const api = buildShellBoot({ fetchStub });
+    await api.boot();                       // 关键断言：这一行以前整体抛出 → 侧栏/路由/F 键全不启动，壳停在死骨架
+    const s = api.snap();
+    assert.deepEqual(s.MANIFEST.axes, [], '必须退到安全默认（空目录），不得把坏对象留在 MANIFEST 里');
+    assert.ok(s.BOOT_ERROR, '必须记下失败原因——route() 据此显示可见的错误提示');
+    for (const w of ['buildSidebar', 'wireSearch', 'wireTheme', 'wireShortcuts', 'wireInspector',
+      'wireLanguage', 'fetchSyncStatus', 'wireSyncConsole', 'renderSyncLight', 'wireRepoSwitch', 'route']) {
+      assert.ok(api.called.includes(w), `${w} 没被调用 —— 壳会停在死骨架（F1–F5 全 disabled）`);
+    }
+    assert.deepEqual(api.scheduled, [15000], '轮询仍要起来——它是失败后的自愈路径');
+    assert.ok(api.called.includes('on:hashchange'));
+  });
+}
+
+test('boot(): manifest 正常 → 既有行为一字不变（页表 / 语言 / LAST_GENERATED 都就位）', async () => {
+  const m = {
+    generated: '2026-09-10T00:00:00Z',
+    language: { default: 'zh', available: ['zh'] },
+    axes: [{ id: 'component', pages: [{ id: 'a', path: 'component/a.md' }] }],
+  };
+  const api = buildShellBoot({ fetchStub: async () => ({ ok: true, json: async () => m }) });
+  await api.boot();
+  const s = api.snap();
+  assert.equal(s.BOOT_ERROR, null);
+  assert.deepEqual(Object.keys(s.FLAT), ['component/a']);
+  assert.equal(s.PAGE_INDEX.a, 'component/a');
+  assert.equal(s.MANIFEST.generated, '2026-09-10T00:00:00Z');
+  assert.equal(s.LAST_GENERATED, '2026-09-10T00:00:00Z');
+  assert.equal(s.SELECTED_LANG, 'zh');
+});
+
+// route()：抽真源码，DOM 与协作者当桩。断言的是**正文区最终写出了什么**（行为），不是源码里有没有字样。
+function buildShellRoute({ fetchStub, hash = '#component/a' }) {
+  const doc = fakeDocument();
+  const location = { hash };
+  const seen = { inspector: [] };
+  const body = [
+    "let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';",
+    'let BOOT_ERROR = null;',
+    'let ROUTE_SEQ = 0;',
+    shellEscapeLine(),
+    sliceShellFn('function renderNotFound'),
+    sliceShellFn('function renderBootFailure'),
+    sliceShellFn('function renderLoadError'),
+    sliceShellFn('async function route'),
+    'return { route,',
+    '  setFlat: f => { FLAT = f; }, setBootError: e => { BOOT_ERROR = e; },',
+    '  html: () => document.getElementById("content").innerHTML,',
+    '  metaHtml: () => document.getElementById("meta").innerHTML };',
+  ].join('\n');
+  const build = new Function(
+    'fetch', 'BASE', 'document', 'location', 'window', 'prompt',
+    'firstPageKey', 'renderInspector', 'renderConsolePage', 'renderMeta', 'renderTranslateState',
+    'resolveLocalizedPage', 'stripFrontmatter', 'renderDecisionTable', 'renderMarkdown',
+    'preprocessWikilinks', 'renderAnchors', 'tagDecisionTable', 'ensureMermaid', 'themedSrc', 'LB', body);
+  const api = build(fetchStub, '/', doc, location, {}, () => null,
+    () => '', notes => seen.inspector.push(notes), () => {}, () => '', () => '',
+    resolveLocalizedPage, stripFrontmatter, renderDecisionTable, renderMarkdown,
+    preprocessWikilinks, renderAnchors, () => {}, async () => {}, s => s, { open() {} });
+  api.doc = doc;
+  api.location = location;
+  api.seen = seen;
+  return api;
+}
+
+const PAGE_A = { id: 'a', axis: 'component', path: 'component/a.md', title: 'A', lang: 'en' };
+const PAGE_B = { id: 'b', axis: 'component', path: 'component/b.md', title: 'B', lang: 'en' };
+
+test('route(): 页文件非 2xx → 走既有 404 分支，绝不把 404 响应体当正文渲染（评审 R3 ②）', async () => {
+  const api = buildShellRoute({ fetchStub: async () => ({ ok: false, status: 404, text: async () => 'not found' }) });
+  api.setFlat({ 'component/a': PAGE_A });
+  await api.route();
+  assert.match(api.html(), /<h1>404<\/h1>/);
+  assert.equal(api.html().includes('not found'), false,
+    `404 响应体被当 markdown 渲染成正文了：${api.html()}`);
+  assert.deepEqual(api.seen.inspector.at(-1), [], '404 页没有锚点 → 注记栏必须清空');
+});
+
+test('route(): 正文 fetch 抛错 → 显示加载失败，不许静默停在上页（评审 R3 ②）', async () => {
+  let fail = false;
+  const api = buildShellRoute({
+    fetchStub: async () => {
+      if (fail) throw new Error('network down');
+      return { ok: true, text: async () => '第一页的正文' };
+    },
+  });
+  api.setFlat({ 'component/a': PAGE_A, 'component/b': PAGE_B });
+  await api.route();
+  assert.match(api.html(), /第一页的正文/);                       // 先正常渲染 A
+  api.location.hash = '#component/b';
+  fail = true;
+  await api.route();
+  assert.match(api.html(), /页面加载失败/);
+  assert.equal(api.html().includes('第一页的正文'), false,
+    '停在上页 = 让读者以为当前 hash 就是屏幕上那份内容（比空白更坏的谎）');
+});
+
+test('route(): 连续两次切换 → 慢的那次落地被丢弃，不许把新页覆盖回旧页（评审 R3 ③）', async () => {
+  let releaseA;
+  const gateA = new Promise(r => { releaseA = r; });
+  const api = buildShellRoute({
+    fetchStub: async url => {
+      if (String(url).includes('component/a.md')) { await gateA; return { ok: true, text: async () => 'AAAA' }; }
+      return { ok: true, text: async () => 'BBBB' };
+    },
+  });
+  api.setFlat({ 'component/a': PAGE_A, 'component/b': PAGE_B });
+  const slow = api.route();                 // A：慢（挂在 gate 上）
+  api.location.hash = '#component/b';
+  await api.route();                        // B：快，先落地
+  assert.match(api.html(), /BBBB/);
+  releaseA();
+  await slow;                               // A 后落地：必须被丢弃
+  assert.match(api.html(), /BBBB/, '慢的那次把新页整体覆盖回旧页了（经典 SPA 竞态）');
+  assert.equal(api.html().includes('AAAA'), false);
+});
+
+test('route(): manifest 没读到 → 正文区给出可见的错误提示，不是误导性的 404（评审 R3 ①）', async () => {
+  const api = buildShellRoute({ fetchStub: async () => { throw new Error('不该被调用'); } });
+  api.setBootError('<img src=x onerror=1> 500');
+  await api.route();                        // FLAT 为空 → 没有 page 可渲染
+  assert.match(api.html(), /页面目录加载失败/);
+  assert.equal(api.html().includes('<h1>404</h1>'), false, '外壳没数据时报 404 会让读者以为是自己点错了页');
+  assert.equal(api.html().includes('<img'), false, '错误文案进 innerHTML 前必须转义');
+  assert.match(api.html(), /&lt;img/);
+});
+
+// pollTick()：抽真源码，只把 DOM/网络/协作者当桩。坏 manifest 每一轮都会来一次（15s），
+// 所以这里的断言是「不炸」而不是「这一次的结果对不对」。
+function buildShellPollTick({ fetchStub }) {
+  const called = [];
+  const location = { hash: '#component/a' };
+  const body = [
+    "let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';",
+    'let LAST_GENERATED = null, POLL_TIMER = null, FAST_LEFT = 0;',
+    sliceShellFn('async function pollTick'),
+    'return { pollTick, setManifest: m => { MANIFEST = m; }, setFlat: f => { FLAT = f; },',
+    '  snap: () => ({ MANIFEST, LAST_GENERATED, FLAT }) };',
+  ].join('\n');
+  const build = new Function(
+    'fetch', 'BASE', 'document', 'location', 'firstPageKey', 'pollDecide', 'buildPageIndex',
+    'buildSidebar', 'fetchSyncStatus', 'renderSyncLight', 'renderConsolePage', 'showUpdateBar',
+    'schedulePoll', body);
+  const mk = name => () => { called.push(name); return Promise.resolve(); };
+  const api = build(fetchStub, '/', fakeDocument(), location, () => '', pollDecide, buildPageIndex,
+    mk('buildSidebar'), mk('fetchSyncStatus'), mk('renderSyncLight'), mk('renderConsolePage'),
+    mk('showUpdateBar'), mk('schedulePoll'));
+  api.called = called;
+  return api;
+}
+
+test('pollTick(): 坏 manifest（null / 缺 axes / 非数组）→ 不抛、不动状态、不重建侧栏（评审 R3 ④）', async () => {
+  for (const bad of [null, {}, { axes: 'nope' }, { axes: null }]) {
+    const api = buildShellPollTick({ fetchStub: async () => ({ json: async () => bad }) });
+    const before = api.snap().MANIFEST;
+    await api.pollTick();                   // 以前这里每 15s 抛一次 TypeError（未处理拒绝风暴）
+    assert.deepEqual(api.snap().MANIFEST, before, `坏 manifest ${JSON.stringify(bad)} 不该改写 MANIFEST`);
+    assert.equal(api.called.includes('buildSidebar'), false, '坏数据不得重建侧栏（把读者正在看的目录清空更坏）');
+    assert.equal(api.snap().LAST_GENERATED, null);
+  }
+});
+
+test('pollTick(): 正常 manifest → 既有行为不变（generated 变了才重建侧栏）', async () => {
+  const fresh = {
+    generated: '2026-09-10T01:00:00Z',
+    axes: [{ id: 'component', pages: [{ id: 'a', path: 'component/a.md' }] }],
+  };
+  const api = buildShellPollTick({ fetchStub: async () => ({ json: async () => fresh }) });
+  await api.pollTick();
+  assert.equal(api.snap().LAST_GENERATED, '2026-09-10T01:00:00Z');
+  assert.deepEqual(Object.keys(api.snap().FLAT), ['component/a']);
+  assert.ok(api.called.includes('buildSidebar'));
+  assert.ok(api.called.includes('fetchSyncStatus'));
+});
+
+// 状态行读数：manifest 没读到时的安全默认 `{axes: []}` **不许**被当成「测出来 0 页」（D13）。
+// 抽 renderStatusLine 的真源码，DOM 与读数出口当桩，断的是**它写进 #statusline 的字**。
+function buildShellStatusLine() {
+  const doc = fakeDocument();
+  const body = [
+    "let MANIFEST = { axes: [] }, PAGE_INDEX = {}, FLAT = {}, SELECTED_LANG = 'en';",
+    'let BOOT_ERROR = null;',
+    'let SYNC_STATUS = null;',
+    sliceShellFn('function renderStatusLine'),
+    'return { renderStatusLine, set: (m, b) => { MANIFEST = m; BOOT_ERROR = b; } };',
+  ].join('\n');
+  const build = new Function('document', 'buildStatusLine', 'queuedArg', body);
+  const api = build(doc, buildStatusLine, () => undefined);
+  api.doc = doc;
+  return api;
+}
+
+test('renderStatusLine: manifest 没读到 → 页数/队列读 unknown，不拿安全默认的 0 冒充（D13）', () => {
+  const api = buildShellStatusLine();
+  api.set({ axes: [] }, 'HTTP 500');
+  api.renderStatusLine();
+  assert.equal(api.doc.getElementById('status-pages').textContent, 'unknown 页');
+  assert.match(api.doc.getElementById('status-queue').textContent, /队列 unknown/);
+  // 目录正常（哪怕真的是 0 页）→ 读数回真值，不许一律降级成 unknown
+  api.set({ axes: [] }, null);
+  api.renderStatusLine();
+  assert.equal(api.doc.getElementById('status-pages').textContent, '0 页');
+  assert.match(api.doc.getElementById('status-queue').textContent, /队列 0/);
 });

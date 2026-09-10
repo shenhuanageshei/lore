@@ -3,6 +3,23 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.12.0] — 2026-09-10
+
+**壳：浅色精密工作台**（设计 §5 落地；计划 `2026-09-10-lore-shell-light-workbench.md`）
+
+- **视觉地基**（设计 §5.2 tokens）：旧视觉语言换成浅色精密工作台——13 个色值逐值落地（弱色 `#6B7280` 白底 4.83:1，达 WCAG AA）、默认主题改 `light`（dark / sepia 保留并重映射到新 token 角色）、正文列宽改 `ch` 定宽 ≤76ch、圆角 / 阴影 / 缓动按 §5.2 表。**零外部资源引用**（字体走字体栈，不引 CDN）。
+- **快捷键栏 F1–F5**（§5.3）：F1 回首页 · F2 聚焦搜索 · F3 滚到决策史 · F4 开关右侧检查器 · F5 触发重写（恒 `preventDefault`，`Ctrl/⌘/Alt` 组合键仍让给浏览器）。**有内容的键才注册**，无内容不注册——不制造死键。
+- **底部状态行 + 燃料读数**（§5.3 / §5.5）：`CAPTURE OK / 未捕获 / unknown · 决策捕获率 N% · 断流 N 天 · N 页 · 队列 N · HH:MM`。「队列 N」**可点击**打开同步面板（§5.5 硬要求：状态行必须可操作，否则是装饰性遥测）。读数取不到一律渲染 `unknown`，**绝不用 0 冒充**（0 是「测出来是零」，unknown 是「测不出来」）；`capture_state` 另分 `none`（能测但从未捕获过——正是「hook 断流三个月」那种最危险形态）与 `unknown`（测不出），两者混同就是把最危险的失败模式藏起来。
+- **两个专属视觉**（§5.4）：① **源码锚点 = 引出线注记**——正文角标 + 右侧注记栏，点角标高亮对应注记（键盘 Enter/Space 亦可）；② **决策史 = 修改记录表**——`版本 / 日期 / 变更与原因`。版本列取短 sha，无 sha 的原子用 atom id 兜底（实测唯一的多原子提交恰好全无 sha，只靠日期会撞车）；atom id 另挂 `title` 属性供对照 `lore confirm <atom-id>`。
+- **锚点两形态都收但区别渲染**：`fn @ file:line` 按生成时行号原样渲染；`fn @ file` 也渲染但**不显示行号**并显式标注「源未给行号」——没有行号就不假装有（不变量⑧）。正则要求完整文件扩展名，杜绝 markdown 硬换行碎片（如 `lib/sync.js` 被截成 `lib/sync.j`）被误渲染成注记。
+- **`fuelReadout`**（`lib/doctor.js`）：抽出 `captureReadout` 作为窗口捕获率与断流的**唯一派生点**，`diagnose` 与 `fuelReadout` 共用——两处各算一遍必然漂移。`GET /api/sync/status` **新增** `fuel` 字段（既有字段一字不动），live 实测与 `lore doctor --json` 四个数字逐个相等。
+- **热路径性能**：fuel 与 budget 两条派生各自同步 spawn git，实测每请求阻塞事件循环约 1s，而壳每 15s 轮询一次 status。两条路径各加短 TTL 缓存（缓存键含 `exec` 维度，与同文件 `versionStamp` 缓存同构）后，**热态 850ms → 5–7ms**。
+- **per-repo 跨仓搜索同源化**：原先跳转根与 fetch 根混用，跨端口拉 manifest 被 CORS 静默拦死，且退化成按键级重试风暴。新增同源只读路由 `/cross/<repo>/wiki/.manifest.json`（数据源为本机注册表、不经过 portal），并把失败分为「确定性失败不再重试」与「瞬时失败带 30s 退避」。**刻意不开 ACAO 头**——那会让本机任意端口的任意页面读走本 server 的全部响应。
+- **健壮性**：`boot()` / `route()` / `pollTick` 的容错对齐（manifest 取不到不再让整壳停在死骨架；页缺失不再把 `not found` 当正文渲染；并发切页加序号丢弃过期渲染）；两个请求处理器加顶层兜底，未预期抛错回 500 而非 `unhandledRejection` 击落长时进程。
+- **测试**：新增约 73 项（769 → 842），多轮修复均带**变异对照**（改回旧实现 → 测试必失败），确保断言咬住行为而非字样。
+
+**验收边界（如实记账）**：§5.5 的交互层（F1–F5 点击、F4 开关、`[`/`]` 翻注记、窄屏视觉、per-repo 跨仓搜索的浏览器路径）**只有静态与纯函数证据，无实机浏览器验证**——本环境 headless Chrome 产不出 DOM。交付台账、逐轮评审的根因与处置见 `docs/superpowers/plans/2026-09-10-lore-shell-light-workbench.md` §9。
+
 ## [0.11.0] — 2026-09-10
 
 **人读理解层地基：⓪ 数据与证据地基 + ① 证据清洗与确认**

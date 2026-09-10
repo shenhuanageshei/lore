@@ -95,6 +95,33 @@ export function serveStatic(rootDir, rel, res, reqPath = '/' + rel) {
   stream.pipe(res);
 }
 
+// --- per-repo 形态的跨仓 manifest **同源**路由（代码评审 R4 🟡#1）---
+// 为什么需要它：per-repo 形态下壳跑在 127.0.0.1:<本仓端口>，而**其它仓**只在 portal 端口上有。
+// 壳原先直接 fetch `http://127.0.0.1:7842/<repo>/wiki/.manifest.json`——跨源请求，而本 server
+// 刻意不发 access-control-allow-origin（见下）→ 浏览器把每个请求都拦掉，跨仓搜索在 per-repo
+// 形态下 100% 不可用，且随每次按键重发（请求风暴）。
+// 为什么选同源路由而不是给响应加 ACAO：ACAO 一旦发出，本机**任意端口上的任意页面**都能读走本
+// server 的全部响应（wiki 正文 / status / 队列读数），本地工具不该开这个读口子；同源路由把新增
+// 读面收窄到「一张 manifest」，且数据源是本机注册表——**不经过 portal，portal 没起也能用**。
+// 安全：只认注册表里**精确**登记的仓库名（不猜名、不拼路径）；rel 固定为 wiki/.manifest.json——
+// 不接任意路径，杜绝把 /cross 变成任意文件读器；未登记 / 注册表缺失 → 404（不泄露本机目录结构）。
+const CROSS_MANIFEST_RE = /^\/cross\/([^/]+)\/wiki\/\.manifest\.json$/;
+
+export function serveCrossManifest(req, res, pathname, reposPath) {
+  const m = pathname.match(CROSS_MANIFEST_RE);
+  if (!m) return false;
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end('method not allowed'); }
+  let entries = [];
+  try { entries = JSON.parse(readFileSync(reposPath, 'utf8')) ?? []; } catch { entries = []; }
+  const hit = Array.isArray(entries)
+    ? entries.find(e => e && e.name === m[1] && typeof e.loreDir === 'string') : null;
+  if (!hit) { res.writeHead(404); return res.end('unknown repo'); }
+  // 复用 serveStatic：同一套 traversal 守卫 / MIME / no-store 语义——本地工具的动态内容必须 no-store，
+  // 否则「server 是新的、用户看到旧的」这条老坑会换一张 manifest 重演。
+  serveStatic(hit.loreDir, 'wiki/.manifest.json', res, pathname);
+  return true;
+}
+
 const PORTAL_PORT = 7842;   // 与 lib/portal.js 固定端口一致
 const slashLower = p => normalize(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
@@ -358,6 +385,9 @@ export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedi
     // 注意：既有的显式分支本来就是正常返回，走不到 catch——兜底不吞任何正常路径。
     try {
       if (await handleApi(root, req, res, pathname, { spawnFn, reposPath, exec, fuelTtlMs, versionTtlMs })) return;
+      // 跨仓 manifest 同源路由（R4 🟡#1）：只在 per-repo server 上开——portal 自己就是聚合者，
+      // 壳在 portal 形态下走 /<repo>/… 本就是同源，无需（也不该）多一条读路径。
+      if (serveCrossManifest(req, res, pathname, reposPath)) return;
 
       const rel = pathname.replace(/^\/+/, '');
       return serveStatic(root, rel, res, pathname);

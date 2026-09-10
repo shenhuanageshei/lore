@@ -1422,3 +1422,77 @@ test('renderStatusLine: manifest 没读到 → 页数/队列读 unknown，不拿
   assert.equal(api.doc.getElementById('status-pages').textContent, '0 页');
   assert.match(api.doc.getElementById('status-queue').textContent, /队列 0/);
 });
+
+// ---------- 阶段 A 的机检项入库（代码评审 R4 🟡#2）----------
+// 为什么必须搬进 `node --test`：这几条（正文字号/字体栈/13 个 §5.2 token/零外部资源引用）此前只活在
+// 计划文档的手工 `node -e` 命令里，而补这些探针的动机恰恰是「它们可以静默回归」——留在手工命令里，
+// 回归只在有人记得重跑时才被抓到（`grep 13.5px test/` 零命中就是证据）。现在每次 `node --test` 都守。
+//
+// 防阷值（上一轮真发生过）：**先剥注释再匹配**。实测 site/index.html 里 `#8A94A3` 与 `@import` 都只
+// 出现在注释文本里（--dim 行尾「不得回退 #8A94A3」、D1 行「绝不 @import / CDN」），不剥注释就会把
+// 「注释里提到」误报成「已经回退」——探针反过来咬人的经典形态。
+const SHELL_HTML_NO_COMMENTS = SHELL_HTML.replace(/<!--[\s\S]*?-->/g, '');
+const SHELL_STYLE = (() => {
+  const m = SHELL_HTML_NO_COMMENTS.match(/<style>([\s\S]*?)<\/style>/);
+  assert.ok(m, 'site/index.html 里找不到 <style> 块——抽取器失效，需同步更新本测试');
+  return m[1].replace(/\/\*[\s\S]*?\*\//g, '');   // CSS 注释里提过的色值/指令一律不算数
+})();
+// 浅色档的 :root（第一个 :root 就是它；dark/sepia 跟在后面，是重映射不是校色对象）
+const SHELL_ROOT_BLOCK = (() => {
+  const i = SHELL_STYLE.indexOf(':root');
+  assert.notEqual(i, -1, 'site/index.html 里找不到 :root——抽取器失效，需同步更新本测试');
+  const open = SHELL_STYLE.indexOf('{', i);
+  const close = SHELL_STYLE.indexOf('}', open);
+  assert.ok(open !== -1 && close > open, ':root 块解析失败——需同步更新本测试');
+  return SHELL_STYLE.slice(open + 1, close);
+})();
+const tokenOf = (block, name) => {
+  const m = block.match(new RegExp(`--${name}\\s*:\\s*([^;]+);`));
+  return m ? m[1].trim() : null;
+};
+
+// 设计 §5.2 的 13 个值（逐值固定：改一个值就是改了整套视觉语言——已逐值验收，不得「顺手调」）
+const DESIGN_TOKENS = {
+  bg: '#F4F6F9', pan: '#FFFFFF', pan2: '#F8FAFC', bd: '#E2E7EE', bd2: '#CFD7E2',
+  fg: '#0F1319', mut: '#5B6473', dim: '#6B7280', acc: '#5B5BD6', acc2: '#0E7490',
+  amber: '#B45309', ok: '#15803D', bad: '#DC2626',
+};
+
+test('阶段 A：浅色 :root 的 13 个 §5.2 token 与设计逐值相等', () => {
+  assert.equal(Object.keys(DESIGN_TOKENS).length, 13, '§5.2 是 13 个值——少一个就是漏了一个角色');
+  for (const [name, value] of Object.entries(DESIGN_TOKENS)) {
+    assert.equal(tokenOf(SHELL_ROOT_BLOCK, name), value,
+      `--${name} 与设计 §5.2 不等（token 是整套视觉语言的地基，不是可调参数）`);
+  }
+  // 弱色回退是最危险的一种回归：v1 的 #8A94A3 在白底只有 3.07:1，违反设计自己的 ≥4.5:1 要求。
+  assert.equal(SHELL_STYLE.includes('#8A94A3'), false, '弱色回退到 #8A94A3（白底 3.07:1，违反 §5.2）');
+});
+
+test('阶段 A：正文 13.5px/1.66 + 两个字体角色的首族与中文回退', () => {
+  const bodies = SHELL_STYLE.match(/(?:^|[\s,{])body\s*\{[^}]*\}/g) ?? [];
+  const body = bodies.find(b => /font:/.test(b));
+  assert.ok(body, 'site/index.html 里找不到带 font 的 body 规则——抽取器失效，需同步更新本测试');
+  assert.match(body, /font:\s*13\.5px\/1\.66/, '正文字号/行高必须与设计 §5.2 相等');
+
+  const font = tokenOf(SHELL_ROOT_BLOCK, 'font') ?? '';
+  const mono = tokenOf(SHELL_ROOT_BLOCK, 'mono') ?? '';
+  const firstFamily = s => s.split(',')[0].trim().replace(/^["']|["']$/g, '');
+  assert.equal(firstFamily(font), 'Inter', '--font 首族必须是 Inter');
+  assert.equal(firstFamily(mono), 'JetBrains Mono', '--mono 首族必须是 JetBrains Mono（读数/锚点/日期角色）');
+  // 中文回退：没装 Inter 时中文不能掉成方框——两个中文族都必须在栈里
+  for (const cn of ['PingFang SC', 'Microsoft YaHei']) {
+    assert.ok(font.includes(cn), `--font 缺中文回退「${cn}」`);
+  }
+  // 定义与使用是两件事：--mono 定义得再对，没人用也等于没落地（读数类文本必须真的落这个角色）
+  assert.ok(/var\(--mono\)/.test(SHELL_STYLE), '--mono 定义了却没有任何使用点——字体角色没落地');
+});
+
+test('阶段 A：零外部资源引用（不引 CDN 字体 / 图标 / 脚本，D1 不引外链）', () => {
+  assert.equal(/@import/.test(SHELL_STYLE), false, '@import 会把壳连到外部（D1 明确禁止联网取字体）');
+  // 只用字体栈降级（D1）。本机回环地址除外（portal 跳转 URL 是壳自己的功能，不是外部依赖）。
+  const external = SHELL_HTML_NO_COMMENTS
+    .match(/https?:\/\/(?!127\.0\.0\.1\b|localhost\b|\[::1\])[^\s"'`)]+/g) ?? [];
+  assert.deepEqual(external, [], `壳里出现外部资源引用（联网即违反 §2 不变量②）：${external.join(', ')}`);
+  // 协议相对 URL（//cdn.example.com/...）是同一件事的另一种写法，别让它从缝里溜进来
+  assert.equal(/<link\b[^>]*\bhref\s*=\s*["']?\/\//i.test(SHELL_HTML_NO_COMMENTS), false, '协议相对外链同样是外链');
+});

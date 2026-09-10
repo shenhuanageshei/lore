@@ -991,8 +991,15 @@ async function wireRepoSwitch() {
     if (!Array.isArray(repos) || repos.length === 0) return;
     const onPortal = BASE !== '/';
     const cur = onPortal ? BASE.replaceAll('/', '') : (info.current ?? '');
+    // 两个「根」不能混用（代码评审 R4 🟡#1）：
+    //   portalRoot   = **跳转**用：跨仓导航是换文档，浏览器不做 CORS 检查 → per-repo 下必须是 portal 绝对 URL；
+    //   manifestRoot = **fetch** 用：跨源读响应会被 CORS 拦（本机 server 刻意不发 ACAO，那是本地工具
+    //                  不该开的读口子）→ 必须同源：portal 形态相对 '/'，per-repo 形态走本 server 的
+    //                  /cross/<repo>/… 同源路由。原先两者共用一个 portalRoot，于是每次跨仓 manifest 拉取
+    //                  都是注定被拦的跨端口请求。
     const portalRoot = onPortal ? '/' : `http://127.0.0.1:${info.portal}/`;
-    REPOS_INFO = { repos, portalRoot, cur };
+    const manifestRoot = onPortal ? '/' : '/cross/';
+    REPOS_INFO = { repos, portalRoot, manifestRoot, cur };
     const home = document.createElement('a');
     home.id = 'portal-home'; home.href = portalRoot; home.textContent = '🏠'; home.title = '仓库列表（portal）';
     const sel = document.createElement('select');
@@ -1008,26 +1015,51 @@ async function wireRepoSwitch() {
 // 跨 repo 搜索（portal 余项兑现）：搜索词非空时懒加载其他 repo 的 manifest，
 // 命中列在侧栏底部「其他仓库」区，点击跳对应 repo（portal 相对 / per-repo 经 portal 绝对）。
 // 缓存语义（两种 null 与两种空）：
-//   CROSS_INDEX === null  → 还没加载 **或** 上次全军覆没（可重试）；CROSS_INDEX === [] → 已加载、就是没有别的仓/没有命中。
+//   CROSS_INDEX === null  → 还没加载 **或** 上次是**瞬时**失败（退避窗口过后可重试）；
+//   CROSS_INDEX === []    → 已加载：没有别的仓 / 没有命中 / 其它仓压根没有 manifest（确定性失败，再试也还是 404）。
 //   CROSS_INFLIGHT 管重入，不参与「加载过没有」的判定——混用就是上一轮那个「一次失败永不再试」的根因。
-let CROSS_INDEX = null;       // 懒加载缓存；null=未加载（**也等于「上次全军覆没，可重试」**）
+let CROSS_INDEX = null;       // 懒加载缓存；null=未加载（**也等于「上次瞬时失败，可重试」**）
 let CROSS_INFLIGHT = false;   // 在途标志：重入防护与「结果缓存」是两件事，必须分开记（见下）
+let CROSS_RETRY_AT = 0;       // 退避截止（时间戳）：**可重试**的失败在此前一律不重发
+const CROSS_BACKOFF_MS = 30000;   // 退避窗口。为什么要它：见下方 ensureCrossIndex 的失败分类——没有窗口，
+                                  // 一次瞬时故障会退化成「每一次按键重发一批注定失败的请求」（本轮修的 bug）。
 async function ensureCrossIndex() {
   if (CROSS_INFLIGHT || CROSS_INDEX !== null || !REPOS_INFO) return;
+  // 窗口内直接返回：既不是「一次失败永不再试」（上一轮修的 bug），也不是「每次按键重发」
+  // （本轮修的 bug）——窗口过去后照样能重试，功能没被锁死，只是不再按键级空转。
+  if (Date.now() < CROSS_RETRY_AT) return;
   CROSS_INFLIGHT = true;
   try {
     const others = REPOS_INFO.repos.filter(r => r !== REPOS_INFO.cur);
     const entries = await Promise.all(others.map(async repo => {
-      try { return { repo, manifest: await (await fetch(`${REPOS_INFO.portalRoot}${encodeURIComponent(repo)}/wiki/.manifest.json`, { cache: 'no-store' })).json() }; }
-      catch { return null; }
+      // 必须同源（manifestRoot）：per-repo 形态下跨端口 fetch 会被浏览器 CORS 拦掉
+      // （本机 server 刻意不发 access-control-allow-origin）——那条链路 100% 失败，且每次按键重发。
+      try {
+        const res = await fetch(`${REPOS_INFO.manifestRoot}${encodeURIComponent(repo)}/wiki/.manifest.json`, { cache: 'no-store' });
+        // 拿到响应但非 2xx = **确定性失败**（该仓没 sync 过 / 没登记）：再试一万次也还是 404，别重发。
+        if (!res.ok) return { repo, manifest: null, retriable: false };
+        return { repo, manifest: await res.json(), retriable: false };
+      } catch {
+        // 连响应都没拿到（网络错 / JSON 坏）= **瞬时失败**，只有这种才值得重试（且带退避）。
+        return { repo, manifest: null, retriable: true };
+      }
     }));
-    const ok = entries.filter(Boolean);
+    const ok = entries.filter(e => e.manifest);
     // 为什么不能再用 `CROSS_INDEX = []` 当在途占位：portal 瞬时不可用（其它仓 manifest 全失败）时，
     // 它会存下一个**看起来像结果**的空数组，而 `CROSS_INDEX !== null` 的守卫让跨仓搜索**永不再试**，
     // 直到整页刷新——一次瞬时故障 = 该功能静默死掉（且没有任何提示）。
-    // 故：确有其它仓要拉、却一个都没成 → 复位 null（= 未加载）让下一次输入重试；
-    // 真的没有其它仓 / 拉到过 → 保留空数组语义（没有更多可拉，不必再试）。
-    CROSS_INDEX = (others.length > 0 && ok.length === 0) ? null : buildCrossRepoIndex(ok);
+    // 三种结局：
+    //   ① 拉到过东西（含部分成功）→ 建索引，不重复请求；
+    //   ② 一个响应都没拿到（全是瞬时失败）→ 复位 null 供重试，但压退避窗口，杜绝按键级重发；
+    //   ③ 响应拿到了却都没有 manifest（确定性失败）/ 压根没有别的仓 → 落空数组 =「已加载，没有更多可拉」。
+    const transient = entries.filter(e => e.retriable);
+    if (transient.length > 0 && ok.length === 0) {
+      CROSS_INDEX = null;
+      CROSS_RETRY_AT = Date.now() + CROSS_BACKOFF_MS;
+    } else {
+      CROSS_INDEX = buildCrossRepoIndex(ok);
+      CROSS_RETRY_AT = 0;
+    }
   } finally {
     CROSS_INFLIGHT = false;   // 成败都放行：否则一次抛错会把跨仓索引一起永久锁死
   }

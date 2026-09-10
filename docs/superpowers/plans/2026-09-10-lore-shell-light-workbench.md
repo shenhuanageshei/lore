@@ -123,6 +123,9 @@
   node -e "const h=require('fs').readFileSync('site/index.html','utf8'); if(/@import\s+url\(\s*['\"]?https?:/.test(h)) throw new Error('外部字体/资源引用'); if(!/--dim:\s*#6B7280/i.test(h)) throw new Error('弱色 token 缺失'); console.log('ok')"
   node -e "const h=require('fs').readFileSync('site/index.html','utf8'); if(!/body\s*\{[^}]*font:\s*13\.5px\/1\.66/.test(h)) throw new Error('正文字号/行高不符'); if(!/--mono\s*:\s*[\"']?JetBrains Mono/.test(h)) throw new Error('mono 角色缺失'); console.log('ok')"
   ```
+  > **机检项已入库（2026-09-10，代码评审 R4 🟡#2）**：上面两条 `node -e` 覆盖的探针（正文字号/字体栈首族/13 个 §5.2 token/零外部资源引用）
+  > 现已作为 `node --test test/shell.test.js` 的断言存在（见 §9.9 #2）。手工命令**保留作对照**，但验收权威 = 自动套件——
+  > 探针的动机正是「这些值能静默回归」，只在有人记得跑命令时才生效等于没守。
 
 ### 阶段 B：状态行 + 燃料读数（唯一的新数据通道）
 
@@ -394,3 +397,25 @@
 - `node --check`：自 `site/index.html` 抽出的内联 module 脚本（1007 行）与 `site/shell.mjs` 均 parse 通过。
 
 **未做 / 已知边界**：manifest 读取失败时**不做自动重试**（重试要重跑全部 `wire*`，会重复绑定事件）——自愈依赖既有 15s 轮询与读者手动刷新；浏览器交互实证仍缺（§9.4 第 1 条不变）。
+
+### 9.9 交付代码评审第四轮修复（2026-09-10，2 🟡）
+
+| # | 级别 | 根因 | 处置（file:line 为修复后位置） |
+|---|---|---|---|
+| 1 | 🟡 | **per-repo 形态的跨仓搜索被 CORS 静默锁死，且退化成按键级重试风暴**：`wireRepoSwitch` 把跳转根与 fetch 根**混用一个 `portalRoot`**，于是 manifest 总是跨端口拉（per-repo 形态下 `portalRoot` = `http://127.0.0.1:7842/`）；而 `sendJson`/`serveStatic` **不发 `access-control-allow-origin`**（本地工具刻意不开任意来源读口子）→ 浏览器每个请求都拦 → 全军覆没 → 上一轮新加的 `CROSS_INDEX = null` 复位逻辑把「一次失败永不再试」修成了「**每次按键重试**」（方向对、根因没治）。**选 (b) 同源转发路由，理由见下** | `server.js:98-123`（新增 `serveCrossManifest`：per-repo server 提供同源只读路由 `/cross/<repo>/wiki/.manifest.json`，数据源是本机注册表 `~/.lore/repos.json` 的 `loreDir`，复用 `serveStatic` 的 traversal 守卫 / MIME / `no-store`）+ `server.js:390`（在 `createServer` 里接线；portal 不接这条——它本来就是聚合者）；`site/index.html:994-1002`（`portalRoot` 与 `manifestRoot` **拆成两个根**：前者管跳转、后者管 fetch，per-repo 下前者是 portal 绝对 URL、后者是 `/cross/`）；`site/index.html:1016-1060`（`ensureCrossIndex` 用 `manifestRoot`；失败**分类**：拿到响应但非 2xx = 确定性失败 → 落空数组不再重试，连响应都没拿到 = 瞬时失败 → 复位 `null` 但压 `CROSS_RETRY_AT` 退避窗口 30s，杜绝按键级重发） |
+| 2 | 🟡 | **阶段 A 的机检项没进自动套件**：正文字号/字体栈/13 个 §5.2 色值/零外部资源引用只活在计划文档的手工 `node -e` 里（`grep 13.5px test/` 零命中）——而补这些探针的动机恰是「它们可以静默回归」，留在手工命令里等于没守 | `test/shell.test.js:1426-1499`（三条入库断言：13 个 token **逐值**比对浅色 `:root`、正文 `font: 13.5px/1.66` + `--font` 首族 Inter / `--mono` 首族 JetBrains Mono + 中文回退 PingFang SC / Microsoft YaHei + `--mono` 真有使用点、`@import` 与非回环 `http(s)://` 一律为 0。**先剥 HTML 与 CSS 注释再匹配**——实测 `#8A94A3` 与 `@import` 在本文件里都**只出现在注释文本中**，不剥注释就会把「注释里提到」误报成「已经回退/已经外链」） |
+
+**为什么选 (b) 同源路由，而不是 (a) 加 ACAO 头**：
+1. **读面**：ACAO 一发出，本机**任意端口上的任意页面**都能读走本 server 的**全部**响应（wiki 正文 / status / 队列）；同源路由把新增读面收窄到「一张 manifest」。
+2. **可用性**：同源路由的数据源是本机注册表、**不经过 portal**——portal 没起也能用；而 (a) 只是让浏览器放行，portal 挂了照样空转。
+3. **不变量② 同源精神**：(a) 是往外开一扇门，(b) 是把已有的数据从**同源**口子递出去，壳仍只与本机同源服务对话。
+   `server.js` 依旧不发 `access-control-allow-origin`（已立断言钉住），`/cross/` 只认注册表里**精确**登记的仓名 + 固定 rel `wiki/.manifest.json`（未登记 / 注册表缺失 → 404；别的路径走静态 404，**不退化成任意文件读器**）。
+   注意：测试用的是 stub fetch，**测不到 CORS**（CORS 是浏览器行为）——故入库断言的是**服务端可见**的那一半（路由可用 + 无 ACAO 头 + 请求 URL 同源），「浏览器里好了」仍需实机（§9.4 第 1 条不变）。
+
+**证据**（自检命令与结果，逐 stage）：
+- Stage 1 `node --test test/server.test.js` → **48/48 通过**（新增 5 项：`/cross` 路由可用且无 ACAO / portal 不开这条读路径 / 跨仓 URL 必须同源 / 确定性失败不重试 / `wireRepoSwitch` 的两个根接线；另把上一轮那条「瞬时失败可重试」按新语义**改写**为「退避窗口内不重发、窗口过后可重试」——它守的仍是「一次故障不得永久停死」）。
+- Stage 2 `node --test test/shell.test.js` → **105/105 通过**（新增 3 项：13 个 token 逐值 / 正文字号与字体栈 / 零外部资源）。
+- **变异对照（一次性，未入库；每次复原后各自全绿）**：① 正文改 `14px/1.6` → 1 失败；② `--dim` 回退 `#8A94A3` → 1 失败；③ 注入 `@import url(https://fonts.googleapis.com/…)` → 1 失败；④ 跨仓 manifest 改回 `portalRoot`（跨源）→ 1 失败；⑤ 摘掉退避窗口守卫 → 1 失败；⑥ 404 误判成瞬时失败（可重试）→ 1 失败；⑦ 摘掉 `/cross` 接线 → 1 失败。
+- `node --check`：自 `site/index.html` 抽出的内联 module 脚本（1043 行）、`server.js`、两个测试文件均 parse 通过（负控 `const = ;` 正确报错，证明该检查不是恒真）。
+
+**未做 / 已知边界**：跨仓搜索的**实机**路径（per-repo 起服务 + 另一仓 + 浏览器搜索）仍未验证——本环境产不出 headless 浏览器 DOM（§9.4 第 1 条），故「per-repo 下浏览器真能搜到别的仓」只有服务端 + 接线两侧的静态证据；退避窗口取 **30s**（与 `pollTick` 的 15s 同量级、又不至于让读者等下一轮），窗口内的读失败**不再提示**（沿用既有静默降级口径，未新增 UI）。

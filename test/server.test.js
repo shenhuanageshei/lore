@@ -626,6 +626,61 @@ test('per-repo: 注册表缺失 → repos 空（壳不显示切换器）', async
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
+// --- 代码评审 R4 🟡#1：per-repo 形态的跨仓 manifest **同源**路由 ---
+// 背景：per-repo 壳读其它仓的 manifest 做跨仓搜索，而其它仓只在 portal 端口上有——原实现直接跨端口
+// fetch，被浏览器 CORS 拦（本 server 刻意不发 ACAO），于是每次按键重发一批注定失败的请求。
+// 修法是 per-repo server 自己提供同源只读路由（读本机注册表，连 portal 没起也能用）。
+// 这里断言的是**服务端可见**的效果——CORS 本身是浏览器行为，stub fetch 证明不了「浏览器里好了」。
+test('per-repo: /cross/<repo>/wiki/.manifest.json → 同源读出其它仓的 manifest（R4 🟡#1）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  const other = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  mkdirSync(join(other, 'wiki'), { recursive: true });
+  writeFileSync(join(other, 'wiki', '.manifest.json'), '{"generated":"t1","axes":[{"id":"docs","pages":[]}]}');
+  writeFileSync(join(other, 'wiki', 'secret.md'), '# 不该被 /cross 读出来');
+  const reposPath = join(root, 'repos.json');
+  writeFileSync(reposPath, JSON.stringify([{ name: 'alpha', loreDir: root }, { name: 'beta', loreDir: other }]));
+  const server = createServer(root, { reposPath });
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/cross/beta/wiki/.manifest.json`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('content-type'), 'application/json');
+    assert.equal(r.headers.get('cache-control'), 'no-store');      // 本地工具的动态内容不缓存
+    assert.equal((await r.json()).generated, 't1');
+    // 选 (b) 而不是 (a)：本 server 依然**不发** ACAO——本机任意端口上的任意页面都读不走它的响应。
+    assert.equal(r.headers.get('access-control-allow-origin'), null, '不许开 CORS 读口子（本地工具不设 ACAO）');
+
+    // 未登记的仓名 → 404（不猜目录、不泄露本机结构）
+    assert.equal((await fetch(`http://127.0.0.1:${port}/cross/gamma/wiki/.manifest.json`)).status, 404);
+    // 只放行这一条 rel：别的路径走静态（当前仓下不存在 → 404），绝不退化成任意文件读器
+    const sneak = await fetch(`http://127.0.0.1:${port}/cross/beta/wiki/secret.md`);
+    assert.equal(sneak.status, 404);
+    assert.equal((await sneak.text()).includes('不该被'), false);
+
+    // 注册表缺失 → 404（不是 500，也不是 200 空 manifest）
+    const noReg = createServer(root, { reposPath: join(root, 'nope.json') });
+    const p2 = await listen(noReg);
+    try { assert.equal((await fetch(`http://127.0.0.1:${p2}/cross/beta/wiki/.manifest.json`)).status, 404); }
+    finally { noReg.close(); }
+  } finally {
+    server.close();
+    rmSync(root, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
+test('portal: 不开 /cross 读路径（portal 本就是聚合者，壳在它下面走 /<repo>/ 天然同源）', async () => {
+  const other = mkdtempSync(join(tmpdir(), 'lore-srv-'));
+  mkdirSync(join(other, 'wiki'), { recursive: true });
+  writeFileSync(join(other, 'wiki', '.manifest.json'), '{"axes":[]}');
+  const server = createPortalServer({ beta: other });
+  const port = await listen(server);
+  try {
+    assert.equal((await fetch(`http://127.0.0.1:${port}/cross/beta/wiki/.manifest.json`)).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/beta/wiki/.manifest.json`)).status, 200);   // 既有路径不受影响
+  } finally { server.close(); rmSync(other, { recursive: true, force: true }); }
+});
+
 test('portal: GET /repos.json → 仓库名列表（壳切换下拉数据源）', async () => {
   const root = mkdtempSync(join(tmpdir(), 'lore-srv-'));
   const server = createPortalServer({ alpha: root, beta: root });
@@ -880,34 +935,64 @@ function sliceShellFn(header) {
   return SHELL_HTML_SRC.slice(at, i);
 }
 
-function buildCrossIndexApi(fetchStub, reposInfo) {
-  const decls = SHELL_HTML_SRC.match(/let CROSS_INDEX = null;[\s\S]*?let CROSS_INFLIGHT = false;/);
+function buildCrossIndexApi(fetchStub, reposInfo, { urls = [] } = {}) {
+  const decls = SHELL_HTML_SRC.match(/let CROSS_INDEX = null;[\s\S]*?const CROSS_BACKOFF_MS = \d+;/);
   assert.ok(decls, 'site/index.html 的跨仓索引状态声明抽取失败——需同步更新本测试');
   const body = [
     decls[0],
     sliceShellFn('async function ensureCrossIndex'),
-    'return { ensureCrossIndex, peek: () => CROSS_INDEX };',
+    'return { ensureCrossIndex, peek: () => CROSS_INDEX,',
+    '  retryAt: () => CROSS_RETRY_AT, backoffMs: CROSS_BACKOFF_MS, clearBackoff: () => { CROSS_RETRY_AT = 0; } };',
   ].join('\n');
-  return new Function('fetch', 'REPOS_INFO', 'buildCrossRepoIndex', body)(fetchStub, reposInfo, buildCrossRepoIndex);
+  // 记下每次请求的 URL：单源同源断言（跨仓 manifest 一旦走绝对 URL 就是跨源，浏览器必拦）靠它。
+  const spy = async (url, ...rest) => { urls.push(String(url)); return fetchStub(url, ...rest); };
+  const api = new Function('fetch', 'REPOS_INFO', 'buildCrossRepoIndex', body)(spy, reposInfo, buildCrossRepoIndex);
+  api.urls = urls;
+  return api;
 }
 
 const okManifest = { ok: true, json: async () => ({ axes: [{ id: 'docs', pages: [{ id: 'x', title: 'X' }] }] }) };
+// per-repo 形态：壳跑在本仓端口、跳转仍去 portal（绝对 URL），但 **fetch 必须同源**（走本 server 的 /cross/）。
+const REPO_INFO_PER_REPO = { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: 'http://127.0.0.1:7842/', manifestRoot: '/cross/' };
 
-test('ensureCrossIndex: 其它仓 manifest 全失败 → 复位为「未加载」，下一次输入真能重试（一次瞬时故障不永久停死）', async () => {
-  let calls = 0;
-  const api = buildCrossIndexApi(async () => { calls++; throw new Error('portal 瞬时不可用'); },
-    { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: '/' });
+test('ensureCrossIndex: per-repo 形态下 manifest 请求必须同源（跨端口会被 CORS 拦，本机 server 刻意不发 ACAO）', async () => {
+  const api = buildCrossIndexApi(async () => okManifest, REPO_INFO_PER_REPO);
   await api.ensureCrossIndex();
-  assert.equal(calls, 1);
-  assert.equal(api.peek(), null);            // 关键：不是「加载过的空结果」，而是「没拿到、可重试」
-  await api.ensureCrossIndex();              // 下一次输入
-  assert.equal(calls, 2);                    // 真的重试了（修复前这里永久停在 1）
+  assert.deepEqual(api.urls, ['/cross/beta/wiki/.manifest.json']);
+  for (const u of api.urls) {
+    assert.equal(/^https?:/i.test(u), false, `跨仓 manifest 走了跨源绝对 URL（浏览器会拦掉，且每次按键重发）：${u}`);
+  }
+  assert.equal(api.peek().length, 1);          // 同源路由真的取到了 manifest
+});
+
+test('ensureCrossIndex: 瞬时失败（响应都没拿到）→ 复位「未加载」可重试，但压退避窗口挡住按键级重发（R4 🟡#1）', async () => {
+  const api = buildCrossIndexApi(async () => { throw new Error('瞬时不可用'); }, REPO_INFO_PER_REPO);
+  await api.ensureCrossIndex();
+  assert.equal(api.urls.length, 1);
+  assert.equal(api.peek(), null);              // 关键：不是「加载过的空结果」，而是「没拿到、可重试」
+  assert.ok(api.retryAt() > Date.now(), '瞬时失败必须压上退避窗口');
+  assert.ok(api.backoffMs >= 5000, '退避窗口太短挡不住按键级重发');
+  await api.ensureCrossIndex();                // 下一次按键（窗口内）
+  assert.equal(api.urls.length, 1, '窗口内不得重发——那正是「每次按键重发一批注定失败的请求」的 bug');
+  api.clearBackoff();                          // 窗口过去
+  await api.ensureCrossIndex();
+  assert.equal(api.urls.length, 2, '窗口过后必须真能重试——修复前这里永久停在 1（一次故障即永死）');
+});
+
+test('ensureCrossIndex: 确定性失败（拿到 404 = 别的仓没有 manifest）→ 落空数组，不再按键级重发（R4 🟡#1）', async () => {
+  const api = buildCrossIndexApi(async () => ({ ok: false, status: 404 }),
+    { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: '/', manifestRoot: '/' });
+  await api.ensureCrossIndex();
+  assert.deepEqual(api.peek(), [], '确定性失败 = 没有可索引的内容：用空数组（已加载语义），不是 null（可重试语义）');
+  assert.equal(api.retryAt(), 0);
+  await api.ensureCrossIndex();
+  assert.equal(api.urls.length, 1, '404 再试一万次还是 404 —— 不许每次按键重发');
 });
 
 test('ensureCrossIndex: 拿到过结果（含真的没有其它仓、含部分成功）→ 保留空数组语义，不再重复请求', async () => {
   let calls = 0;
   const api = buildCrossIndexApi(async () => { calls++; return okManifest; },
-    { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: '/' });
+    { cur: 'alpha', repos: ['alpha', 'beta'], portalRoot: '/', manifestRoot: '/' });
   await api.ensureCrossIndex();
   assert.equal(api.peek().length, 1);        // 索引真的建起来了
   await api.ensureCrossIndex();
@@ -916,7 +1001,7 @@ test('ensureCrossIndex: 拿到过结果（含真的没有其它仓、含部分�
   // 真的没有其它仓：空数组（不是 null）——没有更多可拉，不该每次输入都再试
   let solo = 0;
   const apiSolo = buildCrossIndexApi(async () => { solo++; throw new Error('nope'); },
-    { cur: 'alpha', repos: ['alpha'], portalRoot: '/' });
+    { cur: 'alpha', repos: ['alpha'], portalRoot: '/', manifestRoot: '/' });
   await apiSolo.ensureCrossIndex();
   assert.deepEqual(apiSolo.peek(), []);
   assert.equal(solo, 0);                     // 一个请求都不发
@@ -929,7 +1014,7 @@ test('ensureCrossIndex: 拿到过结果（含真的没有其它仓、含部分�
     part++;
     if (url.includes('beta')) throw new Error('beta down');
     return okManifest;
-  }, { cur: 'alpha', repos: ['alpha', 'beta', 'gamma'], portalRoot: '/' });
+  }, { cur: 'alpha', repos: ['alpha', 'beta', 'gamma'], portalRoot: '/', manifestRoot: '/' });
   await apiPart.ensureCrossIndex();
   assert.equal(apiPart.peek().length, 1);
   await apiPart.ensureCrossIndex();
@@ -940,12 +1025,45 @@ test('ensureCrossIndex: 重入防护仍生效——在途期间再输入不产�
   let calls = 0, release;
   const gate = new Promise(r => { release = r; });
   const api = buildCrossIndexApi(async () => { calls++; await gate; return okManifest; },
-    { cur: 'alpha', repos: ['alpha', 'beta', 'gamma'], portalRoot: '/' });
+    { cur: 'alpha', repos: ['alpha', 'beta', 'gamma'], portalRoot: '/', manifestRoot: '/' });
   const first = api.ensureCrossIndex();
   const second = api.ensureCrossIndex();     // 在途期间的第二次输入（旧实现靠 CROSS_INDEX=[] 占位挡）
   release();
   await Promise.all([first, second]);
   assert.equal(calls, 2);                    // 每个其它仓各一次：并发输入没有翻倍
   assert.equal(api.peek().length, 2);
+});
+
+// 两个「根」的接线（R4 🟡#1）：跳转用 portalRoot（per-repo 下得是 portal 的绝对 URL），
+// fetch 用 manifestRoot（必须同源）。抽 wireRepoSwitch 的真源码跑，断的是它写进 REPOS_INFO 的接线结果；
+// DOM 当桩（它只 createElement + after）。
+function buildRepoSwitch({ fetchStub, base }) {
+  const body = [
+    'let REPOS_INFO = null;',
+    sliceShellFn('async function wireRepoSwitch'),
+    'return { wireRepoSwitch, peek: () => REPOS_INFO };',
+  ].join('\n');
+  const doc = { createElement: () => ({ after() {} }), getElementById: () => ({ after() {} }) };
+  return new Function('fetch', 'BASE', 'document', 'location', body)(fetchStub, base, doc, { href: '' });
+}
+
+test('wireRepoSwitch: per-repo → manifestRoot 同源 /cross/、portalRoot 仍是 portal 绝对 URL；portal → 两者都是 /', async () => {
+  const api = buildRepoSwitch({
+    fetchStub: async () => ({ json: async () => ({ repos: ['alpha', 'beta'], portal: 7842, current: 'alpha' }) }),
+    base: '/',
+  });
+  await api.wireRepoSwitch();
+  assert.equal(api.peek().manifestRoot, '/cross/', 'per-repo 形态的 manifest 请求必须同源');
+  assert.equal(api.peek().portalRoot, 'http://127.0.0.1:7842/', '跳转仍要去 portal（跨仓导航本来就跨源，无 CORS 问题）');
+  assert.equal(api.peek().cur, 'alpha');
+
+  const onPortal = buildRepoSwitch({
+    fetchStub: async () => ({ json: async () => ({ repos: ['alpha', 'beta'] }) }),
+    base: '/alpha/',
+  });
+  await onPortal.wireRepoSwitch();
+  assert.equal(onPortal.peek().manifestRoot, '/', 'portal 形态下壳与其它仓同源，保持相对根');
+  assert.equal(onPortal.peek().portalRoot, '/');
+  assert.equal(onPortal.peek().cur, 'alpha');
 });
 

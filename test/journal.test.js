@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { atomPath, appendAtom, AtomRejected, readAllAtoms, existingIds } from '../lib/journal.js';
+import {
+  atomPath, appendAtom, appendJournalRecord, AtomRejected, RecordRejected, CONFIRMATION_KIND, readAllAtoms, existingIds,
+} from '../lib/journal.js';
 import { validateAtom } from '../lib/atom.js';
 import { commitAtom } from '../lib/mine.js';
 import { noteAtom } from '../lib/note.js';
@@ -84,6 +86,35 @@ test('非法原子被拒：缺 ts / 未知 kind / pitfall 缺三字段 → 可�
       });
     }
     assert.equal(existsSync(j), false);                            // 拒绝路径连目录都不建，更不产生半行
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// 评审 #6：atomPath 按位置切片拼分片路径，非补零 ISO ts（'2026-9-9' / '2026/09/09'）
+// 会写出怪路径。两条落盘路径（原子 + 记录层条目）都在写盘前拒掉 → atomPath 恒安全。
+test('ts 契约：非补零 ISO ts 被拒（原子与记录层两条路径），合格 ts 的分片路径不变', () => {
+  const dir = tmpDir();
+  try {
+    const j = join(dir, 'journal');
+    for (const ts of ['2026-9-9', '2026/09/09']) {
+      assert.throws(() => appendAtom(j, atom({ ts })), (e) => {
+        assert.ok(e instanceof AtomRejected, 'appendAtom should reject ' + ts);
+        assert.match(e.message, /ts: non-iso-ts/);
+        return true;
+      }, ts);
+      assert.throws(() => appendJournalRecord(j, { id: 'confirmation:x', ts, kind: CONFIRMATION_KIND }), (e) => {
+        assert.ok(e instanceof RecordRejected, 'appendJournalRecord should reject ' + ts);
+        assert.match(e.message, /zero-padded ISO-8601/);
+        return true;
+      }, ts);
+    }
+    assert.equal(existsSync(j), false);                       // 拒绝路径连目录都不建，更不产生怪分片
+
+    // 合格 ts 照旧：YYYY/MM/YYYY-MM-DD.ndjson
+    appendAtom(j, atom({ id: 'commit:ok', ts: '2026-06-01T08:00:00Z' }));
+    appendJournalRecord(j, { id: 'confirmation:ok', ts: '2026-06-01T09:00:00Z', kind: CONFIRMATION_KIND, atom: 'commit:ok', verdict: 'confirm', confirmed_by: 'owner' });
+    assert.deepEqual(readdirSync(join(j, '2026')), ['06']);   // 没有 '2026-9-' 这类怪目录
+    assert.deepEqual(readdirSync(join(j, '2026', '06')), ['2026-06-01.ndjson']);
+    assert.equal(readFileSync(join(j, '2026', '06', '2026-06-01.ndjson'), 'utf8').split('\n').filter(Boolean).length, 2);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

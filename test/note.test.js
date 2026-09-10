@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { appendNote, noteAtom } from '../lib/note.js';
 import { AtomRejected, readAllAtoms } from '../lib/journal.js';
 import { init } from '../lib/init.js';
@@ -166,6 +166,26 @@ test('appendNote 非法原子（缺 title）→ AtomRejected 可读错误，不�
       return true;
     });
     assert.equal(existsSync(join(root, '.lore', 'journal')), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------- ① 期遗留 B①：note 旧入口不吞旗标（写入侧错误可见性） ----------
+test('CLI: 旗标吞旗标（node lib/note.js --title --why x）→ 解析期报错 exit 1，一个字节都不落', () => {
+  const root = tmpDir();
+  try {
+    for (const [argv, flag] of [
+      [['--title', '--why', 'x'], 'title'],            // 旧实现把 title 写成字面 '--why' 并落坏原子
+      [['--title', 't', '--why', '--draft'], 'why'],
+      [['--enrich', '--why', 'w'], 'enrich'],
+    ]) {
+      const r = spawnSync(process.execPath, ['lib/note.js', root, ...argv], { cwd: process.cwd(), encoding: 'utf8' });
+      assert.equal(r.status, 1, argv.join(' '));
+      assert.match(r.stderr, new RegExp(`^lore: flag --${flag} requires a value$`, 'm'), argv.join(' '));
+      assert.match(r.stderr, /usage: node lib\/note\.js/, argv.join(' '));
+      assert.equal(r.stdout, '', argv.join(' '));       // 解析失败 → 一个 verb 都不跑
+    }
+    assert.equal(existsSync(join(root, '.lore', 'journal')), false);
+    assert.deepEqual(readAllAtoms(join(root, '.lore', 'journal')), []);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

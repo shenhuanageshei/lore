@@ -473,6 +473,27 @@ test('confirm 错误路径：未知 atom id / 非法 verdict / 缺 atom-id / 未
   }
 });
 
+// ---------- ① 期遗留 B③：CLI 写入口的校验拒绝 = 可读错误（exit 1 + 一行消息，不是栈） ----------
+test('cli.js 遇 AtomRejected → 可读消息 + exit 1（不打印栈、一个字节不落）', () => {
+  const root = tmp();
+  try {
+    mkdirSync(loreOf(root), { recursive: true });
+    // 全空白 title 过得了 cmdNote 的存在性检查（'   ' 是真值），过不了 schema 的 isNonEmptyStr
+    // （kind decision 必须有非空标题）→ appendNote 抛 AtomRejected 冒泡到 main 的域错误出口。
+    const r = run('note', '--title', '   ', '--why', 'w', '--root', root);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /^lore: refusing to write invalid atom "note:[^"]+": title: missing-title/m);
+    assert.equal(r.stdout, '');
+    assert.doesNotMatch(r.stderr, /\n\s+at /);                     // 不打印栈（同一条消息埋深一层）
+    assert.equal(existsSync(join(loreOf(root), 'journal')), false);   // 拒绝路径不产生半行
+    // 直调 main() 同语义（不依赖测试壳）
+    const sink = [];
+    assert.equal(main(['note', '--title', '  ', '--root', root], { cwd: process.cwd(), out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.match(sink.join('\n'), /lore: refusing to write invalid atom/);
+    assert.equal(existsSync(join(loreOf(root), 'journal')), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('旧入口回归：node lib/note.js 位置参数语义不变（cli.js 只新增，不接管旧入口）', () => {
   const root = tmp();
   try {

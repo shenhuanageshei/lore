@@ -36,6 +36,14 @@
   - **机器来源判定**（评审 🔵#5）：以 `source` 前缀判定（`owner*` 之外即机器来源），三入口共用同一函数。
   - append-only 不变：拒绝路径不产生半行。
 - **自检**：`node --test test/journal.test.js test/hook.test.js test/mine.test.js test/note.test.js`
+- **① 期遗留 B 补记（2026-09-10 · 写入侧错误可见性）**：本节的「非法原子被拒且错误可读」在三个入口上补齐——
+  ① `lib/note.js` 旧入口的本地 parseArgs 改为与 `lib/cli.js` 同款的受保护解析（布尔旗标集 + 非布尔旗标的
+  下一个 token 以 `--` 开头即报错）：旧实现把 `--title --why x` 的 title 吞成字面 `'--why'` 并落一条坏原子；
+  ② `lib/hook.js` 的 CLI 兜底不再静默吞 AtomRejected：向 stderr 打一行 `lore: <message>`、退出码仍为 0
+  （post-commit 钩子绝不挡提交），让「提交成功 + journal 空」这对状态可观测（非 AtomRejected 的错误仍静默）；
+  ③ `lib/cli.js` 的 main catch 把 AtomRejected / RecordRejected 并入友好错误域（exit 1 + 可读消息、不打印栈），
+  与 `lib/mine.js` / `lib/note.js` 入口一致。文件：`lib/note.js`、`lib/hook.js`、`lib/cli.js` +
+  三个对应测试。自检：`node --test test/note.test.js test/hook.test.js test/cli.test.js`。
 
 ### S2 · 噪音分类器
 - **目标**：新增 `lib/noise.js`，对原子分类并降权：trailer-only / 模板文本（如 "Generated with …"）/ 重复摘要（同 title 或 why 高度相似）。输出 `{level: none|low|high, reasons: []}`；供 `doctor` 与后续章节 digest 消费。

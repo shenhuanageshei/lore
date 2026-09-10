@@ -1,10 +1,10 @@
 // test/hook.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { captureHead } from '../lib/hook.js';
 import { readAllAtoms } from '../lib/journal.js';
 import { validateAtom } from '../lib/atom.js';
@@ -72,6 +72,46 @@ test('captureHead 落盘原子过校验且 status:draft（机器来源诚实，�
     assert.equal(atom.why, 'real rationale');                        // 写入侧 trailer 闭合（经校验落盘）
     assert.equal(validateAtom(atom).ok, true, JSON.stringify(validateAtom(atom).errors));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ---------- ① 期遗留 B②：hook 路径的校验拒绝必须可观测（但绝不挡提交） ----------
+// 手工构造一个 git 提交对象，其 author 行**没有可解析的时间戳**——git 自己写不出这种提交
+// （GIT_AUTHOR_DATE 会被归一化），只能用 plumbing（hash-object --literally）落。
+// 实测 git log 的 %aI 对不可解析日期回吐非 ISO 占位符（"%aI"）→ commitAtom 的 ts 非法
+// → lib/journal.js 的写入闸门抛 AtomRejected。这是确定性地造出「hook 路径遇 AtomRejected」的手段。
+function commitWithUnparseableDate(root, message) {
+  const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root }).toString().trim();
+  const body = ['tree ' + tree, 'author A <a@a>', 'committer A <a@a> 1757000000 +0000', '', message, ''].join('\n');
+  const sha = execFileSync('git', ['hash-object', '--literally', '-t', 'commit', '-w', '--stdin'],
+    { cwd: root, input: body }).toString().trim();
+  const branch = execFileSync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root }).toString().trim();
+  execFileSync('git', ['update-ref', `refs/heads/${branch}`, sha], { cwd: root });
+  return sha;
+}
+
+test('hook CLI: AtomRejected → stderr 打一行 lore:、退出码仍 0、一个字节都不落', () => {
+  const root = gitRepo();
+  const plain = tmpDir();   // 非 git 目录：用来对照「非 AtomRejected 的错误仍静默」
+  try {
+    commitFile(root, 'a.txt', '1', 'base');          // 先要有一个 HEAD（HEAD^{tree} 要用）
+    const sha = commitWithUnparseableDate(root, 'feat: 时间戳不可解析');
+
+    const r = spawnSync(process.execPath, ['lib/hook.js', root], { cwd: process.cwd(), encoding: 'utf8' });
+    assert.equal(r.status, 0);                       // post-commit 钩子永不挡提交
+    assert.match(r.stderr, /^lore: refusing to write invalid atom "commit:[0-9a-f]+": ts: /m);
+    assert.ok(r.stderr.includes(sha));               // 报的就是这条坏提交
+    assert.equal(r.stdout, '');
+    assert.equal(existsSync(join(root, '.lore', 'journal')), false);   // 拒绝路径不产生半行
+
+    // 对照：非 AtomRejected 的错误（不是 git 仓库）不产生 lore: 行——钩子自己不该刷屏
+    // （git 自己的 "fatal: not a git repository" 走的是 execFileSync 继承来的 stderr，与本模块无关）
+    const q = spawnSync(process.execPath, ['lib/hook.js', plain], { cwd: process.cwd(), encoding: 'utf8' });
+    assert.equal(q.status, 0);
+    assert.doesNotMatch(q.stderr, /^lore: /m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(plain, { recursive: true, force: true });
+  }
 });
 
 test('captureHead on a merge HEAD adds nothing new on the second call', () => {

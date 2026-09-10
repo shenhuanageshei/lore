@@ -127,9 +127,10 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     // 键集只增不改：pitfalls / window 是新增，既有键名/语义一律不动
     // S2 新增 noise（键集只增不改：既有键名/语义一律不动）
     // S3 新增 confirmation（键集只增不改：既有键名/语义一律不动）
+    // D5 新增 badConfirmations（键集只增不改：既有键名/语义一律不动）
     assert.deepEqual(Object.keys(doc.capture),
       ['atoms', 'badLines', 'decisions', 'pitfalls', 'trailerOnly', 'noise', 'refsPitfall', 'commits', 'captureRate',
-        'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays', 'confirmation']);
+        'captureRatePct', 'window', 'lastAtomTs', 'lastHookTs', 'lastSource', 'gapDays', 'confirmation', 'badConfirmations']);
     assert.deepEqual(Object.keys(doc.capture.noise), ['high', 'low', 'none']);   // 分布契约只有这三个键
     assert.deepEqual(Object.keys(doc.capture.confirmation),
       ['records', 'unattributed', 'decisions', 'confirmed', 'disputed', 'pending']);   // S3 确认进度契约（D1 增 unattributed）
@@ -144,6 +145,8 @@ test('--json：顶层与子对象键集锁定，可被程序消费；--json 不�
     // S3：夹具里 1 条 decision、0 条确认记录 → 全部待确认
     assert.deepEqual(doc.capture.confirmation,
       { records: 0, unattributed: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
+    assert.equal(doc.capture.badConfirmations, 0);          // D5：没有坏确认记录
+    assert.match(formatReport(diagnose(dir, { now: NOW })), /坏确认记录 0/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -270,7 +273,7 @@ test('S3 确认进度：confirmation 记录不污染原子计数；已确认/待
 
     const r = diagnose(dir, { now: NOW });
     assert.deepEqual(r.capture.confirmation, { records: 1, unattributed: 0, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
-    assert.match(formatReport(r), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 0（决策 1 · confirmation 记录 1）/);
+    assert.match(formatReport(r), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 0 · 坏确认记录 0（决策 1 · confirmation 记录 1）/);
 
     // 追加一条更晚的 dispute → 派生状态翻转为已否决（最新确认覆盖）
     writeFileSync(shard, readFileSync(shard, 'utf8') + confLine({
@@ -288,6 +291,41 @@ test('S3 确认进度：confirmation 记录不污染原子计数；已确认/待
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+
+// 审计 D5：坏确认记录（verdict 不在词表内）必须报数，且不改写任何派生/计数。
+test('D5 坏确认记录：capture.badConfirmations 单列计数；不覆盖派生、不进原子计数', () => {
+  const dir = tmp();
+  try {
+    gitInit(dir);
+    mkdirSync(join(dir, '.lore', 'journal', '2026', '09'), { recursive: true });
+    const shard = join(dir, '.lore', 'journal', '2026', '09', '2026-09-09.ndjson');
+    writeFileSync(shard, ATOMS.trimEnd() + '\n' + confLine({
+      id: 'confirmation:bad1', ts: '2026-09-09T10:00:00Z', atom: 'decision:d1', verdict: 'maybe',
+      confirmed_at: '2026-09-09T10:00:00Z',
+    }) + '\n');
+
+    const s = readJournalStats(join(dir, '.lore', 'journal'));
+    assert.equal(s.badConfirmations, 1);
+    assert.equal(s.atoms, 6);                                  // 记录层条目仍不进原子计数
+    assert.equal(s.confirmation.records, 1);                   // 坏记录确实落在盘上 → 计入 records
+    assert.deepEqual({ ...s.confirmation, records: 0 },
+      { records: 0, unattributed: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
+
+    const r = diagnose(dir, { now: NOW });
+    assert.equal(r.capture.badConfirmations, 1);
+    // 坏记录不把内联 status 覆盖成 null：没有有效确认的决策仍是「待确认」（D5 的核心症状）
+    assert.equal(r.capture.confirmation.pending, 1);
+    assert.equal(r.capture.confirmation.confirmed, 0);
+    assert.match(formatReport(r), /confirm\s+已确认 0 · 待确认 1 · 已否决 0 · 未署名 0 · 坏确认记录 1/);
+
+    // 无 .lore → 与 atoms 一样降级 unknown（不是 0 冒充）
+    const empty = tmp();
+    try {
+      assert.equal(diagnose(empty, { now: NOW }).capture.badConfirmations, UNKNOWN);
+      assert.equal(readJournalStats(join(empty, '.lore', 'journal')).badConfirmations, 0);   // 没数过 = 0 条记录
+    } finally { rmSync(empty, { recursive: true, force: true }); }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
 
 // 端到端（CLI 接线 + 体检同源）：lore confirm 写下的确认，doctor 立刻报出「已确认 / 待确认」。
 test('S3 端到端：CLI note --draft → confirm → doctor 报已确认 1 / 待确认 0', () => {
@@ -309,7 +347,7 @@ test('S3 端到端：CLI note --draft → confirm → doctor 报已确认 1 / �
     const after = diagnose(dir, { now: NOW });
     assert.deepEqual(after.capture.confirmation,
       { records: 1, unattributed: 1, decisions: 1, confirmed: 1, disputed: 0, pending: 0 });
-    assert.match(formatReport(after), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 1（决策 1 · confirmation 记录 1）/);
+    assert.match(formatReport(after), /confirm\s+已确认 1 · 待确认 0 · 已否决 0 · 未署名 1 · 坏确认记录 0（决策 1 · confirmation 记录 1）/);
 
     // dispute → 派生 flipped（体检与确认同源，不各自算一遍）
     assert.equal(run(['confirm', id, '--verdict', 'dispute', '--why', '锚点已漂移', '--root', dir]), 0);

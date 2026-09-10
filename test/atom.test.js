@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ATOM_KINDS, ATOM_STATUSES, COMPREHENSION_KINDS, MACHINE_SOURCES, PITFALL_FIELDS,
-  isKnownKind, isMachineSource, requiresTitle, validateAtom, normalizeAtom, parseAtom,
+  isKnownKind, isMachineSource, isPaddedIsoTs, requiresTitle, validateAtom, normalizeAtom, parseAtom,
 } from '../lib/atom.js';
 import { readAllAtoms } from '../lib/journal.js';
 
@@ -60,6 +60,31 @@ test('id / ts 必填且 ts 可解析', () => {
   assert.ok(codes(validateAtom(base({ ts: '' }))).includes('missing-ts'));
   assert.ok(codes(validateAtom(base({ ts: 'not-a-date' }))).includes('invalid-ts'));
   assert.equal(validateAtom(base()).ok, true);
+});
+
+// 审计 D5 / 代码评审 #6：ts 必须是**补零** ISO-8601。atomPath 用位置切片（slice(0,4)/slice(5,7)/slice(0,10)）
+// 拼分片路径，而 Date.parse 对 '2026-9-9' / '2026/09/09' 都返回合法时间戳 → 收紧到写盘之前。
+test('ts 收紧：非补零 ISO-8601 被拒（non-iso-ts），补零形态照常通过', () => {
+  for (const ts of ['2026-9-9', '2026/09/09', '2026/9/9', '09/09/2026']) {
+    const r = validateAtom(base({ ts }));
+    assert.equal(r.ok, false, ts);
+    const hit = r.errors.find(e => e.field === 'ts');
+    assert.equal(hit.code, 'non-iso-ts', ts);
+    assert.match(hit.message, /zero-padded ISO-8601/, ts);
+  }
+  // 两个码不合并：'not-a-date' 说「解析不了」，非补零说「没补零」
+  assert.ok(codes(validateAtom(base({ ts: 'not-a-date' }))).includes('invalid-ts'));
+  assert.equal(codes(validateAtom(base({ ts: 'not-a-date' }))).includes('non-iso-ts'), false);
+  for (const ts of ['2026-09-09T08:00:00Z', '2026-09-09T08:00:00.000Z', '2026-09-09T08:00:00+08:00']) {
+    assert.equal(validateAtom(base({ ts })).ok, true, ts);
+  }
+  // 判据导出给记录层复用（lib/journal.js 的 appendJournalRecord 用同一份）
+  assert.equal(isPaddedIsoTs('2026-09-09T08:00:00Z'), true);
+  for (const ts of ['2026-9-9', '2026/09/09', 'not-a-date', '', '   ', undefined, null, 20260909]) {
+    assert.equal(isPaddedIsoTs(ts), false, JSON.stringify(ts));
+  }
+  // normalizeAtom 同样拒（校验不过就不产出规范化原子）
+  assert.equal(normalizeAtom(base({ ts: '2026-9-9' })).ok, false);
 });
 
 test('status 仅四态；confirmed 必须带 confirmed_by', () => {

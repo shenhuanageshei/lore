@@ -16,7 +16,8 @@ import { join } from 'node:path';
 import {
   CONFIRM_SCHEMA_VERSION, ConfirmError, DEFAULT_CONFIRMED_BY, DEFAULT_VIA, PROVENANCE_VIAS, STATUS_BY_VERDICT,
   UNATTRIBUTED_BY, VERDICTS, confirmAtom, confirmationRecord, confirmationSummary, confirmationsFor, confirmerOf,
-  countUnattributedConfirmations, deriveStatus, deriveStatuses, findAtom, isUnattributedConfirmation,
+  countBadConfirmations, countUnattributedConfirmations, deriveStatus, deriveStatuses, findAtom,
+  isBadConfirmation, isUnattributedConfirmation,
   latestByAtom, latestConfirmation, newConfirmationId, readConfirmations,
 } from '../lib/confirm.js';
 import { CONFIRMATION_KIND, appendAtom, readAllAtoms, readAllRecords } from '../lib/journal.js';
@@ -206,6 +207,38 @@ test('有效状态 = 派生视图：最新 confirmation 覆盖内联 status（di
     assert.equal(stored.status, 'draft');
     assert.equal(deriveStatus(stored, readConfirmations(j)).status, 'confirmed');
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// 审计 D5：verdict 不在词表内的记录是**坏记录**——不参与派生（绝不把内联 status 覆盖成 null），
+// 但也不静默：条数由 countBadConfirmations 单列（doctor 出口 capture.badConfirmations）。
+test('坏确认记录（未知 verdict）：回退内联 status、不编造状态，条数可数', () => {
+  const draftAtom = { ...ATOM, status: 'draft' };
+  const noStatus = { ...ATOM, status: undefined };
+  const bad = { kind: CONFIRMATION_KIND, atom: ATOM.id, verdict: 'maybe', confirmed_at: LATER, confirmed_by: 'owner' };
+  const good = { kind: CONFIRMATION_KIND, atom: ATOM.id, verdict: 'confirm', confirmed_at: TS, confirmed_by: 'owner' };
+
+  // 判据：verdict 不在词表内
+  assert.equal(isBadConfirmation(bad), true);
+  assert.equal(isBadConfirmation({ kind: CONFIRMATION_KIND, atom: ATOM.id, verdict: 'confirm' }), false);
+  assert.equal(isBadConfirmation({ kind: CONFIRMATION_KIND, atom: ATOM.id }), true);   // 缺 verdict 同样无效
+  assert.equal(isBadConfirmation(null), false);
+  assert.equal(countBadConfirmations([bad, { ...bad, atom: 'decision:other' }, good]), 2);
+  assert.equal(countBadConfirmations(), 0);
+
+  // 只有坏记录 → 回退内联值（不是 null：坏数据不得把好数据抹成空）
+  assert.deepEqual(deriveStatus(draftAtom, [bad]), { status: 'draft', from: 'inline', confirmation: null });
+  // 无内联 status 也无有效确认 → 仍是 none/null（不编造一个状态出来）
+  assert.deepEqual(deriveStatus(noStatus, [bad]), { status: null, from: 'none', confirmation: null });
+  // 坏记录夹在有效记录里：有效记录照常生效（跳过坏记录，不是把派生整体打回内联）
+  assert.equal(deriveStatus(draftAtom, [good, bad]).status, 'confirmed');
+  assert.equal(deriveStatus(draftAtom, [bad, { ...good, verdict: 'dispute', confirmed_at: '2026-09-09T12:00:00.000Z' }]).status, 'disputed');
+  // 批量派生与单条派生同一条规则（latestByAtom 同样跳过坏记录）
+  assert.equal(deriveStatuses([draftAtom], [bad])[0].status, 'draft');
+  assert.equal(latestByAtom([bad]).size, 0);
+  assert.equal(latestByAtom([good, bad]).get(ATOM.id).verdict, 'confirm');
+  // confirmationSummary：坏记录计入 records（它确实落在盘上），但不算已确认/已否决
+  assert.deepEqual(confirmationSummary([draftAtom], [bad]),
+    { records: 1, unattributed: 0, decisions: 1, confirmed: 0, disputed: 0, pending: 1 });
 });
 
 test('机器重写不改确认记录：写入路径与决策史重物化后，确认行逐字节不变（不变量③）', () => {

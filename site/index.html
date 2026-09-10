@@ -268,6 +268,9 @@
     border: 1px solid var(--bd); background: var(--pan);
     transition: transform 200ms var(--ease), opacity 200ms var(--ease); }
   #inspector .note-n { font: 500 10.5px/1 var(--mono); color: var(--acc); }
+  /* D15：文件级锚点（源未给行号）的显式标注。文件级锚点的确定性**低于**行级锚点，必须看得见——
+     渲染成一样就是伪造确定性（不变量⑧）。用既有 weak/amber token 与既有 10.5px mono 刻度，不新增字号档。 */
+  #inspector .note-src { font: 500 10.5px/1 var(--mono); color: var(--amber); }
   #inspector .note-anchor { font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
     color: var(--fg); word-break: break-all; }
   /* 点角标 → 高亮（验收 ③）：换色瞬时生效，transition 只挂 transform/opacity（§5.2「只动 transform/opacity」） */
@@ -415,7 +418,7 @@ import {
   buildNavModel, buildMeta, chooseInitialLanguage, resolveLocalizedPage,
   baseFromPathname, buildConsoleModel, pollDecide, buildDocsRows, buildCrossRepoIndex,
   buildThemeRows, budgetNotice, buildStatusLine,
-  renderAnchors, renderDecisionTable,
+  renderAnchors, renderNoteHtml, renderDecisionTable,
 } from './shell.mjs';
 
 // per-repo serve 下 BASE="/"（行为同旧 ../wiki）；portal 下 BASE="/<repo>/"。
@@ -590,7 +593,8 @@ async function route() {
   //   ① renderDecisionTable：**md 层次**的改造（决策史哨兵区的列表 → 三列表格 md，
   //      内部就是 parseDecisionLog 的三列结果 + 空态判定：无决策史小节 / 无列表 → 原样返回，
   //      所以无决策史的页不会长出空表头），必须发生在 renderMarkdown **之前**（表格渲染器吃 md）。
-  //   ② renderAnchors：**HTML 层次**的插标（给 `fn @ file:line` 插上标角标，并给出右栏注记模型），
+  //   ② renderAnchors：**HTML 层次**的插标（给锚点插上标角标，并给出右栏注记模型；两形态见 D15——
+  //      行级 `fn @ file:line` 与文件级 `fn @ file` 都收，但区别渲染），
   //      必须发生在 renderMarkdown **之后**（它按标签切段、要跳过 <pre>/mermaid，md 源里没有标签）。
   const { html, notes } = renderAnchors(
     preprocessWikilinks(renderMarkdown(renderDecisionTable(stripFrontmatter(raw))), PAGE_INDEX));
@@ -651,9 +655,6 @@ async function route() {
 // 先清空，再决定显示与否。
 // 空白态是硬要求（验收 ⑥）：notes 为空 → 保持 hidden，绝不出现空注记栏，也不占第三列宽度
 // （#app 的 :has(#inspector:not([hidden])) 只在真有内容时才让出 268px）。F4 的 enabled() 看的也是这个 hidden。
-const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
 const FLASH_MS = 1400;        // 验收 ③：约 1.4 秒后移除高亮
 let flashTimer = null;
 
@@ -675,11 +676,11 @@ function renderInspector(notes) {
   INSPECTOR_NOTES = notes;                         // F4 / `[` `]` 的判据（与可见性解耦，见上）
   currentNoteN = null;                             // 切页游标归零，不带到下一页的编号上
   if (!notes.length) { box.hidden = true; INSPECTOR_OPEN = false; return; }
-  // D7：anchor 逐字原样显示（生成时刻的 file:line）——不做 stale 标记、不重解析、不改写行号。
+  // D7 + D15：行级锚点逐字原样显示（生成时刻的 file:line，不重解析、不改写行号）；
+  // 文件级锚点（源未给行号）**不显示行号**并由 renderNoteHtml 显式标注——区别渲染是硬要求，
+  // 故单条的 HTML 由 shell.mjs 的纯函数产出（可在 Node 里断言），这里只做拼装。
   box.innerHTML = `<div class="insp-title">引出线注记 · ${notes.length}</div>`
-    + notes.map(n => `<div class="note" id="note-${n.n}" data-note-n="${n.n}">`
-      + `<span class="note-n">[${n.n}]</span>`
-      + `<code class="note-anchor">${escHtml(n.anchor)}</code></div>`).join('');
+    + notes.map(renderNoteHtml).join('');
   box.hidden = false;
   INSPECTOR_OPEN = true;                           // 每页默认展开（收起是读者在**本页**的手动状态，不跨页继承）
 }

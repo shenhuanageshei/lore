@@ -398,7 +398,11 @@ function manifestPageCount(manifest) {
 const pad2 = n => String(n).padStart(2, '0');
 
 // now 可注入：HH:MM 是读数（截取时刻），测试必须能给定时钟，读挂钟的纯函数不可测。
-export function buildStatusLine({ status = null, manifest = null, queued = 0, now = new Date() } = {}) {
+// queued **刻意没有默认值**（D13）：调用点「取不到」与「没给」是同一件事——undefined。
+// 若给默认 0，调用方一旦拿不到已排队条数（API 挂了、字段改名、还没轮询到），提示语就会
+// 理直气壮地报「0 条排队请求」：0 是「测出来是零」，这里是「测不出来」，混同就是把最危险的
+// 失败模式藏起来。真正的 0 必须由调用方**显式**传 0。
+export function buildStatusLine({ status = null, manifest = null, queued, now = new Date() } = {}) {
   const fuel = status?.fuel ?? null;
   const state = fuel?.capture_state === 'ok' || fuel?.capture_state === 'none' ? fuel.capture_state : STATUS_UNKNOWN;
   const hasManifest = !!manifest && Array.isArray(manifest.axes);
@@ -414,6 +418,8 @@ export function buildStatusLine({ status = null, manifest = null, queued = 0, no
   // D13：排队条数取不到时**不许冒充 0**——「0 条排队请求」是一句假读数（0 是「测出来是零」，
   // 取不到是「测不出」，混同就是把最危险的失败模式藏起来）。故读不到时整句改报 unknown；
   // 真正的 0（读得到、就是 0 条）仍原样报 0。
+  // 现实缓解（不是修复理由）：目前唯一调用方 site/index.html 总传 `QUEUED_PAGES.size`（有限数），
+  // 今天不会真显示错；但语义漏洞要在这儿堵死——下一个调用方不该继承一个会撒谎的默认值。
   const queued_text = isFiniteNum(queued) ? `${queued} 条排队请求` : `排队请求 ${STATUS_UNKNOWN}`;
 
   return {
@@ -437,17 +443,36 @@ export function buildStatusLine({ status = null, manifest = null, queued = 0, no
   };
 }
 
-// ---------- §5.4 视觉①：源码锚点 = 引出线注记（壳阶段 C） ----------
-// 纯函数（无 DOM，Node 可直测）：从**正文 HTML**里认出 `fn @ file:line`（例 `runAuto @ lib/runner.js:77`）
-// 形态的锚点 → 在正文对应位置插上标角标 `[n]`，并给出右栏注记模型 `notes:[{n, anchor}]`。
+// ---------- §5.4 视觉①：源码锚点 = 引出线注记（壳阶段 C；两形态见 D15） ----------
+// 纯函数（无 DOM，Node 可直测）：从**正文 HTML**里认出锚点 → 在正文对应位置插上标角标 `[n]`，
+// 并给出右栏注记模型 `notes:[{n, anchor, line}]`。
 // 点角标的交互（高亮对应注记、再点取消）在 site/index.html——本函数只答「标什么、标几号」，不碰 DOM。
 //
 // D7（本期锚点漂移口径，计划 §2）：锚点**按生成时刻的 file:line 原样渲染**——正则只做识别与编号，
 // 不重解析源码、不校验符号是否还在、**绝不静默改写行号**；notes 里的 anchor 就是正文里那串字面量。
 // （行号变动 → 标 stale 还是重解析，是 ② 期的语义定案，本期明确不做。）
 //
+// D15（2026-09-10 审计后新增）：**两种形态都收**，但**必须区别渲染**。
+//   · `fn @ file:line`（例 `runAuto @ lib/runner.js:77`）→ `line` 是行号，按 D7 原样显示；
+//   · `fn @ file`（例 `finalizeSync @ lib/sync.js`）→ `line` 是 null，**绝不硬凑行号**，
+//     右栏由 renderNoteHtml 显式标注「源未给行号」。
+//   为什么两形态都收：文档教读者写的是 `func @ file`——`AGENTS.md`/`CLAUDE.md` 的 resident 区块
+//   给的锚点示例正是这个形态，而旧正则只认 `fn @ file:line`：文档教读者写 A、工具只认 B，是工具在骗人。
+//   注意理由**不是覆盖率**：两形态都收之后仍有 **87% 页面无注记**（收尾轮实测 99 页里 13 页有注记；
+//   `file` 形态 223 处/9 页、`file:line` 113 处/7 页——D15 行内写的「23 页 / 23%」在渲染管线上复现不了，
+//   差异口径与实测明细见计划 §9.5）。那是 wiki 内容形态决定的，**不是缺陷**——不得为了凑覆盖率去认
+//   不完整的文件名。
+//   为什么必须区别渲染：引出线的本义是「指向**确切**源码位置」，文件级锚点更像「出处」；
+//   把 file 形态渲染成带行号，就是把「不知道」渲染成「确定」，违反不变量⑧。
+//
+// 收紧正则（D15 同时要求）：文件名必须带**完整扩展名（≥2 字符）**，两形态**共用同一个 ANCHOR_FILE
+// 片段**（不可能只堵一边）。实测反例：markdown 硬换行把 `finalizeSync @ lib/sync.js` 截成
+// `finalizeSync @ lib/sync.j`——旧正则（扩展名 ≥1）会把这个截断碎片渲染成一条看起来确定的注记，
+// 比不渲染更坏。
+//
 // 编号：按**正文首次出现顺序**从 1 发号；同一锚点（字符串逐字相等）**复用同一编号**——
-// 既不一号多义，也不一义多号。重复出现处同样插角标（同一号有多处角标正是引出线的语义：
+// 既不一号多义，也不一义多号。**两形态共用同一个编号空间**（同一个 Map / 同一个 notes 数组），
+// 故混合出现时号序连续、不重复。重复出现处同样插角标（同一号有多处角标正是引出线的语义：
 // 一个注记可以被正文多处引用）。确定性：只看输入字符串，不读挂钟；Map 只按 key 取号，
 // 发号顺序由 notes 数组钉死，与 Map 迭代顺序无关。
 //
@@ -455,12 +480,14 @@ export function buildStatusLine({ status = null, manifest = null, queued = 0, no
 //   · HTML 标签内部（属性里的 `@` 不是 anchors）；
 //   · `<pre>` 代码块（字面代码样本，插进去是污染）；
 //   · mermaid 图源（`div.mermaid` 的 textContent 会被 route() 读回去当图源渲染，插角标直接画坏图）。
-const ANCHOR_RE = /(?<![\w$./-])(\/?[A-Za-z_$][\w$]*(?:[./][\w$]+)*(?:\(\))?) @ ([A-Za-z0-9_][\w./-]*\.[A-Za-z0-9]+):(\d+)/g;
+const ANCHOR_FILE = String.raw`[A-Za-z0-9_][\w./-]*\.[A-Za-z0-9]{2,}`;
+const ANCHOR_RE = new RegExp(
+  String.raw`(?<![\w$./-])(\/?[A-Za-z_$][\w$]*(?:[./][\w$]+)*(?:\(\))?) @ (${ANCHOR_FILE})(?::(\d+))?`, 'g');
 
 const anchorBadge = n =>
   `<sup class="anchor-ref" data-anchor-n="${n}" role="button" tabindex="0" aria-label="引出线注记 ${n}">[${n}]</sup>`;
 
-// html → { html, notes:[{n, anchor}] }。零锚点时 notes 为空数组且 **html 原样返回**（不插任何角标、
+// html → { html, notes:[{n, anchor, line}] }。零锚点时 notes 为空数组且 **html 原样返回**（不插任何角标、
 // 不产生空注记栏——空态判定交给调用方看 notes.length）。
 export function renderAnchors(html) {
   if (typeof html !== 'string' || html === '') return { html, notes: [] };
@@ -480,16 +507,38 @@ export function renderAnchors(html) {
       continue;
     }
     if (!parts[i] || preDepth > 0 || mermaidDepth > 0) continue;
-    parts[i] = parts[i].replace(ANCHOR_RE, (match) => {
+    // 捕获组：(1) 符号 (2) 文件 (3) 行号（**可缺省**——缺省即 D15 的 file 形态，line 记 null）
+    parts[i] = parts[i].replace(ANCHOR_RE, (match, _fn, _file, line) => {
       if (!numbered.has(match)) {
         numbered.set(match, notes.length + 1);          // 首次出现才发号（号序 = 正文顺序）
-        notes.push({ n: notes.length + 1, anchor: match });
+        notes.push({ n: notes.length + 1, anchor: match, line: line === undefined ? null : Number(line) });
       }
       return match + anchorBadge(numbered.get(match));
     });
   }
   if (notes.length === 0) return { html, notes: [] };   // 零锚点：返回原串，连重建都不做
   return { html: parts.join(''), notes };
+}
+
+// 文件级锚点（源未给行号）的显式标注语（D15）——导出成常量供测试与调用方共用同一串字面量。
+export const ANCHOR_NO_LINE = '源未给行号';
+
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// 单条注记的**纯**渲染器（无 DOM，Node 可直测）——D15 的「区别渲染」是硬要求，必须能断言其行为，
+// 而不是只去 grep site/index.html 里有没有那四个字（计划 §9.3 的教训：验字样只给虚假的通过感）。
+//   · line 是有限数 → 行号已在 anchor 字面量里原样显示（D7），此外不加任何东西；
+//   · line 为 null（file 形态）→ **不显示行号**，改为显式标注「源未给行号」：文件级锚点的确定性
+//     低于行级锚点，渲染成一样就是伪造确定性（不变量⑧）。
+export function renderNoteHtml(note) {
+  const { n, anchor, line = null } = note;
+  const hasLine = typeof line === 'number' && Number.isFinite(line);
+  return `<div class="note" id="note-${n}" data-note-n="${n}">`
+    + `<span class="note-n">[${n}]</span>`
+    + `<code class="note-anchor">${escHtml(anchor)}</code>`
+    + (hasLine ? '' : `<span class="note-src">${ANCHOR_NO_LINE}</span>`)
+    + `</div>`;
 }
 
 // ---------- §5.4 视觉②：决策史 = 修改记录表（壳阶段 C） ----------

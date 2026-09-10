@@ -658,16 +658,17 @@ test('buildStatusLine: 预算超限复用既有 budgetNotice()（独立读数，
   assert.equal(line.text.includes('预算超限'), false);               // 读数是独立 span（超限才出现），不进规范一行
 });
 
-// --- 壳阶段 C 视觉①：源码锚点 = 引出线注记（设计 §5.4 / D7）---
-// 纯函数（无 DOM）：renderAnchors(html) → { html, notes:[{n, anchor}] }；点角标的交互在 site/index.html。
-import { renderAnchors } from '../site/shell.mjs';
+// --- 壳阶段 C 视觉①：源码锚点 = 引出线注记（设计 §5.4 / D7 / D15）---
+// 纯函数（无 DOM）：renderAnchors(html) → { html, notes:[{n, anchor, line}] }；点角标的交互在 site/index.html。
+// line 是 D15 的判据：行级锚点 = 行号；文件级锚点 = null（渲染时绝不硬凑行号，改标注「源未给行号」）。
+import { renderAnchors, renderNoteHtml, ANCHOR_NO_LINE } from '../site/shell.mjs';
 
 test('renderAnchors: 多个锚点 → 按正文出现顺序编号 1..N，角标落在锚点后，notes 与之一一对应', () => {
   const html = '<p>入口 <code>runAuto @ lib/runner.js:77</code>，再看 <code>planSync @ lib/sync.js:21</code>。</p>';
   const { html: out, notes } = renderAnchors(html);
   assert.deepEqual(notes, [
-    { n: 1, anchor: 'runAuto @ lib/runner.js:77' },
-    { n: 2, anchor: 'planSync @ lib/sync.js:21' },
+    { n: 1, anchor: 'runAuto @ lib/runner.js:77', line: 77 },
+    { n: 2, anchor: 'planSync @ lib/sync.js:21', line: 21 },
   ]);
   assert.match(out, /runAuto @ lib\/runner\.js:77<sup class="anchor-ref" data-anchor-n="1"/);
   assert.match(out, /planSync @ lib\/sync\.js:21<sup class="anchor-ref" data-anchor-n="2"/);
@@ -710,7 +711,7 @@ test('renderAnchors: D7 —— 锚点按生成时刻的 file:line 原样渲染�
   assert.equal(/stale|重解析|已更新/.test(out), false);
   // 前导斜杠的路径形态（wiki 表里真实存在：`/api/sync/finalize @ server.js:190`）
   assert.deepEqual(renderAnchors('<td><code>/api/sync/finalize @ server.js:190</code></td>').notes,
-    [{ n: 1, anchor: '/api/sync/finalize @ server.js:190' }]);
+    [{ n: 1, anchor: '/api/sync/finalize @ server.js:190', line: 190 }]);
 });
 
 test('renderAnchors: 不碰标签属性、<pre> 代码块与 mermaid 图源（插进去会污染样本 / 画坏图）', () => {
@@ -725,7 +726,66 @@ test('renderAnchors: 不碰标签属性、<pre> 代码块与 mermaid 图源（�
   assert.equal(/anchor-ref/.test(mer.html), false);
   // <pre> 之外仍照常编号（跳过是局部的，不是把整页静音）
   const mixed = renderAnchors('<pre><code>x @ a/a.js:1\n</code></pre><p><code>y @ b/b.js:2</code></p>');
-  assert.deepEqual(mixed.notes, [{ n: 1, anchor: 'y @ b/b.js:2' }]);
+  assert.deepEqual(mixed.notes, [{ n: 1, anchor: 'y @ b/b.js:2', line: 2 }]);
+});
+
+// --- 壳阶段 D15：锚点两形态都收，但必须区别渲染（计划 §2 D15 / 验收 ①②③）---
+test('D15: 文件级锚点 `fn @ file` 被识别，但 line 为 null —— 源没给行号就不许有行号', () => {
+  const { html: out, notes } = renderAnchors('<p>入口 <code>finalizeSync @ lib/sync.js</code>。</p>');
+  assert.deepEqual(notes, [{ n: 1, anchor: 'finalizeSync @ lib/sync.js', line: null }]);
+  assert.equal(notes[0].line, null);
+  assert.match(out, /finalizeSync @ lib\/sync\.js<sup class="anchor-ref" data-anchor-n="1"/);
+  // 正文里不得凭空长出 `:数字`（硬凑行号 = 违反不变量⑧）
+  assert.equal(/lib\/sync\.js:\d/.test(out), false);
+});
+
+test('D15: 区别渲染 —— 行级锚点无标注，文件级锚点显式标注「源未给行号」', () => {
+  const withLine = renderNoteHtml({ n: 1, anchor: 'runAuto @ lib/runner.js:77', line: 77 });
+  const noLine = renderNoteHtml({ n: 2, anchor: 'finalizeSync @ lib/sync.js', line: null });
+  assert.match(withLine, /runAuto @ lib\/runner\.js:77/);            // 行号原样（D7）
+  assert.equal(withLine.includes(ANCHOR_NO_LINE), false);            // 行级锚点不挂「源未给行号」
+  assert.match(noLine, /finalizeSync @ lib\/sync\.js/);              // 文件级：显示到文件为止
+  assert.match(noLine, /源未给行号/);                                 // 且必须显式标注
+  assert.equal(/lib\/sync\.js:\d/.test(noLine), false);              // 且绝不含行号
+  assert.equal(noLine.includes('class="note-src"'), true);           // 标注是独立元素，不是混进 anchor 文本
+  // anchor 逐字原样 + HTML 转义（不能被正文里的 < > 撕开）
+  assert.match(renderNoteHtml({ n: 3, anchor: 'a<b @ c/d.js', line: null }), /a&lt;b @ c\/d\.js/);
+});
+
+test('D15: 换行碎片不得被识别 —— 扩展名 <2 字符一律不算锚点（反例 `finalizeSync @ lib/sync.j`）', () => {
+  // 实测反例：markdown 硬换行把 `lib/sync.js` 截成 `lib/sync.j`，旧正则（扩展名 ≥1）会把它渲染成
+  // 一条看起来确定的注记——比不渲染更坏。
+  const frag = renderAnchors('<p>见 <code>finalizeSync @ lib/sync.j</code></p>');
+  assert.deepEqual(frag.notes, []);
+  assert.equal(frag.html, '<p>见 <code>finalizeSync @ lib/sync.j</code></p>');   // 原样返回（空态 nop）
+  // 行级形态同样受这条约束（两形态共用同一文件名合法性判定，不可能只堵一边）
+  assert.deepEqual(renderAnchors('<p><code>f @ lib/sync.j:12</code></p>').notes, []);
+  assert.deepEqual(renderAnchors('<p><code>a @ b.c</code></p>').notes, []);
+  // 单字符扩展名的"行级"锚点同样不认（`:12` 不能把不合法的文件名救回来）
+  assert.deepEqual(renderAnchors('<p><code>a @ b.c:12</code></p>').notes, []);
+  assert.equal(/anchor-ref/.test(renderAnchors('<p><code>a @ b.c:12</code></p>').html), false);
+  // 边界：≥2 字符的合法扩展名照常认（.ts 文件级 / .mjs 行级）
+  assert.deepEqual(renderAnchors('<p><code>a @ b/c.ts</code></p>').notes.map(n => n.line), [null]);
+  assert.deepEqual(renderAnchors('<p><code>a @ b/c.mjs:3</code></p>').notes.map(n => n.line), [3]);
+});
+
+test('D15: 两形态混用 → 统一在一个编号空间递增（不重复、不跳号），同锚点仍复用同号', () => {
+  const html = '<p><code>runAuto @ lib/runner.js:77</code> <code>finalizeSync @ lib/sync.js</code> '
+    + '<code>runAuto @ lib/runner.js:77</code> <code>renderAnchors @ site/shell.mjs</code></p>';
+  const { html: out, notes } = renderAnchors(html);
+  assert.deepEqual(notes, [
+    { n: 1, anchor: 'runAuto @ lib/runner.js:77', line: 77 },
+    { n: 2, anchor: 'finalizeSync @ lib/sync.js', line: null },
+    { n: 3, anchor: 'renderAnchors @ site/shell.mjs', line: null },
+  ]);
+  assert.deepEqual(notes.map(n => n.n), [1, 2, 3]);                  // 统一递增，两形态不各占一套号
+  assert.equal((out.match(/data-anchor-n="1"/g) || []).length, 2);   // 重复的行级锚点复用 1 号
+  assert.equal((out.match(/data-anchor-n="2"/g) || []).length, 1);
+  assert.equal((out.match(/data-anchor-n="3"/g) || []).length, 1);
+  // 同一文件级锚点重复出现 → 同样复用编号（编号规则与形态无关）
+  const dup = renderAnchors('<p><code>a @ b/c.js</code><code>a @ b/c.js</code></p>');
+  assert.equal(dup.notes.length, 1);
+  assert.equal((dup.html.match(/data-anchor-n="1"/g) || []).length, 2);
 });
 
 // --- 壳阶段 C 视觉②：决策史 = 修改记录表（设计 §5.4 / D6；生成侧 = lib/sync.js renderDecisionHistory）---
@@ -876,21 +936,27 @@ test('buildStatusLine: 「队列 N」提示语带上已排队条数（QUEUED_PAG
   const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: 2, now: AT_1402 });
   assert.match(line.queue_hint, /1 页待重写/);
   assert.match(line.queue_hint, /2 条排队请求/);
-  const empty = buildStatusLine({ status: null, manifest: { axes: [] }, now: AT_1402 });
+  const empty = buildStatusLine({ status: null, manifest: { axes: [] }, queued: 0, now: AT_1402 });
   assert.equal(empty.queue_text, '队列 0');                         // manifest 说 0 页落后 = 真值 0（不是 unknown）
   assert.equal(empty.pages_text, '0 页');
   assert.match(empty.queue_hint, /0 条排队请求/);                    // 读得到的 0 照报 0（别把真值改成 unknown）
 });
 
 test('buildStatusLine: 排队条数取不到 → 提示语不许出现「0 条」（D13：取不到 ≠ 0）', () => {
-  // 唯一调用方目前总传有限数（QUEUED_PAGES.size），但这个默认值的语义必须本来就对——
-  // 否则下个调用方一传 NaN/null/Infinity，提示语就悄悄撒谎「0 条排队请求」。
-  // 注：显式传 undefined 会命中形参默认值 0（那是 API 契约上的「没给 = 0 条」，非本断言的范围）。
-  for (const bad of [NaN, null, Infinity, -Infinity, '2']) {
+  // 唯一调用方目前总传有限数（QUEUED_PAGES.size），但这个形参的语义必须本来就对——
+  // 否则下个调用方一传 undefined/NaN/null，提示语就悄悄撒谎「0 条排队请求」。
+  // 注：queued **没有默认值**（曾经的 `= 0` 正是「取不到冒充 0」的本体）：调用点拿不到条数时
+  // 自然就是 undefined，而 undefined 必须走 unknown，不得落到 0。真值 0 必须显式传。
+  for (const bad of [undefined, NaN, null, Infinity, -Infinity, '2']) {
     const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: bad, now: AT_1402 });
     assert.equal(line.queue_hint.includes('0 条'), false,
       `queued=${String(bad)} 时提示语不得出现「0 条」，实际：${line.queue_hint}`);
     assert.match(line.queue_hint, /排队请求 unknown/);
     assert.match(line.queue_hint, /1 页待重写/);                      // 页面待重写数（读得到的）仍照报
+    assert.equal(line.queue_text, '队列 1');                          // 队列数本身来自 manifest，不受影响
   }
+  // 省略该字段 = 调用点没拿到条数 → 同样 unknown（这一条正是「默认值不能是 0」的回归断言）
+  const omitted = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, now: AT_1402 });
+  assert.equal(omitted.queue_hint.includes('0 条'), false);
+  assert.match(omitted.queue_hint, /排队请求 unknown/);
 });

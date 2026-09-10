@@ -366,3 +366,70 @@ export function budgetNotice(status) {
   const num = v => (Number.isFinite(v) ? v : '?');
   return `预算超限（${num(b.used)}/${num(b.budget)} ${b.dimension ?? 'calls'}）`;
 }
+
+// ---------- 底部状态行读数（设计 §5.3 结构 / §5.5 验收；壳阶段 B） ----------
+// 纯函数（无 DOM，Node 可直测）：site/index.html 把结果逐字段填进已落地的 #statusline。
+//
+// 数据源只有两个，**不新增数据源**：
+//   · fuel  —— GET /api/sync/status 的顶层 fuel 字段（派生唯一在 lib/doctor.js 的 fuelReadout，计划 D3）；
+//   · manifest / status —— 既有 buildConsoleModel（页数、待重写队列）。
+//
+// 纪律（D13 / lib/doctor.js:40-41）：取不到的数字一律渲染 'unknown'，**绝不用 0 冒充**——
+// 0 是「测出来是零」，unknown 是「测不出来」，两者混同就是把最危险的失败模式藏起来。
+// 三态必须分列，且 none ≠ unknown：
+//   ok       → `CAPTURE OK`（绿：捕获路径活着）
+//   none     → `CAPTURE 未捕获`（琥珀：能测、但从未捕获过 —— 正是「hook 断流 3 个月」那种最危险形态）
+//   unknown  → `CAPTURE unknown`（弱色：测不出，含 API 不可用 / 未 init）
+//
+// 降级（§5.5）：status 为 null（SYNC_STATUS 不可用：python serve / portal / 未 init）时，
+// 燃料三项显示 unknown，但页数与队列仍取 manifest 的静态读数——不报错、不空白。
+// 预算超限走既有 budgetNotice()（不与超限/未配置混淆），单独成字段：状态行把它当独立读数渲染。
+export const STATUS_UNKNOWN = 'unknown';
+
+const isFiniteNum = v => typeof v === 'number' && Number.isFinite(v);
+const numText = v => (isFiniteNum(v) ? String(v) : STATUS_UNKNOWN);   // 真实的 0 原样输出，非有限数才 unknown
+
+// 页数 = manifest 全部轴的页数和；manifest 形状不对 → null（未知），不拿 0 冒充「0 页」。
+function manifestPageCount(manifest) {
+  if (!manifest || !Array.isArray(manifest.axes)) return null;
+  return manifest.axes.reduce((n, ax) => n + (Array.isArray(ax?.pages) ? ax.pages.length : 0), 0);
+}
+
+const pad2 = n => String(n).padStart(2, '0');
+
+// now 可注入：HH:MM 是读数（截取时刻），测试必须能给定时钟，读挂钟的纯函数不可测。
+export function buildStatusLine({ status = null, manifest = null, queued = 0, now = new Date() } = {}) {
+  const fuel = status?.fuel ?? null;
+  const state = fuel?.capture_state === 'ok' || fuel?.capture_state === 'none' ? fuel.capture_state : STATUS_UNKNOWN;
+  const hasManifest = !!manifest && Array.isArray(manifest.axes);
+  const queueCount = hasManifest ? buildConsoleModel(manifest, status).staleTotal : null;
+  const pageCount = manifestPageCount(manifest);
+
+  const capture_text = state === 'ok' ? 'CAPTURE OK' : state === 'none' ? 'CAPTURE 未捕获' : 'CAPTURE unknown';
+  const rate_text = `决策捕获率 ${isFiniteNum(fuel?.capture_pct) ? `${fuel.capture_pct}%` : STATUS_UNKNOWN}`;
+  const gap_text = `断流 ${isFiniteNum(fuel?.days_since_capture) ? `${fuel.days_since_capture} 天` : STATUS_UNKNOWN}`;
+  const pages_text = `${pageCount === null ? STATUS_UNKNOWN : pageCount} 页`;
+  const queue_text = `队列 ${queueCount === null ? STATUS_UNKNOWN : queueCount}`;
+  const stamp_text = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const queuedCount = isFiniteNum(queued) ? queued : 0;
+
+  return {
+    capture_state: state,
+    capture_text,
+    // 复用已落地的状态行 CSS：ok → .live（绿点）、none → .cap-none（琥珀）、unknown → .cap-unknown（弱色）
+    capture_class: state === 'ok' ? 'live' : state === 'none' ? 'cap-none' : 'cap-unknown',
+    rate_text,
+    gap_text,
+    pages_text,
+    queue_text,
+    stamp_text,
+    // 队列是**可操作**读数（§5.5 硬项）：null = 连 manifest 都读不到 → 不可点（静态 markup 的禁用态）
+    queue_count: queueCount,
+    queue_hint: queueCount === null
+      ? '同步面板：页面索引未就绪'
+      : `打开同步面板：${queueCount} 页待重写 · ${queuedCount} 条排队请求`,
+    budget_text: budgetNotice(status),   // 超限才有字；未配置/未超限为 ''（遥测位不塞噪音）
+    // §5.3 的规范一行（不含预算读数——预算在 #statusline 里是独立读数，超限才出现）
+    text: [capture_text, rate_text, gap_text, pages_text, queue_text, stamp_text].join(' · '),
+  };
+}

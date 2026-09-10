@@ -290,6 +290,111 @@ test('GET /api/sync/status: budget{configured,dimension,budget,used,exceeded}—
   } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
+// --- 壳阶段 B：GET /api/sync/status 的 fuel（设计 §5.3 状态行 / §5.5 燃料读数）---
+// 验收口径：契约只增不改（既有 mode/last_finalize/config/runner_running/budget 一个不动）；
+// fuel 的派生**唯一在 lib/doctor.js 的 fuelReadout**，server.js 只传仓库根——不重写一套（计划 D3）。
+// 关键口径：createServer(root) 的 root 是 **.lore 目录本身**（见本文件 :420 与 lib/serve.js:219），
+// 而 fuelReadout 要的仓库根 = 它的父目录（与同处 budgetStatus 的 repoRoot 一致）。
+const FUEL_NUMERIC_KEYS = ['capture_pct', 'window_commits', 'days_since_capture'];
+
+// 取不到一律 'unknown'，绝不用 0 冒充——这个断言是阶段 B 的「不许把 unknown 渲染成 0」在数据侧的闸。
+function assertFuelShape(fuel) {
+  assert.equal(typeof fuel, 'object');
+  assert.deepEqual(Object.keys(fuel).sort(),
+    ['capture_pct', 'capture_state', 'days_since_capture', 'last_hook_ts', 'window_commits']);
+  assert.equal(['ok', 'none', 'unknown'].includes(fuel.capture_state), true,
+    `capture_state 只能是 ok|none|unknown，实际 ${fuel.capture_state}`);
+  for (const k of FUEL_NUMERIC_KEYS) {
+    assert.equal(Number.isFinite(fuel[k]) || fuel[k] === 'unknown', true,
+      `fuel.${k} 只能是有限数或 'unknown'，实际 ${JSON.stringify(fuel[k])}`);
+  }
+  // last_hook_ts 是**时间戳字符串**（口径同 doctor.capture.lastHookTs），取不到才 'unknown'
+  assert.equal(fuel.last_hook_ts === 'unknown'
+    || (typeof fuel.last_hook_ts === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(fuel.last_hook_ts)), true,
+    `fuel.last_hook_ts 只能是 ISO 时间戳或 'unknown'，实际 ${JSON.stringify(fuel.last_hook_ts)}`);
+}
+
+function fuelFixture({ journal = [], initialized = true } = {}) {
+  const repo = mkdtempSync(join(tmpdir(), 'lore-fuel-'));
+  const root = join(repo, '.lore');                      // 传给 createServer 的就是 .lore 目录
+  if (initialized) {
+    mkdirSync(join(root, 'wiki'), { recursive: true });
+    writeFileSync(join(root, 'wiki', '.manifest.json'),
+      JSON.stringify({ generated: '2026-06-09T05:00:00Z', axes: [] }));
+  }
+  if (journal.length) {
+    mkdirSync(join(root, 'journal'), { recursive: true });
+    writeFileSync(join(root, 'journal', '2026-09-10.ndjson'),
+      journal.map(a => JSON.stringify(a)).join('\n') + '\n');
+  }
+  return { repo, root, cleanup: () => rmSync(repo, { recursive: true, force: true }) };
+}
+
+test('GET /api/sync/status: 未 init / 非 git → 200 且 fuel 五项全 unknown（不崩、不用 0 冒充）', async () => {
+  const { root, cleanup } = fuelFixture({ initialized: false });
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/sync/status`);
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assertFuelShape(body.fuel);
+    assert.deepEqual(body.fuel, {
+      capture_state: 'unknown', capture_pct: 'unknown',
+      window_commits: 'unknown', days_since_capture: 'unknown', last_hook_ts: 'unknown',
+    });
+    // 既有契约字段一个都没被改名/删除（只增不改）
+    assert.equal(body.mode, 'notify');
+    assert.equal(body.last_finalize, null);                              // 无 manifest
+    assert.equal(body.runner_running, false);
+    assert.deepEqual(body.config,
+      { mode: 'notify', debounce_minutes: 10, schedule: null, max_pages: 5, stale_threshold: 15, backend: 'auto' });
+    assert.equal(typeof body.budget, 'object');
+    assert.equal(existsSync(root), false);                               // 只读端点：没有凭空造目录
+  } finally { server.close(); cleanup(); }
+});
+
+test('GET /api/sync/status: fuel 与 doctor 同源同口径（hook 捕获过 → ok + 窗口读数真值）', async () => {
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'decision:x', kind: 'decision', ts: '2026-09-01T00:00:00Z', source: 'hook', commit: 'sha1', title: 't', why: 'w' },
+  ] });
+  // 注入 git：版本戳（budgetStatus）与窗口（fuelReadout 的 git log）走同一个 exec 口径。
+  const exec = (cmd, args) => {
+    if (args[0] === 'describe') return 'v9.9.9\n';
+    if (args[0] === 'log') return 'sha1\x1f2026-09-01T00:00:00+00:00\nsha2\x1f2026-09-02T00:00:00+00:00\n';
+    return '';
+  };
+  const server = createServer(root, { exec });
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assertFuelShape(body.fuel);
+    assert.equal(body.fuel.capture_state, 'ok');                         // 捕获过（hook 来源的原子在上）
+    assert.equal(body.fuel.last_hook_ts, '2026-09-01T00:00:00Z');
+    assert.equal(body.fuel.window_commits, 2);                           // 窗口内提交数（N=50 默认）
+    assert.equal(body.fuel.capture_pct, 50);                             // 窗口率 = 1 decision / 2 commits
+    assert.equal(Number.isInteger(body.fuel.days_since_capture), true);  // 断流天数：数字（口径同 doctor.capture.gapDays）
+    assert.equal(body.budget.version, 'v9.9.9');                         // 既有预算字段：repoRoot 口径未被改动
+  } finally { server.close(); cleanup(); }
+});
+
+test('GET /api/sync/status: fuel 区分「测得出但从未捕获」(none) 与「测不出」(unknown)', async () => {
+  // 有记录层但没有一条 source==='hook' 的原子 = 「hook 断流 3 个月」的最危险形态：
+  // 能测（capture_state 有值）却从未捕获过 → 必须与 unknown 分列，不许混成一个词。
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'commit:1', kind: 'commit', ts: '2026-09-05T00:00:00Z', source: 'mine', title: 't', why: 'w' },
+  ] });
+  const server = createServer(root);
+  const port = await listen(server);
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+    assertFuelShape(body.fuel);
+    assert.equal(body.fuel.capture_state, 'none');                       // 测得出：从未捕获
+    assert.equal(body.fuel.last_hook_ts, 'unknown');                     // 从未有过 hook 原子 → 无时间戳（不是 0）
+    assert.notEqual(body.fuel.capture_state, 'unknown');                 // 与「测不出」严格区分
+  } finally { server.close(); cleanup(); }
+});
+
 test('POST /api/sync/config: 部分更新落盘+读回；非法 400 不落盘；非 local 403', async () => {
   const root = syncFixture();
   const server = createServer(root);

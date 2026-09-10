@@ -9,6 +9,7 @@ import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
   readSyncConfig, readBudgetConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
 import { budgetStatus } from './lib/cost.js';
+import { fuelReadout } from './lib/doctor.js';
 import { isAlive } from './lib/serve.js';
 import { HumanStoreError, appendHuman, visitRecord } from './lib/human.js';
 
@@ -170,11 +171,19 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
       catch { /* 无 manifest（未 sync）→ null */ }
       // 预算闸的**可见出口**（审计 D4）：auto 因超预算静默停摆时，壳状态行必须读得到原因。
       // 未配置预算也照报（configured:false）——「为什么没跑」要能一眼看出是没配还是超了。
+      // repoRoot：createServer(root) 的 root **就是 .lore 目录本身**（test/server.test.js:420、lib/serve.js:219），
+      // 而预算版本戳与下面的 fuel 都要的是**仓库根**——统一从 root 的父目录推导，不猜、不"顺手修"传参。
+      const repoRoot = join(resolve(root), '..');
       const budgetCfg = readBudgetConfig(stateDir);
       const bs = budgetStatus({
-        stateDir, repoRoot: join(resolve(root), '..'),
+        stateDir, repoRoot,
         budget: budgetCfg.budget, dimension: budgetCfg.dimension, exec,
       });
+      // 壳状态行的燃料读数（设计 §5.3 底部 / §5.5；壳阶段 B）。派生**唯一在 lib/doctor.js 的 fuelReadout**
+      // （计划 D3：同源同口径，绝不在 server.js 重写一套，否则与 `lore doctor` 漂移即可信度崩塌）。
+      // 取不到的数一律 'unknown'（UNKNOWN），**绝不用 0 冒充**；未 init / 非 git 也不崩（全 unknown）。
+      // 性能：fuelReadout 只跑窗口 + 断流派生——不碰 hook 指向与仓库版本那两块 git spawn（各自要起一次 git）。
+      const fuel = fuelReadout(repoRoot, { exec });
       return sendJson(res, 200, {
         mode: config.mode, last_finalize: lastFinalize, config,
         runner_running: runnerAlive(stateDir, isAlive),
@@ -182,6 +191,7 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
           configured: bs.configured, dimension: bs.dimension, budget: bs.budget,
           used: bs.used, exceeded: bs.exceeded, version: bs.version,
         },
+        fuel,
       });
     }
 

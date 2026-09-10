@@ -569,3 +569,100 @@ test('installVisitSensor: Node / 无 location / 无 addEventListener → 不装�
   assert.equal(installVisitSensor({ win: {} }), null);
   assert.equal(installVisitSensor({ win: { location: { hash: '#x' } } }), null);
 });
+
+// --- 壳阶段 B：底部状态行读数（设计 §5.3 / §5.5）---
+// 纯函数（无 DOM）：site/index.html 只负责把下面这些字段填进 #statusline 并接上「队列 → 同步面板」的动作。
+import { buildStatusLine, STATUS_UNKNOWN } from '../site/shell.mjs';
+
+const STATUS_MANIFEST = {
+  axes: [
+    { id: 'component', label: 'Component', pages: [
+      { id: 'a', title: 'A', stale: 2, path: 'component/a.md' },
+      { id: 'b', title: 'B', stale: 0 },
+    ] },
+    { id: 'docs', label: 'Docs', pages: [{ id: 'c', title: 'C' }] },
+  ],
+};
+const AT_1402 = new Date(2026, 8, 10, 14, 2);        // 本地时间 14:02（getHours 不受时区影响）
+const okFuel = { capture_state: 'ok', capture_pct: 38, window_commits: 50, days_since_capture: 0, last_hook_ts: '2026-09-10T06:02:00Z' };
+const unknownFuel = { capture_state: 'unknown', capture_pct: 'unknown', window_commits: 'unknown', days_since_capture: 'unknown', last_hook_ts: 'unknown' };
+const noneFuel = { capture_state: 'none', capture_pct: 'unknown', window_commits: 'unknown', days_since_capture: 'unknown', last_hook_ts: 'unknown' };
+
+test('buildStatusLine: ok 态 → §5.3 规范一行（CAPTURE OK · 捕获率 · 断流 · 页 · 队列 · 时刻）', () => {
+  const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: 2, now: AT_1402 });
+  assert.equal(line.text, 'CAPTURE OK · 决策捕获率 38% · 断流 0 天 · 3 页 · 队列 1 · 14:02');
+  assert.equal(line.capture_state, 'ok');
+  assert.equal(line.capture_text, 'CAPTURE OK');
+  assert.equal(line.capture_class, 'live');                       // 绿点（复用已落地 CSS）
+  assert.equal(line.pages_text, '3 页');                          // 页数来自 manifest 全轴页数和
+  assert.equal(line.queue_text, '队列 1');                        // 队列 = 既有 buildConsoleModel().stalePages
+  assert.equal(line.queue_count, 1);
+  assert.equal(line.stamp_text, '14:02');
+  assert.equal(line.budget_text, '');                             // 未超限/未配置 → 不塞噪音
+});
+
+test('buildStatusLine: ok 态但真值为 0 → 如实渲染 0（别把「测出来是零」修成 unknown）', () => {
+  const line = buildStatusLine({
+    status: { fuel: { ...okFuel, capture_pct: 0, days_since_capture: 0 } },
+    manifest: STATUS_MANIFEST, now: AT_1402,
+  });
+  assert.equal(line.rate_text, '决策捕获率 0%');
+  assert.equal(line.gap_text, '断流 0 天');
+});
+
+test('buildStatusLine: none 态 → 「CAPTURE 未捕获」（危险形态），与 unknown 严格不同词', () => {
+  const none = buildStatusLine({ status: { fuel: noneFuel }, manifest: STATUS_MANIFEST, now: AT_1402 });
+  const unknown = buildStatusLine({ status: { fuel: unknownFuel }, manifest: STATUS_MANIFEST, now: AT_1402 });
+  assert.equal(none.capture_text, 'CAPTURE 未捕获');
+  assert.equal(none.capture_class, 'cap-none');
+  assert.equal(none.capture_text.includes(STATUS_UNKNOWN), false);      // 未捕获 ≠ 测不出
+  assert.notEqual(none.capture_text, unknown.capture_text);
+  assert.match(none.text, /^CAPTURE 未捕获 · /);
+});
+
+test('buildStatusLine: unknown 态 → 渲染 unknown，绝不渲染成 0', () => {
+  const line = buildStatusLine({ status: { fuel: unknownFuel }, manifest: STATUS_MANIFEST, now: AT_1402 });
+  assert.equal(line.capture_text, 'CAPTURE unknown');
+  assert.equal(line.capture_class, 'cap-unknown');
+  assert.equal(line.rate_text, '决策捕获率 unknown');
+  assert.equal(line.gap_text, '断流 unknown');
+  assert.equal(line.text, 'CAPTURE unknown · 决策捕获率 unknown · 断流 unknown · 3 页 · 队列 1 · 14:02');
+  assert.equal(/\b0%|断流 0/.test(line.text), false);              // 测不出的数不许变成 0（D13）
+  // 值缺失 / 非数字垃圾（NaN、字符串数字）同样走 unknown 分支，不猜
+  for (const bad of [{}, { capture_pct: NaN, days_since_capture: '0' }, { capture_pct: null, days_since_capture: Infinity }]) {
+    const l = buildStatusLine({ status: { fuel: { ...unknownFuel, ...bad, capture_state: 'ok' } }, manifest: STATUS_MANIFEST, now: AT_1402 });
+    assert.equal(l.rate_text, '决策捕获率 unknown', JSON.stringify(bad));
+    assert.equal(l.gap_text, '断流 unknown', JSON.stringify(bad));
+  }
+});
+
+test('buildStatusLine: API 不可用（SYNC_STATUS 为 null）→ 降级为静态读数，不报错、不空白', () => {
+  const line = buildStatusLine({ status: null, manifest: STATUS_MANIFEST, queued: 0, now: AT_1402 });
+  assert.equal(line.capture_state, 'unknown');
+  assert.equal(line.text, 'CAPTURE unknown · 决策捕获率 unknown · 断流 unknown · 3 页 · 队列 1 · 14:02');
+  assert.equal(line.pages_text, '3 页');                            // 页数/队列来自 manifest，静态服务也读得到
+  assert.equal(line.queue_count, 1);                                // 「队列」仍可点开同步面板（只读态）
+  assert.equal(line.budget_text, '');                               // 无 API → 无预算读数，不报错
+  assert.equal(buildStatusLine({ now: AT_1402 }).text, 'CAPTURE unknown · 决策捕获率 unknown · 断流 unknown · unknown 页 · 队列 unknown · 14:02');
+  assert.equal(buildStatusLine({ now: AT_1402 }).queue_count, null);   // 无 manifest → 不可点，绝不用 0 冒充
+});
+
+test('buildStatusLine: 预算超限复用既有 budgetNotice()（独立读数，不改文案）', () => {
+  const status = {
+    fuel: okFuel,
+    budget: { configured: true, exceeded: true, used: 12, budget: 10, dimension: 'calls' },
+  };
+  const line = buildStatusLine({ status, manifest: STATUS_MANIFEST, now: AT_1402 });
+  assert.equal(line.budget_text, budgetNotice(status));
+  assert.equal(line.budget_text, '预算超限（12/10 calls）');
+  assert.equal(line.text.includes('预算超限'), false);               // 读数是独立 span（超限才出现），不进规范一行
+});
+
+test('buildStatusLine: 「队列 N」提示语带上已排队条数（QUEUED_PAGES 口径），供面板入口的 title', () => {
+  const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: 2, now: AT_1402 });
+  assert.match(line.queue_hint, /1 页待重写/);
+  assert.match(line.queue_hint, /2 条排队请求/);
+  const empty = buildStatusLine({ status: null, manifest: { axes: [] }, now: AT_1402 });
+  assert.equal(empty.queue_text, '队列 0');                         // manifest 说 0 页落后 = 真值 0（不是 unknown）
+  assert.equal(empty.pages_text, '0 页');
+});

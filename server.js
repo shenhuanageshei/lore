@@ -8,7 +8,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { translationSourceHash } from './lib/i18n.js';
 import { readSyncMode, writeSyncMode, writeSyncConfig, appendRewriteRequest, readRewriteRequests,
   readSyncConfig, readBudgetConfig, runnerAlive, readAutoRuns, readAutoPending, clearAutoPending } from './lib/syncstate.js';
-import { budgetStatus } from './lib/cost.js';
+import { budgetStatus, versionStamp } from './lib/cost.js';
 import { fuelReadout } from './lib/doctor.js';
 import { isAlive } from './lib/serve.js';
 import { HumanStoreError, appendHuman, visitRecord } from './lib/human.js';
@@ -102,7 +102,66 @@ const slashLower = p => normalize(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '
 // 返回 true = 已响应；false = 非 API 路径（调用方继续静态/404）。
 // Local write APIs (only reachable on 127.0.0.1). Scoped to <root>/.state and
 // a read of <root>/wiki; never write arbitrary paths.
-export async function handleApi(root, req, res, pathname, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync } = {}) {
+//
+// --- fuel 的短 TTL 缓存（审计 🟡#3 / 阶段 B 验收 8）---
+// 为什么必须缓存：fuelReadout → captureReadout → gitWindow 会 **spawn 一次 `git log`**，
+// 而 execFileSync 是同步的——每个 /api/sync/status 请求都会把事件循环卡住约 1 秒（实测 0.98/1.08/1.10s），
+// 壳却每 15s 轮询一次 status，这个热路径花不起。
+// 为什么 30s 的陈旧可以接受：fuel 的两个可变读数的最小变化粒度是「天」（days_since_capture）
+// 与「提交数」（capture_pct = 窗口内 decision/commit）——30 秒的延迟不会把 38% 读成别的数，
+// 只会在真实提交刚落地后晚 30 秒反映；换来的是轮询请求从 ~1s 降到毫秒级。
+// 只做缓存：派生逻辑仍**唯一在 lib/doctor.js 的 fuelReadout**（D3），这里绝不重写一套口径，
+// 缓存的就是那个函数的返回值本身（键名/取值原样，契约零改动）。
+const FUEL_CACHE_TTL_MS = 30_000;
+const FUEL_CACHE = new Map();   // repoRoot → { at, value }；portal 形态下每个 repo 各一条
+
+function fuelCached(repoRoot, exec, ttlMs = FUEL_CACHE_TTL_MS, now = Date.now()) {
+  const key = resolve(repoRoot);
+  const hit = FUEL_CACHE.get(key);
+  if (hit && now - hit.at < ttlMs) return hit.value;
+  const value = fuelReadout(key, { exec });
+  FUEL_CACHE.set(key, { at: now, value });
+  // 惰性清过期项：只在这一条 key 被访问时顺带扫一遍——portal 的 repo 数是个位数，够用且无需定时器。
+  for (const [k, v] of FUEL_CACHE) if (now - v.at >= ttlMs) FUEL_CACHE.delete(k);
+  return value;
+}
+
+// --- 版本戳（预算窗口键）的短 TTL 缓存 ---
+// 为什么必须缓存：budgetStatus → versionStamp（lib/cost.js:41）会 **spawn 一次 `git describe --tags`**，
+// 同样是同步的 execFileSync。fuel 缓存命中后，这一条是 status 热路径上**唯一**剩余的 git 冷启动
+// （实测单独 506/682ms，via budgetStatus 877ms），不消除就永远到不了毫秒级。
+// 为什么选「只缓存版本戳」而不是「把整个 status 载荷一起缓存」（二选一里选更简的）：
+//   ① 更简——status 载荷里 config / runner_running / last_finalize / used / exceeded 都是**便宜且会变**的
+//      读数（各读一个 json / ndjson 文件），整载荷缓存会把它们一并冻住 30s：壳刚切的模式、刚跑起来的 runner
+//      最长 30s 看不到，这是**语义降级**，不只是性能取舍；
+//   ② 精度——贵的只有「派生」，所以只缓存派生结果（版本戳），其余每次照样现读，缓存面最小。
+//   ③ 口径不动——缓存的是 lib/cost.js 的 versionStamp **本身的返回值**（D3：派生点唯一在 lib/cost.js），
+//      这里只是把它当作 budgetStatus 的 `version` 入参注入（budgetStatus 签名本就支持 version 注入），
+//      不重写任何预算口径、不改 budget 对象任何子字段。
+// 为什么 30s 够（版本戳的变化粒度是「发版」= `git describe --tags`，比 fuel 的「天」还粗）：
+//   发 tag 后 ≤30s 内，壳读到的可能是上一个版本的窗口键——可观察后果仅为「壳状态行的 used/exceeded 暂时按旧
+//   窗口显示」；而**真正的闸本身不受影响**（lib/runner.js:87 每轮自算新鲜 versionStamp，不经过这个缓存），
+//   且错报方向是保守（旧窗口条目只会让 used 更大，不会静默放行）。与 FUEL_CACHE_TTL_MS 同值，减少记忆负担。
+// 为什么键是 (exec, repoRoot) 两段、而 FUEL_CACHE 只有 repoRoot：版本戳是**由某个 exec 口径派生的**，
+//   缓存必须与口径绑定——同一个目录换一个 exec（测试注入 stub、或将来接入别的 git 封装）就应该重算，
+//   否则会读到另一个口径的陈旧值。生产里 exec 恒为 execFileSync（同一函数对象），命中率不受影响。
+const VERSION_STAMP_TTL_MS = 30_000;
+const VERSION_STAMP_CACHE = new WeakMap();   // exec → Map(repoRoot → { at, value })；portal 形态下每个 repo 各一条
+
+function versionStampCached(repoRoot, exec, ttlMs = VERSION_STAMP_TTL_MS, now = Date.now()) {
+  let byRepo = VERSION_STAMP_CACHE.get(exec);
+  if (!byRepo) { byRepo = new Map(); VERSION_STAMP_CACHE.set(exec, byRepo); }
+  const key = resolve(repoRoot);
+  const hit = byRepo.get(key);
+  if (hit && now - hit.at < ttlMs) return hit.value;
+  const value = versionStamp(key, { exec });
+  byRepo.set(key, { at: now, value });
+  // 惰性清过期项：与 fuelCached 同款（portal 的 repo 数是个位数，无需定时器）。
+  for (const [k, v] of byRepo) if (now - v.at >= ttlMs) byRepo.delete(k);
+  return value;
+}
+
+export async function handleApi(root, req, res, pathname, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync, fuelTtlMs = FUEL_CACHE_TTL_MS, versionTtlMs = VERSION_STAMP_TTL_MS } = {}) {
     if (req.method === 'POST' && pathname.startsWith('/api/') && !localHost(req)) {
       sendJson(res, 403, { error: 'forbidden host' });
       return true;
@@ -175,15 +234,20 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
       // 而预算版本戳与下面的 fuel 都要的是**仓库根**——统一从 root 的父目录推导，不猜、不"顺手修"传参。
       const repoRoot = join(resolve(root), '..');
       const budgetCfg = readBudgetConfig(stateDir);
+      // 版本戳（预算窗口键）：唯一剩余的 per-request git spawn 就在这里，走上面的 30s TTL 缓存。
+      // 传 `version` 进 budgetStatus 即让它跳过内部 versionStamp(repoRoot,{exec})——口径与 library 完全同一份。
+      const budgetVersion = versionStampCached(repoRoot, exec, versionTtlMs);
       const bs = budgetStatus({
         stateDir, repoRoot,
         budget: budgetCfg.budget, dimension: budgetCfg.dimension, exec,
+        version: budgetVersion,
       });
       // 壳状态行的燃料读数（设计 §5.3 底部 / §5.5；壳阶段 B）。派生**唯一在 lib/doctor.js 的 fuelReadout**
       // （计划 D3：同源同口径，绝不在 server.js 重写一套，否则与 `lore doctor` 漂移即可信度崩塌）。
       // 取不到的数一律 'unknown'（UNKNOWN），**绝不用 0 冒充**；未 init / 非 git 也不崩（全 unknown）。
-      // 性能：fuelReadout 只跑窗口 + 断流派生——不碰 hook 指向与仓库版本那两块 git spawn（各自要起一次 git）。
-      const fuel = fuelReadout(repoRoot, { exec });
+      // 性能：fuelReadout 的窗口派生内部要 spawn 一次 `git log`（同步、约 1s）→ 走上面的 30s TTL 缓存，
+      // 否则壳每 15s 一次的状态轮询会各自阻塞事件循环一秒（审计 🟡#3）。
+      const fuel = fuelCached(repoRoot, exec, fuelTtlMs);
       return sendJson(res, 200, {
         mode: config.mode, last_finalize: lastFinalize, config,
         runner_running: runnerAlive(stateDir, isAlive),
@@ -263,14 +327,14 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
   return false;   // 非 API 路径
 }
 
-export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync } = {}) {
+export function createServer(rootDir, { spawnFn = spawn, reposPath = join(homedir(), '.lore', 'repos.json'), exec = execFileSync, fuelTtlMs = FUEL_CACHE_TTL_MS, versionTtlMs = VERSION_STAMP_TTL_MS } = {}) {
   const root = normalize(rootDir).replace(/[/\\]+$/, '');
   return http.createServer(async (req, res) => {
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
     catch { res.writeHead(400); return res.end('bad request'); }
 
-    if (await handleApi(root, req, res, pathname, { spawnFn, reposPath, exec })) return;
+    if (await handleApi(root, req, res, pathname, { spawnFn, reposPath, exec, fuelTtlMs, versionTtlMs })) return;
 
     const rel = pathname.replace(/^\/+/, '');
     return serveStatic(root, rel, res, pathname);

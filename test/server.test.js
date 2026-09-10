@@ -395,6 +395,124 @@ test('GET /api/sync/status: fuel 区分「测得出但从未捕获」(none) 与�
   } finally { server.close(); cleanup(); }
 });
 
+// --- 审计 🟡#3：fuel 的短 TTL 缓存（每次 status 请求都同步 spawn git 的性能修复）---
+// 缓存的是 fuelReadout 的**返回值**——派生点仍在 lib/doctor.js（D3），server.js 不重写口径。
+// 两条断言分别钉住缓存的两个方向：① 命中时不重复派生；② 过期后必须重新派生（不是「一次定终身」）。
+// 为什么用 fuelTtlMs=0 而不是 sleep 30s 验过期：同一段代码路径，TTL 为 0 时每次请求都走「未命中」分支。
+function fuelExecStub() {
+  const calls = { log: 0, describe: 0 };
+  return {
+    calls,
+    exec: (cmd, args) => {
+      if (args[0] === 'describe') { calls.describe += 1; return 'v9.9.9\n'; }
+      if (args[0] === 'log') { calls.log += 1; return 'sha1\x1f2026-09-01T00:00:00+00:00\n'; }
+      return '';
+    },
+  };
+}
+
+test('GET /api/sync/status: fuel 走 TTL 缓存 —— 连续 3 次请求只 spawn 一次 git log', async () => {
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'decision:x', kind: 'decision', ts: '2026-09-01T00:00:00Z', source: 'hook', commit: 'sha1', title: 't', why: 'w' },
+  ] });
+  const { calls, exec } = fuelExecStub();
+  const server = createServer(root, { exec });        // 默认 TTL（30s）：三次请求落在同一窗口内
+  const port = await listen(server);
+  try {
+    const bodies = [];
+    for (let i = 0; i < 3; i += 1) bodies.push(await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json());
+    assert.equal(calls.log, 1, `连续 3 次 status 只该 spawn 一次 git log，实测 ${calls.log} 次`);
+    for (const b of bodies) {
+      assertFuelShape(b.fuel);
+      assert.deepEqual(b.fuel, bodies[0].fuel);        // 命中缓存不改变 fuel 的键名/取值（语义零改动）
+    }
+    assert.equal(bodies[0].fuel.window_commits, 1);    // 缓存里存的就是真值，不是空壳
+    assert.equal(bodies[0].fuel.capture_pct, 100);
+  } finally { server.close(); cleanup(); }
+});
+
+test('GET /api/sync/status: TTL 过期（fuelTtlMs=0）→ 每次请求都重新派生，缓存不改变新鲜度语义', async () => {
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'decision:x', kind: 'decision', ts: '2026-09-01T00:00:00Z', source: 'hook', commit: 'sha1', title: 't', why: 'w' },
+  ] });
+  const { calls, exec } = fuelExecStub();
+  const server = createServer(root, { exec, fuelTtlMs: 0 });
+  const port = await listen(server);
+  try {
+    for (let i = 0; i < 3; i += 1) {
+      const b = await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json();
+      assertFuelShape(b.fuel);
+      assert.equal(b.fuel.window_commits, 1);
+    }
+    assert.equal(calls.log, 3, `TTL=0 时每次请求都该重新派生，实测 ${calls.log} 次`);
+  } finally { server.close(); cleanup(); }
+});
+
+// --- 窄修复：版本戳（预算窗口键）的短 TTL 缓存 ---
+// 根因：status 处理里除 fuel 外还有 budgetStatus → versionStamp（lib/cost.js:41）会**同步 spawn 一次
+// `git describe --tags`**；fuel 缓存命中后它成了热路径上唯一的 git 冷启动（实测 hot 仍有 ~850ms）。
+// 做法：只缓存「版本戳」这一个派生结果（派生点仍在 lib/cost.js，D3），把它当 `version` 注入 budgetStatus，
+// 让它跳过内部的 versionStamp 调用——**不**把整个 status 载荷一起缓存（那会把 config / runner_running /
+// last_finalize / used / exceeded 一并冻住 TTL 秒，是语义降级而非单纯取舍），也**不改** budget 的任何子字段。
+// 下面两条分别钉住缓存的两个方向：① 热态零 git spawn；② 过期后版本戳必须真的重取（不是一次定终身）。
+function budgetExecStub(describeValues = ['v9.9.9']) {
+  const calls = { describe: 0, log: 0 };
+  return {
+    calls,
+    exec: (cmd, args) => {
+      if (args[0] === 'describe') {
+        // 连续取值模拟「缓存过期后 repo 出现了新 tag」——用于证明窗口键不会被缓存冻死
+        const v = describeValues[Math.min(calls.describe, describeValues.length - 1)];
+        calls.describe += 1;
+        return `${v}\n`;
+      }
+      if (args[0] === 'log') { calls.log += 1; return 'sha1\x1f2026-09-01T00:00:00+00:00\n'; }
+      return '';
+    },
+  };
+}
+
+const BUDGET_KEYS = ['budget', 'configured', 'dimension', 'exceeded', 'used', 'version'];
+
+test('GET /api/sync/status: 版本戳走 TTL 缓存 —— 连续 3 次请求 describe 与 log 各只 spawn 一次（热态零 git）', async () => {
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'decision:x', kind: 'decision', ts: '2026-09-01T00:00:00Z', source: 'hook', commit: 'sha1', title: 't', why: 'w' },
+  ] });
+  const { calls, exec } = budgetExecStub();
+  const server = createServer(root, { exec });           // 默认 TTL（30s）：三次请求落在同一窗口内
+  const port = await listen(server);
+  try {
+    const bodies = [];
+    for (let i = 0; i < 3; i += 1) bodies.push(await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json());
+    assert.equal(calls.describe, 1, `连续 3 次 status 只该 spawn 一次 git describe，实测 ${calls.describe} 次`);
+    assert.equal(calls.log, 1, `连续 3 次 status 只该 spawn 一次 git log，实测 ${calls.log} 次`);
+    // 缓存命中不改内容：既有 budget 子字段一个不多一个不少，取值与首次一致
+    for (const b of bodies) {
+      assert.deepEqual(Object.keys(b.budget).sort(), BUDGET_KEYS);
+      assert.deepEqual(b.budget, bodies[0].budget);
+      assertFuelShape(b.fuel);
+    }
+    assert.equal(bodies[0].budget.version, 'v9.9.9');    // 缓存里存的是真版本戳，不是空壳
+  } finally { server.close(); cleanup(); }
+});
+
+test('GET /api/sync/status: 版本戳 TTL 过期（versionTtlMs=0）→ 每次请求重取窗口键，缓存不改变新鲜度语义', async () => {
+  const { root, cleanup } = fuelFixture({ journal: [
+    { id: 'decision:x', kind: 'decision', ts: '2026-09-01T00:00:00Z', source: 'hook', commit: 'sha1', title: 't', why: 'w' },
+  ] });
+  const { calls, exec } = budgetExecStub(['v1.0.0', 'v2.0.0', 'v2.0.0']);
+  const server = createServer(root, { exec, versionTtlMs: 0 });
+  const port = await listen(server);
+  try {
+    const versions = [];
+    for (let i = 0; i < 3; i += 1) {
+      versions.push((await (await fetch(`http://127.0.0.1:${port}/api/sync/status`)).json()).budget.version);
+    }
+    assert.equal(calls.describe, 3, `TTL=0 时每次请求都该重取版本戳，实测 ${calls.describe} 次`);
+    assert.deepEqual(versions, ['v1.0.0', 'v2.0.0', 'v2.0.0']);   // 新 tag 在 TTL 外一定会被看见
+  } finally { server.close(); cleanup(); }
+});
+
 test('POST /api/sync/config: 部分更新落盘+读回；非法 400 不落盘；非 local 403', async () => {
   const root = syncFixture();
   const server = createServer(root);

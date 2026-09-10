@@ -257,7 +257,7 @@
   /* ---- 阶段 C 视觉①：引出线注记（正文角标 ↔ 右栏注记，设计 §5.4）---- */
   /* 角标（引出线的正文端）：renderAnchors 产出的 <sup class="anchor-ref">，点它高亮右栏对应注记 */
   #content .anchor-ref { font: 500 10px/1 var(--mono); color: var(--acc); cursor: pointer;
-    margin-left: 2px; padding: 1px 5px; border-radius: 6px;
+    margin-left: 2px; padding: 1px 5px; border-radius: 8px;
     background: color-mix(in srgb, var(--acc) 12%, transparent); }
   #content .anchor-ref:hover { background: color-mix(in srgb, var(--acc) 24%, transparent); }
   #content .anchor-ref:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
@@ -287,6 +287,12 @@
     font: 400 10.5px/1 var(--mono); letter-spacing: .06em; color: var(--dim); }
   #statusline b { color: var(--fg); font-weight: 500; }
   #statusline .live { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); }
+  /* 状态行的「live」呼吸点：**刻意不走 §5.2 的 150–300ms 动效档**，留痕说明理由——
+     那一档说的是「一次状态变化的过渡」时长（transition 的一次性动作），而这里是**常驻**状态指示灯：
+     300ms 的无限循环是频闪（光敏性癫痫风险），不是动效，对齐它反而违反 §5.2 的另外两条
+     （「只动 opacity」「尊重 prefers-reduced-motion」）。
+     2.4s 沿用既有的 lb-pulse 关键帧（纯 opacity、不触发布局），与 #sync-light.busy 的 1.2s 同族——
+     读数灯的时间语言一致，不新造曲线；prefers-reduced-motion: reduce 时由下方媒体查询全局关停。 */
   #statusline .live::before { content: ""; width: 6px; height: 6px; border-radius: 50%;
     background: var(--ok); animation: lb-pulse 2.4s infinite; }
   #statusline .cap-none { color: var(--amber); }
@@ -651,6 +657,12 @@ const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
 const FLASH_MS = 1400;        // 验收 ③：约 1.4 秒后移除高亮
 let flashTimer = null;
 
+// F4「开关检查器」（D8）的判据：**本页有没有注记**，而不是「检查器当前是否可见」。
+// 若判据取 visibility，收起检查器就会把 F4 自己关掉——「收起」成了不可逆的死状态（D8 禁死键）。
+let INSPECTOR_NOTES = [];
+let INSPECTOR_OPEN = false;
+let currentNoteN = null;      // `[` / `]` 的游标：当前定位到第几号注记（切页重置）
+
 function cancelFlash() {
   clearTimeout(flashTimer); flashTimer = null;
   document.querySelectorAll('#inspector .note.flash').forEach(el => el.classList.remove('flash'));
@@ -660,14 +672,58 @@ function renderInspector(notes) {
   const box = document.getElementById('inspector');
   box.innerHTML = '';                              // 重建：先清空（切页不残留）
   cancelFlash();                                   // 重建即撤销上一页遗留的高亮计时器
-  if (!notes.length) { box.hidden = true; return; }
+  INSPECTOR_NOTES = notes;                         // F4 / `[` `]` 的判据（与可见性解耦，见上）
+  currentNoteN = null;                             // 切页游标归零，不带到下一页的编号上
+  if (!notes.length) { box.hidden = true; INSPECTOR_OPEN = false; return; }
   // D7：anchor 逐字原样显示（生成时刻的 file:line）——不做 stale 标记、不重解析、不改写行号。
   box.innerHTML = `<div class="insp-title">引出线注记 · ${notes.length}</div>`
     + notes.map(n => `<div class="note" id="note-${n.n}" data-note-n="${n.n}">`
       + `<span class="note-n">[${n.n}]</span>`
       + `<code class="note-anchor">${escHtml(n.anchor)}</code></div>`).join('');
   box.hidden = false;
+  INSPECTOR_OPEN = true;                           // 每页默认展开（收起是读者在**本页**的手动状态，不跨页继承）
 }
+
+// F4 的开关（D8：「F4 = 聚焦/**开关**检查器」）。收起只是把这一列藏掉——注记模型仍在
+// INSPECTOR_NOTES 里，所以还能再展开；展开时滚进视口（原来是 hidden 的，不滚就等于没开）。
+function openInspector() {
+  if (!INSPECTOR_NOTES.length) return;             // 无注记 → 不展开空栏（验收 ⑥）
+  document.getElementById('inspector').hidden = false;
+  INSPECTOR_OPEN = true;
+}
+
+function closeInspector() {
+  document.getElementById('inspector').hidden = true;
+  INSPECTOR_OPEN = false;
+}
+
+function toggleInspector() {
+  if (INSPECTOR_OPEN) closeInspector();
+  else { openInspector(); document.getElementById('inspector').scrollIntoView({ block: 'nearest' }); }
+  refreshShortcuts();                              // 按钮标题要说实话（展开/收起），否则 UI 在骗人
+}
+
+// D8 后半：`[` / `]` 在注记间跳转（上一条 / 下一条）。
+// 到端点**环绕**：末条再按 `]` 回第一条——否则「按了没反应」正是 D8 要禁的死键形态。
+// 目标注记不在视口内才滚动（block:'nearest' 的语义），并高亮之（与点角标同一条高亮路径）。
+function navNote(dir) {
+  if (!INSPECTOR_NOTES.length) return;
+  const ns = INSPECTOR_NOTES.map(n => n.n);
+  const i = ns.indexOf(currentNoteN);
+  const next = i < 0
+    ? (dir > 0 ? ns[0] : ns[ns.length - 1])        // 还没定位过：向前从第一条、向后从最后一条起
+    : ns[(i + dir + ns.length) % ns.length];
+  currentNoteN = next;
+  openInspector();                                 // 收起时先展开：否则「高亮了一条看不见的注记」
+  refreshShortcuts();
+  flashNote(next);
+  document.getElementById(`note-${next}`)?.scrollIntoView({ block: 'nearest' });
+}
+
+// 输入控件里的方括号是**正文**，不是快捷键（搜索框里打 `[` 不该跳注记）。F1–F5 不受此限：
+// 功能键在输入框里也打不出字符，屏蔽它们只会让快捷键在搜索时失效。
+const isTyping = t => !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'
+  || t.tagName === 'SELECT' || t.isContentEditable);
 
 // 点正文角标 → 对应注记高亮约 1.4s；点别处取消（验收 ③）。
 // 用 document 上的**事件委托**（而非逐角标绑）：正文每次 route() 整块重建，
@@ -692,6 +748,15 @@ function wireInspector() {
     if (!badge) return;
     e.preventDefault();                            // 空格默认滚页；这里它是「按下按钮」
     flashNote(badge.dataset.anchorN);
+  });
+  // D8 后半：`[` `]` 注记间跳转。只在注记存在时生效（INSPECTOR_NOTES 判据，同 F4）。
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key !== '[' && e.key !== ']') return;
+    if (isTyping(e.target)) return;
+    if (!INSPECTOR_NOTES.length) return;           // 无注记 → 不注册（不抢浏览器默认行为）
+    e.preventDefault();
+    navNote(e.key === ']' ? 1 : -1);
   });
 }
 
@@ -929,9 +994,10 @@ const FKEY = {
   },
   F4: {
     // D8：本期检查器只有引出线注记（阶段 C 才有内容）→ 无注记时不注册，避免死键。
-    title: '检查：聚焦引出线注记栏',
-    enabled: () => !document.getElementById('inspector').hidden,
-    run: () => document.getElementById('inspector').scrollIntoView({ block: 'nearest' }),
+    // title 是函数：开关状态变了标题要跟着变（「检查」按下去到底是开还是关，按钮得说清楚）。
+    title: () => (INSPECTOR_OPEN ? '检查：收起引出线注记栏' : '检查：展开引出线注记栏'),
+    enabled: () => INSPECTOR_NOTES.length > 0,     // 判据是「有注记」，不是「当前可见」（收起后仍要能再开）
+    run: () => toggleInspector(),
   },
   F5: {
     // D5：F5 是浏览器刷新键，整页重载会打断阅读 → **恒 preventDefault**（见下方 keydown）；
@@ -950,12 +1016,23 @@ const decisionSection = () => [...document.querySelectorAll('#content h2')]
 // **委托它 .click()**——不复制一份排队逻辑（复制出来的第二套迟早与 route() 里那份漂移）。
 const rewriteButton = () => document.querySelector('#meta button[data-rewrite-page]');
 
+// FKEY 条目的标题：纯字符串是常态；F4 的标题是函数（开/关是两个不同的动作，得分别说）
+const slotTitle = spec => (typeof spec.title === 'function' ? spec.title() : spec.title);
+
+// 快捷键动作的**唯一入口**：鼠标 click 与 F1–F5 键盘路径都汇到这里，再不重复 run() 里的逻辑。
+// 未知键静默返回（静态 markup 与 FKEY 表的键一一对应，走到这里说明表被改漏了，不该抛给用户）。
+function runFkey(key) {
+  const spec = FKEY[key];
+  if (spec) spec.run();
+}
+
 function refreshShortcuts() {
   for (const btn of document.querySelectorAll('#fkeys .fkey')) {
     const spec = FKEY[btn.dataset.fkey];
     const on = !!spec && spec.enabled();
+    const label = spec ? slotTitle(spec) : '';     // F4 的标题随开/关变 → 允许 title 是函数（其余键仍是字符串）
     btn.disabled = !on;
-    btn.title = spec ? (on ? spec.title : `${spec.title}（本页无内容）`) : '';
+    btn.title = spec ? (on ? label : `${label}（本页无内容）`) : '';
   }
   const rb = document.getElementById('rewrite-page');
   const canRewrite = !!rewriteButton();
@@ -967,6 +1044,16 @@ function refreshShortcuts() {
 
 function wireShortcuts() {
   document.getElementById('rewrite-page').onclick = () => rewriteButton()?.click();
+  // 按钮的**唯一动作入口**（审计 🔴#1）。FKEY 里五个键各自写好了 run()，却从没人调用它——
+  // 「定义了 handler 但没接线」正是 D8 要禁的死键：鼠标点没反应，键盘 btn.click() 也只是
+  // 触发一次**没有监听者**的 click，同样没反应。
+  // 用容器上的事件委托（不是逐按钮 .onclick）：静态 markup 里的五个键恒在、不会重建，
+  // 但委托少一处「漏绑一个键」的机会，与 wireSearch/wireInspector 的既有写法一致。
+  document.getElementById('fkeys').addEventListener('click', e => {
+    const btn = e.target.closest?.('.fkey');
+    if (!btn || btn.disabled) return;    // disabled 的键浏览器本就不派发 click，这里再挡一道不绕过 enabled 判定
+    runFkey(btn.dataset.fkey);
+  });
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;    // Ctrl+F5 之类的组合键留给浏览器
     if (!/^F[1-5]$/.test(e.key)) return;
@@ -974,7 +1061,7 @@ function wireShortcuts() {
     const btn = document.querySelector(`#fkeys .fkey[data-fkey="${e.key}"]`);
     if (!btn || btn.disabled) return;                  // 未注册的键不额外抢浏览器默认行为
     e.preventDefault();
-    btn.click();
+    btn.click();                                       // 走上面那条 click 委托 → runFkey：键盘与鼠标**同一条**动作路径
   });
   // 正文 / 页面元数据都是客户端注入的：落地后重刷可用性（只改 disabled/title，不再触发 mutation）
   new MutationObserver(refreshShortcuts).observe(document.getElementById('main'), { childList: true, subtree: true });

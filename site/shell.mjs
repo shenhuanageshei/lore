@@ -411,7 +411,10 @@ export function buildStatusLine({ status = null, manifest = null, queued = 0, no
   const pages_text = `${pageCount === null ? STATUS_UNKNOWN : pageCount} 页`;
   const queue_text = `队列 ${queueCount === null ? STATUS_UNKNOWN : queueCount}`;
   const stamp_text = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
-  const queuedCount = isFiniteNum(queued) ? queued : 0;
+  // D13：排队条数取不到时**不许冒充 0**——「0 条排队请求」是一句假读数（0 是「测出来是零」，
+  // 取不到是「测不出」，混同就是把最危险的失败模式藏起来）。故读不到时整句改报 unknown；
+  // 真正的 0（读得到、就是 0 条）仍原样报 0。
+  const queued_text = isFiniteNum(queued) ? `${queued} 条排队请求` : `排队请求 ${STATUS_UNKNOWN}`;
 
   return {
     capture_state: state,
@@ -427,7 +430,7 @@ export function buildStatusLine({ status = null, manifest = null, queued = 0, no
     queue_count: queueCount,
     queue_hint: queueCount === null
       ? '同步面板：页面索引未就绪'
-      : `打开同步面板：${queueCount} 页待重写 · ${queuedCount} 条排队请求`,
+      : `打开同步面板：${queueCount} 页待重写 · ${queued_text}`,
     budget_text: budgetNotice(status),   // 超限才有字；未配置/未超限为 ''（遥测位不塞噪音）
     // §5.3 的规范一行（不含预算读数——预算在 #statusline 里是独立读数，超限才出现）
     text: [capture_text, rate_text, gap_text, pages_text, queue_text, stamp_text].join(' · '),

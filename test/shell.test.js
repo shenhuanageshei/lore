@@ -879,4 +879,18 @@ test('buildStatusLine: 「队列 N」提示语带上已排队条数（QUEUED_PAG
   const empty = buildStatusLine({ status: null, manifest: { axes: [] }, now: AT_1402 });
   assert.equal(empty.queue_text, '队列 0');                         // manifest 说 0 页落后 = 真值 0（不是 unknown）
   assert.equal(empty.pages_text, '0 页');
+  assert.match(empty.queue_hint, /0 条排队请求/);                    // 读得到的 0 照报 0（别把真值改成 unknown）
+});
+
+test('buildStatusLine: 排队条数取不到 → 提示语不许出现「0 条」（D13：取不到 ≠ 0）', () => {
+  // 唯一调用方目前总传有限数（QUEUED_PAGES.size），但这个默认值的语义必须本来就对——
+  // 否则下个调用方一传 NaN/null/Infinity，提示语就悄悄撒谎「0 条排队请求」。
+  // 注：显式传 undefined 会命中形参默认值 0（那是 API 契约上的「没给 = 0 条」，非本断言的范围）。
+  for (const bad of [NaN, null, Infinity, -Infinity, '2']) {
+    const line = buildStatusLine({ status: { fuel: okFuel }, manifest: STATUS_MANIFEST, queued: bad, now: AT_1402 });
+    assert.equal(line.queue_hint.includes('0 条'), false,
+      `queued=${String(bad)} 时提示语不得出现「0 条」，实际：${line.queue_hint}`);
+    assert.match(line.queue_hint, /排队请求 unknown/);
+    assert.match(line.queue_hint, /1 页待重写/);                      // 页面待重写数（读得到的）仍照报
+  }
 });

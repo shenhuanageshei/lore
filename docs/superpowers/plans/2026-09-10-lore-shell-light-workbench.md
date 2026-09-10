@@ -419,3 +419,13 @@
 - `node --check`：自 `site/index.html` 抽出的内联 module 脚本（1043 行）、`server.js`、两个测试文件均 parse 通过（负控 `const = ;` 正确报错，证明该检查不是恒真）。
 
 **未做 / 已知边界**：跨仓搜索的**实机**路径（per-repo 起服务 + 另一仓 + 浏览器搜索）仍未验证——本环境产不出 headless 浏览器 DOM（§9.4 第 1 条），故「per-repo 下浏览器真能搜到别的仓」只有服务端 + 接线两侧的静态证据；退避窗口取 **30s**（与 `pollTick` 的 15s 同量级、又不至于让读者等下一轮），窗口内的读失败**不再提示**（沿用既有静默降级口径，未新增 UI）。
+
+### 9.10 交付代码评审第五轮修复（2026-09-10，1 🟡）
+
+| # | 级别 | 根因 | 处置（file:line 为修复后位置） |
+|---|---|---|---|
+| 1 | 🟡 | **只读模式下顶部 sync 面板的「全自动」档键是死键**（D8 明令禁止、且全文件其它地方都在防的形态）：`renderSyncLight` 的禁用选择器写成 `#sync-panel .seg button:not([data-mode="auto"])`，于是 `SYNC_API_OK === false`（python 静态服务 / portal 无 API）时「手动」「提醒」被禁用而 **「全自动」保持可点**；点它 `fetch` 得到非 2xx **不抛错** → `catch` 不触发 → 静默重读 status → **界面毫无变化**。与控制台页 `:871-874` 三个键一律挂 `RO_ATTR` 的口径直接矛盾。<br>**为什么当初会这么写（git 考证，非猜测）**：顶部面板落地时（`0662ed5a`）auto 写死 `disabled title="B2 解锁"`，onclick 也显式跳过它——那时绕开 auto 是**对的**（它恒禁用）。后来 `bc0b76e6` 解锁了 auto（markup 去 `disabled`、绑定去跳过），**却漏改这个禁用选择器** → auto 从「恒禁用」变成「只在只读模式下可点」，即只读模式下的死键。核实无剩余语义：`wireSyncConsole` 对三个 `[data-mode]` 一律绑同一处理器、`POST /api/sync/mode` 三档同权、`buildConsoleModel` 无 auto 特殊分支 | `site/index.html:1382-1387`（选择器去掉 `:not([data-mode="auto"])`，三个档位键统一 `b.disabled = !SYNC_API_OK`；title 文案与 `RO_ATTR`、`:1365` 统一为完整提示而非旧的「只读模式」四字。考证结论写进 `:1375-1381` 注释）；`test/shell.test.js:1426-1467`（新增 2 条：抽真实源码在 Node 里跑 `renderSyncLight` 行为——只读模式三键均 `disabled` 且 title 匹配 `/只读模式/`；正常态三键均不 `disabled` 且 title 为空，钉住「行为不变」）。桩的 `querySelectorAll` 只回答「选择器有没有排除 auto」，旧写法原样少返回 auto，**这正是让 bug 被抓住的机制** |
+
+**证据**：`node --test test/shell.test.js test/server.test.js` → **155/155 通过**（修复前 153 → 新增 2 条）；内联 module 脚本（1050 行）与两个测试文件 `node --check` 均 exit 0；**变异对照**：把选择器改回 `:not([data-mode="auto"])` → 只读模式用例按预期失败（正常态用例仍通过，证明两条测的是不同的事），复原后 2/2 通过。
+
+**已知边界**：静态 markup（`site/index.html:370-372`）三个档键本身不带 `disabled`，只读态由 `renderSyncLight` 在 `boot()` 后写上——首屏 JS 执行前的极短窗口内 auto 仍可点。三个键一致，属既有形态，**未改**（彻底消除需在 markup 侧加默认态，会牵动 `renderConsolePage` 同类问题）。

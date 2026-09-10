@@ -1423,6 +1423,49 @@ test('renderStatusLine: manifest 没读到 → 页数/队列读 unknown，不拿
   assert.match(api.doc.getElementById('status-queue').textContent, /队列 0/);
 });
 
+// ---------- 只读模式下的档位键（代码评审 R5 🟡）----------
+// 为什么抽真源码来跑：三个档位键的禁用态是 `renderSyncLight` 在**运行时**写上去的（静态 markup 里
+// 三个 `data-mode` 键都不带 `disabled`），grep 选择器字样只能证明「写了某行」，证明不了「三个键都被禁」
+// ——上一轮的教训正是「验字样只给虚假的通过感」。壳是 SPA、本仓零依赖无 jsdom → DOM 当桩，
+// 抽出来的 renderSyncLight 是真源码；它依赖的纯函数（buildConsoleModel / budgetNotice）照传真实实现。
+function buildShellSyncLight(apiOk) {
+  const doc = fakeDocument();
+  const seg = ['manual', 'notify', 'auto'].map(mode => (
+    { dataset: { mode }, disabled: false, title: '', classList: { toggle() {} } }));
+  // 桩只认「选择器有没有把 auto 档排除在外」这件事：旧写法 `:not([data-mode="auto"])` 会原样少返回
+  // auto —— 于是「auto 在只读模式下没被禁用」这个 bug 会被断言直接抓住；等价的新写法照样返回三个。
+  doc.querySelectorAll = sel => (String(sel).includes('not([data-mode="auto"])')
+    ? seg.filter(b => b.dataset.mode !== 'auto') : seg);
+  const body = [
+    'let SYNC_STATUS = null;',
+    `let SYNC_API_OK = ${apiOk};`,
+    'let MANIFEST = { axes: [] };',
+    sliceShellFn('function renderSyncLight'),
+    'return { renderSyncLight, seg: SEG };',   // new Function 无闭包：抽出的源码看不到本文件的 seg，须按参数注入
+  ].join('\n');
+  const build = new Function('document', 'buildConsoleModel', 'budgetNotice', 'queuedArg', 'renderStatusLine', 'SEG', body);
+  return build(doc, buildConsoleModel, budgetNotice, () => undefined, () => {}, seg);
+}
+
+test('只读模式（SYNC_API_OK=false）→ 顶部面板三个档位键全部 disabled（评审 R5 🟡：auto 不再是死键）', () => {
+  const api = buildShellSyncLight(false);
+  api.renderSyncLight();
+  for (const b of api.seg) {
+    assert.equal(b.disabled, true,
+      `${b.dataset.mode} 档在只读模式下仍可点——fetch 对非 2xx 不抛错 → catch 不触发 → 界面毫无变化（D8 禁止的死键）`);
+    assert.match(b.title, /只读模式/, `${b.dataset.mode} 档缺只读提示（与控制台页 RO_ATTR 口径一致）`);
+  }
+});
+
+test('正常态（SYNC_API_OK=true）→ 三个档位键均可点、无只读提示，行为不变', () => {
+  const api = buildShellSyncLight(true);
+  api.renderSyncLight();
+  for (const b of api.seg) {
+    assert.equal(b.disabled, false, `${b.dataset.mode} 档在正常态被误禁用（三个档位都该可切换）`);
+    assert.equal(b.title, '', `${b.dataset.mode} 档在正常态挂着只读提示`);
+  }
+});
+
 // ---------- 阶段 A 的机检项入库（代码评审 R4 🟡#2）----------
 // 为什么必须搬进 `node --test`：这几条（正文字号/字体栈/13 个 §5.2 token/零外部资源引用）此前只活在
 // 计划文档的手工 `node -e` 命令里，而补这些探针的动机恰恰是「它们可以静默回归」——留在手工命令里，

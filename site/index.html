@@ -1372,9 +1372,16 @@ function renderSyncLight() {
     else if (unqueued === 0) { qa.disabled = true; qa.textContent = `✓ 已排队 ${m.staleTotal} 页`; }
     else { qa.textContent = `✍ 重写排队 (${unqueued})`; }
   }
-  document.querySelectorAll('#sync-panel .seg button:not([data-mode="auto"])').forEach(b => {
+  // 三个档位键同权：只读模式（SYNC_API_OK=false：python 静态服务 / portal 无 API）下**全部**禁用，
+  // 与控制台页三个键一律挂 RO_ATTR 的口径一致。
+  // 这里原带 `:not([data-mode="auto"])`——那是 auto 档「B2 解锁」时代的残留：当年 auto 在 markup 里
+  // 就写死 `disabled title="B2 解锁"`，且 onclick 绑定显式跳过它（`if (b.dataset.mode === 'auto') return // B2`），
+  // 所以只读禁用循环刻意绕开它。bc0b76e 已解锁 auto（markup 去掉 disabled、绑定去掉跳过），
+  // 这个排除条件却留了下来：只读模式下唯独 auto 仍可点，而点它 fetch 到非 2xx 不抛错 → catch 不触发
+  // → 静默重读 status → 界面毫无变化，正是 D8 禁止的死键形态。排除条件已无任何剩余语义，删除。
+  document.querySelectorAll('#sync-panel .seg button').forEach(b => {
     b.disabled = !SYNC_API_OK;
-    b.title = SYNC_API_OK ? '' : '只读模式';
+    b.title = SYNC_API_OK ? '' : '只读模式（portal 或 python server）——本地 /lore:serve --node 可操作';
   });
   // 状态行与 sync 灯同源刷新：两者读的是同一份 SYNC_STATUS / QUEUED_PAGES，不该各刷各的。
   renderStatusLine();

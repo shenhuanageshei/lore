@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
-  CONFIDENCE_LEVELS, EVIDENCE_KINDS, EVIDENCE_SCHEMA_VERSION, anchorsOf, confidenceOf, countEvidence,
+  CONFIDENCE_LEVELS, EVIDENCE_KINDS, EVIDENCE_SCHEMA_VERSION, anchorLocation, anchorsOf, confidenceOf, countEvidence,
   evidenceEntries, evidenceReport, formatEvidence, isEvidenceAtom,
 } from '../lib/evidence.js';
 import { appendAtom } from '../lib/journal.js';
@@ -123,6 +123,22 @@ test('无锚点 → 显式标「未验证」（不变量⑧）；有锚点不标
     assert.deepEqual(anchorsOf({ refs: { anchors: ['a', '', '  ', 42] } }), ['a']);
     assert.deepEqual(anchorsOf({ refs: {} }), []);
     assert.deepEqual(anchorsOf(null), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('定位口径：行号不参与判定 —— 带行号的锚点只给文件级定位，行号显式标注可能已漂移', () => {
+  // 纯函数：行号被剥出定位，只保留文件级 + 显式说明
+  assert.equal(anchorLocation('runAuto @ lib/runner.js:77'), 'runAuto @ lib/runner.js（行号 77 为生成时记录，可能已漂移）');
+  assert.equal(anchorLocation('runAuto @ lib/runner.js'), 'runAuto @ lib/runner.js');
+  assert.equal(anchorLocation('x @ a.js:1'), 'x @ a.js（行号 1 为生成时记录，可能已漂移）');
+  assert.equal(anchorLocation('没有 @ 的自由文本'), '没有 @ 的自由文本');
+  const root = fixture();
+  try {
+    const report = evidenceReport(root, { now: NOW });
+    // 人读渲染：定位不把旧行号当「确切位置」——实测全库 5 个带行号锚点 100% 漂移
+    assert.match(formatEvidence(report), /定位 runAuto @ lib\/runner\.js（行号 77 为生成时记录，可能已漂移）/);
+    // --json 保留原始字符串（账本如实显示记录里写了什么；契约键集不动）
+    assert.deepEqual(report.entries.find(e => e.id === 'decision:d1').anchors, ['runAuto @ lib/runner.js:77']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

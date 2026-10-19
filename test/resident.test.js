@@ -141,10 +141,14 @@ test('residentSection: agent 代捕获约定（kind:decision 的 draft 原子 + 
   assert.match(s, /\`kind:decision\`/);
   assert.match(s, /\*\*draft\*\*/);
   assert.match(s, /\`why\` 写清因果/);
-  assert.match(s, /\`refs.anchors\` 挂源码锚点 \`fn @ file:line\`/);
+  assert.match(s, /\`refs.anchors\` 挂源码锚点 \`fn @ file\`/);
   assert.match(s, /lore note --draft --title/);          // CLI 示例可直接照抄
-  assert.match(s, /--anchors "runAuto @ lib\/runner.js:77"/);
+  assert.match(s, /--anchors "runAuto @ lib\/runner\.js"/);
   assert.match(s, /只有 owner 的直接动作能产生 confirmed/);   // 不变量⑦ 的口径写进约定
+  // 锚点纪律（2026-10-19 owner 定案）：resident 区块里不得再出现带行号的锚点形态。
+  // 实测全库 5 个带行号锚点 100% 漂移（+9 到 +139 行）——行号是零价值信息。
+  // 这条断言防的是「约定文案里又长出 :line 形态」：它不检查具体串，只钉住「不许带行号」。
+  assert.doesNotMatch(s, /@ [^\s`"]+:\d+/);
 });
 
 test('同源：CLAUDE.md / AGENTS.md 的 resident 区块除 syncHint 外逐字一致', () => {

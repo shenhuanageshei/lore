@@ -1,1 +1,17 @@
+# 行尾统一 LF —— Windows checkout 不再把源码变成 CRLF。
+#
+# 三条理由（都是 2026-10-19 在 Windows 上实测踩出来的，不是洁癖）：
+#   ① 带 shebang 的文件（lib/cli.js、scripts/*.mjs）在 POSIX 上，CRLF 会让 shebang 失效
+#      （`#!/usr/bin/env node\r` 解释器收到的是 "node\r"）——这会让 npm bin shim 选错解释器。
+#   ② core.autocrlf=true 会让「逐字比对型」断言无端变红：shebang 断言
+#      （test/cli.test.js）读首行时拿到的是 "…node\r"，撞上正则的 $ 锚点。
+#      断言的意图是「首行是 node shebang」，不是「首行没有任何 CR」——文件被 checkout
+#      改坏了，测试没错。
+#   ③ journal 的追加写的是 '\n'（LF，见 lib/journal.js appendAtom）。存量文件是 CRLF 时，
+#      往老文件追加会得到**混合行尾**——ndjson 还要跨机 merge=union，行尾不一致迟早打架。
+#
+# text=auto：git 自动判文本/二进制；eol=lf：工作区一律 LF（Windows 也不例外）。
+* text=auto eol=lf
+
+# journal 是事实源，跨机各自 commit 不冲突（append-only 的 ndjson）。
 .lore/journal/**/*.ndjson merge=union

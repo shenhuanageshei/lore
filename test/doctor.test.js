@@ -428,6 +428,31 @@ test('闸门：捕获率低于 X → 非零退出 + 醒目告警 + --json gate �
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('doctor --now：注入时钟——断流天数按注入值算，不依赖当天日期', () => {
+  const dir = gateRepo([DECISION, HOOK_NOW]);      // 最后一次捕获 2026-09-10
+  try {
+    // 注入 2026-09-10 → 断流 0 天 → 闸门过。
+    // （实现前这条必红：--now 未实现时走真实时钟，2026-10-10 之后就是 39d > 30d → exit 1 —— 那正是本用例的由来）
+    const sink = [];
+    assert.equal(main(['doctor', '--gap-days-max', '30', '--now', NOW.toISOString(), '--root', dir],
+      { cwd: ROOT, out: s => sink.push(s), err: s => sink.push(s) }), 0);
+    assert.match(sink.join('\n'), /gate\s+ok\b/);
+    // 同一份 journal，只把时钟推到 2026-10-20 → 断流 40 天 > 30 → 闸门红（证明读数真的跟注入值走）
+    const sink2 = [], err2 = [];
+    assert.equal(main(['doctor', '--gap-days-max', '30', '--now', '2026-10-20T00:00:00Z', '--root', dir],
+      { cwd: ROOT, out: s => sink2.push(s), err: s => err2.push(s) }), 1);
+    assert.match(err2.join('\n'), /gap 40d > 30d/);
+    // --now 给了却没值 → 用法错误（绝不静默回落到真实时钟：那会让依赖日期的断言随日历自己变红）
+    const bad = [];
+    assert.equal(main(['doctor', '--root', dir, '--now'], { cwd: ROOT, out: s => bad.push(s), err: s => bad.push(s) }), 1);
+    assert.match(bad.join('\n'), /--now requires <iso>/);
+    // 解析不了的日期 → 明确报错（同样不静默回落成真实时钟）
+    const bad2 = [];
+    assert.equal(main(['doctor', '--root', dir, '--now', 'not-a-date'], { cwd: ROOT, out: s => bad2.push(s), err: s => bad2.push(s) }), 1);
+    assert.match(bad2.join('\n'), /--now requires <iso> \(unparseable date\)/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('闸门：断流超过 N 天 → 非零退出；未超阈值 → ok 且 exit 0', () => {
   const stale = gateRepo([DECISION, HOOK_OLD]);
   const fresh = gateRepo([DECISION, HOOK_NOW]);
@@ -436,12 +461,12 @@ test('闸门：断流超过 N 天 → 非零退出；未超阈值 → ok 且 exi
     assert.equal(r.capture.gapDays, 252);                      // 2026-01-01 → 09-10
     assert.deepEqual(r.gate, { ok: false, reason: 'gap 252d > 30d' });
     const sink = [];
-    assert.equal(main(['doctor', '--gap-days-max', '30', '--root', stale], { cwd: ROOT, out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.equal(main(['doctor', '--gap-days-max', '30', '--now', NOW.toISOString(), '--root', stale], { cwd: ROOT, out: s => sink.push(s), err: s => sink.push(s) }), 1);
 
     const ok = diagnose(fresh, { now: NOW, gate: { gapDaysMax: 30 } });
     assert.deepEqual(ok.gate, { ok: true, reason: 'ok' });
     const sink2 = [];
-    assert.equal(main(['doctor', '--gap-days-max', '30', '--root', fresh], { cwd: ROOT, out: s => sink2.push(s), err: s => sink2.push(s) }), 0);
+    assert.equal(main(['doctor', '--gap-days-max', '30', '--now', NOW.toISOString(), '--root', fresh], { cwd: ROOT, out: s => sink2.push(s), err: s => sink2.push(s) }), 0);
     assert.match(sink2.join('\n'), /gate\s+ok\b/);
   } finally {
     rmSync(stale, { recursive: true, force: true });
@@ -457,10 +482,10 @@ test('闸门：阈值来自 .lore/config.yml 的 doctor: 子块（CLI 旗标可�
     const r = diagnose(dir, { now: NOW });
     assert.deepEqual(r.gate, { ok: false, reason: 'gap 252d > 3d' });
     const sink = [];
-    assert.equal(main(['doctor', '--json', '--root', dir], { cwd: ROOT, out: s => sink.push(s), err: s => sink.push(s) }), 1);
+    assert.equal(main(['doctor', '--json', '--now', NOW.toISOString(), '--root', dir], { cwd: ROOT, out: s => sink.push(s), err: s => sink.push(s) }), 1);
     // CLI 旗标覆盖 config（把断流上限放宽 → 闸门转 ok）
     assert.deepEqual(diagnose(dir, { now: NOW, gate: { gapDaysMax: 365 } }).gate, { ok: true, reason: 'ok' });
-    assert.equal(main(['doctor', '--gap-days-max', '365', '--root', dir], { cwd: ROOT, out: () => {}, err: () => {} }), 0);
+    assert.equal(main(['doctor', '--gap-days-max', '365', '--now', NOW.toISOString(), '--root', dir], { cwd: ROOT, out: () => {}, err: () => {} }), 0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

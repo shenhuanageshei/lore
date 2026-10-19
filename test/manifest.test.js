@@ -343,8 +343,19 @@ test('countCommitsSince scopes to a pathspec', () => {
     execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'base'], { cwd: root, stdio: 'pipe' });
     const base = git('rev-parse', '--short', 'HEAD').toString().trim();
     // 一个 commit 动 a/，一个动 b/
-    execFileSync('bash', ['-c', 'mkdir -p a b && echo x > a/f && git add a/f && git commit -q -m a'], { cwd: root, stdio: 'pipe' });
-    execFileSync('bash', ['-c', 'echo y > b/f && git add b/f && git commit -q -m b'], { cwd: root, stdio: 'pipe' });
+    // 一个 commit 动 a/，一个动 b/。
+    // 纯 Node + git，**不经 shell**——原来的 `bash -c` 在 Windows 上会踩两个坑：
+    //   ① PATH 上的 bash 可能是 WSL 的残缺中继壳（execvpe(/bin/bash) 失败 → 夹具根本建不起来）；
+    //   ② WSL 进程会占住 CWD 句柄 → finally 的清理报 EPERM，**把真正的失败原因盖掉**。
+    // 2026-10-19 实测：Windows 上这条一直红，红的不是断言而是夹具（Linux/macOS 上 shell 可用才绿）。
+    mkdirSync(join(root, 'a'), { recursive: true });
+    writeFileSync(join(root, 'a', 'f'), 'x');
+    git('add', 'a/f');
+    git('commit', '-q', '-m', 'a');
+    mkdirSync(join(root, 'b'), { recursive: true });
+    writeFileSync(join(root, 'b', 'f'), 'y');
+    git('add', 'b/f');
+    git('commit', '-q', '-m', 'b');
     const count = makeCountCommitsSince(root);
     assert.equal(count(base), 2);              // 全仓：2 个 commit
     assert.equal(count(base, ['a']), 1);       // 只数动过 a/ 的：1

@@ -24,4 +24,10 @@ journal:
   hook: true                 # post-commit hook 已装（每 commit 写 journal 骨架原子）
   mine: [commits, changelog, claude_md_pitfalls]
 
+doctor:                     # 捕获闸门（doctor: 子块）——配了就生效，doctor 不通过则 exit 1
+  capture_rate_min: 5        # 窗口捕获率下限（百分数 0–100）：最近 N 个提交里的真实决策占比
+  gap_days_max: 30           # 断流上限（天）：距上次捕获超过这个天数就判红
+  # 这两条是 2026-10-19 补的——之前闸门没配，捕获断了 38 天（hook 没装）也没人知道。
+  # 数字来自 ② 期开工闸门同一套口径；改阈值只改这里，CLI 旗标可临时覆盖。
+
 # resident: true             # CLAUDE.md 注入 + .mcp.json 注册开关（false 关；详见 README agent 常驻）

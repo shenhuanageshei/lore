@@ -335,7 +335,7 @@ export async function handleApi(root, req, res, pathname, { spawnFn = spawn, rep
       writeSyncMode(join(root, '.state'), mode);   // 非法值 throw → 400
       return sendJson(res, 200, { ok: true, mode });
     } catch {
-      return sendJson(res, 400, { error: 'invalid mode (B1: manual|notify; auto lands in B2)' });
+      return sendJson(res, 400, { error: 'invalid mode (manual|notify|auto)' });
     }
   }
 

@@ -95,6 +95,24 @@ test('axisPrompt: theme/flow 含排版分层要求（小标题/表格，杜绝�
   assert.match(axisPrompt({ axis: 'flow', path: 'flow/x.md' }), /小标题|分层|表格/);
 });
 
+test('axisPrompt: lint 判缺图的轴（component/flow）必须在 prompt 里要求出图', () => {
+  // 与 lib/lint.js 的 lintMissingDiagram 同口径：component/flow 页缺 mermaid → lint 报红。
+  //
+  // 钉这条是因为踩过：component 轴的 prompt 漏了出图要求（flow/HOME 都有）→ auto 档重写
+  // component 鸟瞰页必然不带图 → lint 报红 → 壳徽标提示排队 → auto 档再重写 → 还是没图。
+  // 自我破坏循环（2026-10-19 实测：mal-analyze-cli 的 mal_analyze.md / server.md 被 auto 档
+  // 重写后丢了图；threat-intel 的 195 页缺图多半同源）。
+  //
+  // 不只钉「提到 mermaid」——还钉住约束本身：节点数区间 + 标签里不许裸 " / <。
+  // 少一句约束就可能画出 3 节点的图或带裸引号的标签（lint 的 mermaid 检查会报）。
+  for (const axis of ['component', 'flow']) {
+    const p = axisPrompt({ axis, path: `${axis}/x.md` });
+    assert.match(p, /mermaid/, `${axis} 轴 prompt 必须要求出图`);
+    assert.match(p, /5.{0,3}15|5 到 15/, `${axis} 轴 prompt 必须给节点数区间`);
+    assert.match(p, /裸|" |<|引号/, `${axis} 轴 prompt 必须给标签的转义约束`);
+  }
+});
+
 test('axisPrompt: page.instruction 注入「额外要求」段；无指令不变（重写带意图）', () => {
   const withInstr = axisPrompt({ axis: 'component', path: 'component/x.md', instruction: '精简概览段，加个调用例子' });
   assert.match(withInstr, /额外要求/);

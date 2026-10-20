@@ -3,6 +3,40 @@
 All notable changes to **lore** are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [Unreleased]
+
+**三处静默故障 + 一处自我破坏循环**（2026-10-19 → 10-20 的排查与修复）
+
+- **auto 档在 main 分支上「每页必失败」**（`lib/backend.js`）：claude 调用的 argv 顺序是
+  `['-p', '--allowedTools', …, '--disallowedTools', …, prompt]` —— **prompt 排在可变参数旗标之后**。
+  `--disallowedTools` 是可变参数，prompt 被逐个空格切开当工具名校验 → claude 拒启，报
+  `Permission deny rule "你是" matches no known tool`。**这条 bug 在 main 上从 2026-07-19 活到 2026-10-19**
+  （修复提交 `cb277d9` 写了但从未合进 main，直到 10-19 的一次 pull 才第一次进来），
+  期间把 `mal-analyze-cli` 的自动重写打瘫 **75 天、27655 次**。已把 prompt 移到 `-p` 之后。
+- **`component` 轴的 prompt 漏了「出图」要求**（`lib/backend.js` `axisPrompt`）：`flow`/`HOME` 轴都写了出图，
+  只有 component 轴没写；而 `lint` 的 `lintMissingDiagram` 对**所有** component/flow 页强制要求 mermaid。
+  → **自我破坏循环**：auto 档重写 component 鸟瞰页必然抹掉图 → lint 报红 → 壳徽标提示排队 →
+  auto 档再重写 → 永远缺图。已把出图要求抽成 `DIAGRAM_NOTE` 由 component/flow 共用
+  （含 5–15 节点区间与「标签里不许裸 `"` / `<`」的约束），并加测试把
+  「lint 判缺图的轴必须在 prompt 里要求出图」钉死。
+- **doctor 的时间炸弹**（`lib/cli.js`）：断流天数按真实时钟算，而测试夹具把「现在」写死 2026-09-10
+  → 2026-10-10 之后那条用例必然变红。新增 `--now <iso>` 注入「现在」；给了却没值 / 解析不了
+  → 用法错误 exit 1，**绝不静默回落成真实时钟**（回落 = 注入被悄悄忽略 = 本仓最忌的「安静地不工作」）。
+  缺省行为不变。
+- **`sync/mode` 的 400 文案还停在 B1 口径**（`server.js`）：文案说「auto 非法」，而 `lib/syncstate.js` 的
+  `MODES` 早已放行 auto。用户在把一个**合法**的 mode 改错时看到「auto 非法」的提示。已与 `syncstate.js` 对齐。
+- **行尾统一 LF**（`.gitattributes`）：`core.autocrlf=true` 把源码 checkout 成 CRLF，带 shebang 的文件
+  （`lib/cli.js`、`scripts/*.mjs`）在 POSIX 上失效，逐字比对型断言也会无端变红。
+  加 `* text=auto eol=lf`；仓库无 .cmd/.bat/.ps1 等必须 CRLF 的文件，无副作用。
+- **锚点口径统一到文件级**（owner 2026-10-19 定案）：实测全库 5 个带行号的锚点 **100% 漂移**（+9 到 +139 行），
+  文件级锚点 0 个——行号是零价值信息。`lib/resident.js` 的约定文案改成 `fn @ file`（这是约定的**唯一源头**，
+  CLAUDE.md / AGENTS.md 同源渲染）、`lib/evidence.js` 的账本人读渲染只给文件级定位并显式标注
+  「行号 N 为生成时记录，可能已漂移」、`test/resident.test.js` 加一条**行为**断言（不许再出现带行号形态）。
+- **捕获闸门**（`.lore/config.yml`）：配 `capture_rate_min: 5` / `gap_days_max: 30`。此前闸门是
+  「未配置阈值 → 不阻断」= 仪表没接——本机 post-commit hook 一直没装，捕获断了 38 天都没人知道。
+
+**测试**：`node --test` 856 项 / 856 通过 / 0 失败（此前 854 项 / 850 通过 / 4 失败）。
+
 ## [0.12.0] — 2026-09-10
 
 **壳：浅色精密工作台**（设计 §5 落地；计划 `2026-09-10-lore-shell-light-workbench.md`）

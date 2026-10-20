@@ -32,6 +32,14 @@ All notable changes to **lore** are documented here. Format loosely follows
   2026-10-20 实测（threat-intel）：747 条原子全写在主仓根（且未被 git 跟踪、随时会丢），
   wiki 一条也读不到，页面上的「决策史」只有 2 条，而真相全在隔壁目录躺着。
   修法：桩改用 init 时的 repoRoot **绝对路径**（`repoRoot` 缺省时保留旧写法，兼容既有调用方）。
+- **新增 dsh 后端**（`lib/backend.js`）：auto 档不再依赖 Claude Code。`dsh headless <task>` 是 DeepSeek
+  Harness 的 headless 模式（"answer one task, print the result, and exit"），与其它后端同一契约：
+  prompt 进、整页 markdown 出（stdout）、诊断走 stderr。三个实现要点：**prompt 走 stdin**（不进命令行
+  → 零转义、零 32K 上限、零注入面）· **shell: true**（Windows 上 dsh 是 .cmd，execFile 跑不了）·
+  **凭证兜底**（`DEEPSEEK_API_KEY` 不在环境里时从 `~/.dsh/.credentials.yaml` 的 refs 段读）。
+  另：**stderr 只取尾部 6 行**喂给 `classify`——dsh 把几百行 reasoning 打到 stderr，整段喂过去会被
+  噪音里的偶然字样误判成 auth 类，该 failover 的不 failover。探测序改为 `dsh` 优先；
+  config 的 `backend` 字段仍可钉死具体后端。端到端实测 245.8s/页（claude 实测 228–594s/页，同形）。
 - **行尾统一 LF**（`.gitattributes`）：`core.autocrlf=true` 把源码 checkout 成 CRLF，带 shebang 的文件
   （`lib/cli.js`、`scripts/*.mjs`）在 POSIX 上失效，逐字比对型断言也会无端变红。
   加 `* text=auto eol=lf`；仓库无 .cmd/.bat/.ps1 等必须 CRLF 的文件，无副作用。

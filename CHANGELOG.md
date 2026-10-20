@@ -49,8 +49,17 @@ All notable changes to **lore** are documented here. Format loosely follows
   「行号 N 为生成时记录，可能已漂移」、`test/resident.test.js` 加一条**行为**断言（不许再出现带行号形态）。
 - **捕获闸门**（`.lore/config.yml`）：配 `capture_rate_min: 5` / `gap_days_max: 30`。此前闸门是
   「未配置阈值 → 不阻断」= 仪表没接——本机 post-commit hook 一直没装，捕获断了 38 天都没人知道。
+- **跨 root 同基名 deep 会丢掉一页的源范围**（`lib/lint.js` `componentScopes` + `lib/sync.js`
+  `planSync`/`finalizeSync`）：`config.deep` 里两个不同 root 下的同名模块（如 `m3_nlp/pipeline.py` 与
+  `m4_report/pipeline.py`）解析出**同一个页 id** `component/pipeline.md`，而「页 → 源范围」是
+  **last-wins 覆盖** → 只登记一个源。后果链：另一个源改动时，lint 不报 stale、壳徽标显示「最新」、
+  该页也不进重写工单 → **合并页静默失鲜**（内容过期但没人知道）。真实事故：threat-intel 的
+  `component/pipeline.md` 正是这种合并页。另：`planSync` 还会给同一页产出**两条同 path 工单**，
+  白吃 `max_pages` 名额。修法：`lib/source.js` 新增 `groupDeepEntriesByPage`（一页 ↔ 一组源文件），
+  三处口径统一取**并集**；工单加 `sourceFiles` 字段并对同一页只产一条；后端 prompt 的「源码入口」
+  改为直接列源文件（比「属于哪个目录」更能省掉 LLM 瞎找）。
 
-**测试**：`node --test` 856 项 / 856 通过 / 0 失败（此前 854 项 / 850 通过 / 4 失败）。
+**测试**：`node --test` 866 项 / 866 通过 / 0 失败（此前 862 项 / 862 通过 / 0 失败，本轮 +4 条行为断言）。
 
 ## [0.12.0] — 2026-09-10
 

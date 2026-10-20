@@ -818,6 +818,8 @@ test('finalize: 删页后 GC 掉孤儿指纹', () => {
 
 // --- incremental planSync (Task 5) ---
 import { planSync as pl } from '../lib/sync.js';
+import { parseConfigDeep as pcd } from '../lib/config.js';
+import { componentScopes as cs } from '../lib/lint.js';
 
 test('planSync 增量：未动 code_root 的 component 页跳过，动了的入 worklist', () => {
   const r = fzRepo();
@@ -968,6 +970,73 @@ test('planSync resolves Python and nested deep worklist metadata', () => {
       'mal_analyze/native_enrichment/startup_paths.py',
     ]);
     assert.deepEqual(plan.configIssues, []);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+// --- 跨 root 同基名 deep（真实案例：m3_nlp/pipeline.py + m4_report/pipeline.py → 同一页 component/pipeline.md）---
+// 事故链：同基名跨 root 抢同一个页 id → 若「页 → 源范围」是 last-wins 覆盖，只登记一个源 →
+// 另一个源改动时该页既不报 stale 也不进重写工单 → 合并页静默失鲜（内容过期但没人知道）。
+function fzRepoDeepCrossRootSameName() {
+  const root = mkN(jN(tmpN(), 'lore-deep-crossroot-'));
+  const git = (...a) => exN2('git', a, { cwd: root, stdio: 'pipe' }).toString().trim();
+  git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  mdN(jN(root, 'm3_nlp'), { recursive: true });
+  wfN(jN(root, 'm3_nlp', 'pipeline.py'), 'P1 = 1\n');
+  mdN(jN(root, 'm4_report'), { recursive: true });
+  wfN(jN(root, 'm4_report', 'pipeline.py'), 'P2 = 1\n');
+  const lore = jN(root, '.lore');
+  mdN(jN(lore, 'wiki', 'component'), { recursive: true });
+  mdN(jN(lore, 'journal'), { recursive: true });
+  mdN(jN(lore, '.state'), { recursive: true });
+  wfN(jN(lore, 'config.yml'),
+    'axes:\n  component:\n    code_roots: [m3_nlp, m4_report]\n    deep:\n      m3_nlp: [pipeline]\n      m4_report: [pipeline]\n');
+  exN2('git', ['add', '-A'], { cwd: root, stdio: 'pipe' });
+  exN2('git', ['commit', '-q', '-m', 'init'], { cwd: root, stdio: 'pipe' });
+  return { root, loreDir: lore, git };
+}
+
+test('lint scope: 跨 root 同基名 deep → 一页的源范围覆盖两个源（不 last-wins 丢覆盖）', () => {
+  const r = fzRepoDeepCrossRootSameName();
+  try {
+    const deep = pcd(rdN(jN(r.loreDir, 'config.yml'), 'utf8'));
+    const scopes = cs(['m3_nlp', 'm4_report'], deep, r.root);
+    assert.deepEqual(scopes.get('pipeline').slice().sort(),
+      ['m3_nlp/pipeline.py', 'm4_report/pipeline.py']);
+  } finally { rmN(r.root, { recursive: true, force: true }); }
+});
+
+// 两个源都要测：last-wins 恰好保留哪一个取决于条目顺序，只测一个会假绿。
+for (const changed of ['m3_nlp/pipeline.py', 'm4_report/pipeline.py']) {
+  test(`finalizeSync: 跨 root 同基名 deep → 合并页 stale 覆盖两个源（改 ${changed} 也报脏）`, () => {
+    const r = fzRepoDeepCrossRootSameName();
+    try {
+      for (const id of ['m3_nlp', 'm4_report', 'pipeline']) {
+        wfN(jN(r.loreDir, 'wiki', 'component', `${id}.md`),
+          `---\ntitle: ${id}\nsummary: s\n---\n# component: ${id}\n\n## Current architecture\n\nv1\n`);
+      }
+      fz(r.loreDir, '2026-08-03T00:00:00Z');                 // 盖章：code_sha = commit A
+      const shaA = r.git('rev-parse', '--short', 'HEAD');
+      wfN(jN(r.root, changed), 'CHANGED = 2\n');
+      exN2('git', ['commit', '-aqm', 'touch ' + changed], { cwd: r.root, stdio: 'pipe' });
+      fz(r.loreDir, '2026-08-03T01:00:00Z');                 // 正文未变 → code_sha 仍为 A
+      const manifest = JSON.parse(rdN(jN(r.loreDir, 'wiki', '.manifest.json'), 'utf8'));
+      const page = manifest.axes.find(a => a.id === 'component').pages.find(p => p.id === 'pipeline');
+      assert.equal(page.code_sha, shaA);
+      assert.ok(page.stale >= 1,
+        `改 ${changed} 后 component/pipeline.md 应报脏，实际 stale=${page.stale}`);
+    } finally { rmN(r.root, { recursive: true, force: true }); }
+  });
+}
+
+test('planSync: 跨 root 同基名 deep → 同一页只产一条工单 + 工单源范围含两个源', () => {
+  const r = fzRepoDeepCrossRootSameName();
+  try {
+    const plan = pl(r.loreDir, { all: true });
+    const items = plan.worklist.filter(w => w.kind === 'deep' && w.id === 'pipeline');
+    assert.equal(items.length, 1,
+      '同一页只能有一条工单——两条会让 auto 档重复重写同一页，还白吃 max_pages 名额');
+    assert.deepEqual(items[0].sourceFiles.slice().sort(),
+      ['m3_nlp/pipeline.py', 'm4_report/pipeline.py']);
   } finally { rmN(r.root, { recursive: true, force: true }); }
 });
 

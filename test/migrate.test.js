@@ -72,6 +72,27 @@ test('alignHookStub: absent → installed；老内容含 MARKER → refreshed；
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('alignHookStub: 桩里传 init 时的 repoRoot 绝对路径（不猜 git toplevel）', () => {
+  // 场景：/lore:init 跑在 git 仓库的**子目录**里 → .lore/ 在子目录，但 `git rev-parse
+  // --show-toplevel` 指到主仓根。若桩在运行时猜 git 根，hook 就把原子写到**另一个 .lore/**
+  // 里，而 wiki 读的是子目录那份 → 决策史永远是空的（捕获没断，但页面读不到）。
+  //
+  // 2026-10-20 实测（threat-intel）：747 条原子全写在主仓根，wiki 一条也读不到——
+  // 页面上的「决策史」只有 2 条，而真相全在隔壁目录躺着。
+  const root = tmp();
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    const sub = join(root, 'sub', 'proj');
+    mkdirSync(sub, { recursive: true });
+    const r = alignHookStub(sub, 'D:/engine/lib/hook.js', 'journal:\n  hook: true\n', { install: true });
+    assert.equal(r.status, 'installed');
+    const stub = readFileSync(join(root, '.git', 'hooks', 'post-commit'), 'utf8');
+    assert.doesNotMatch(stub, /git rev-parse --show-toplevel/, '桩不得在运行时猜 git 根（子目录 init 时会写错 .lore）');
+    const subForward = sub.replace(/\\/g, '/');
+    assert.ok(stub.includes(subForward), '桩必须含 repoRoot 绝对路径（forward-slash）：' + subForward);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('alignResidentAssets: 首装两资产+记 resident:install；删除后 applied → 不复活；老路径条目 → refreshed', () => {
   const root = tmp();
   try {

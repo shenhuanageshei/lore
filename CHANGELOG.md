@@ -25,6 +25,13 @@ All notable changes to **lore** are documented here. Format loosely follows
   缺省行为不变。
 - **`sync/mode` 的 400 文案还停在 B1 口径**（`server.js`）：文案说「auto 非法」，而 `lib/syncstate.js` 的
   `MODES` 早已放行 auto。用户在把一个**合法**的 mode 改错时看到「auto 非法」的提示。已与 `syncstate.js` 对齐。
+- **hook 桩在 git 仓库的子目录里 init 时会写错 `.lore`**（`lib/migrate.js` `renderHookStub`）：桩原来用
+  `$(git rev-parse --show-toplevel)` 在运行时猜仓库根，而 `.lore/` 的位置由 **init 时的 repoRoot** 决定。
+  两者不一致时（`/lore:init` 跑在子目录里），hook 把原子写到**另一个 `.lore/`**——捕获没断，但
+  wiki 读的是子目录那份 → **页面的决策史永远是空的**。
+  2026-10-20 实测（threat-intel）：747 条原子全写在主仓根（且未被 git 跟踪、随时会丢），
+  wiki 一条也读不到，页面上的「决策史」只有 2 条，而真相全在隔壁目录躺着。
+  修法：桩改用 init 时的 repoRoot **绝对路径**（`repoRoot` 缺省时保留旧写法，兼容既有调用方）。
 - **行尾统一 LF**（`.gitattributes`）：`core.autocrlf=true` 把源码 checkout 成 CRLF，带 shebang 的文件
   （`lib/cli.js`、`scripts/*.mjs`）在 POSIX 上失效，逐字比对型断言也会无端变红。
   加 `* text=auto eol=lf`；仓库无 .cmd/.bat/.ps1 等必须 CRLF 的文件，无副作用。

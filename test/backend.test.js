@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { claudeBackend, codexBackend, opencodeBackend, backendFor, detectAvailableBackends, resolveBackendChain, BackendError } from '../lib/backend.js';
+import { claudeBackend, codexBackend, opencodeBackend, dshBackend, backendFor, detectAvailableBackends, resolveBackendChain, BackendError } from '../lib/backend.js';
+import { EventEmitter } from 'node:events';
 
 const okExec = (stdout = 'v1.0.0') => (cmd, args, opts, cb) => cb(null, stdout, '');
 const missingExec = () => (cmd, args, opts, cb) => { const e = new Error('spawn ENOENT'); e.code = 'ENOENT'; cb(e, '', ''); };
@@ -87,16 +88,98 @@ test('opencodeBackend: opencode run + stderr 截断', async () => {
 
 test('detectAvailableBackends: binary 缺/provider 挂都跳过', async () => {
   const allOk = okExec();
-  assert.deepEqual(await detectAvailableBackends({ exec: allOk }), ['claude', 'codex', 'opencode']);
+  // 探测序 = BACKEND_ORDER：dsh 优先（owner 2026-10-19 定：auto 档不再默认走 claude code）
+  assert.deepEqual(await detectAvailableBackends({ exec: allOk }), ['dsh', 'claude', 'codex', 'opencode']);
   const noCodexLogin = (cmd, args, opts, cb) => {
     if (cmd === 'codex' && args[0] === 'login') return cb(new Error('exit 1'), '', 'not logged in');
     cb(null, 'v1', '');
   };
-  assert.deepEqual(await detectAvailableBackends({ exec: noCodexLogin }), ['claude', 'opencode']);
+  assert.deepEqual(await detectAvailableBackends({ exec: noCodexLogin }), ['dsh', 'claude', 'opencode']);
   assert.deepEqual(await detectAvailableBackends({ exec: missingExec() }), []);
   let seenTimeout = 0;
   await detectAvailableBackends({ exec: (cmd, args, opts, cb) => { seenTimeout = opts.timeout; cb(null, 'v1', ''); } });
   assert.ok(seenTimeout >= 20000, `探测预算需容 CLI 冷启动（实测 7.5s），实为 ${seenTimeout}`);
+});
+
+// dsh：DeepSeek Harness 的 headless 模式。fake spawn 桩——记录 argv/opts，并在 stdin.end 时回吐 stdout。
+function fakeDshSpawn({ stdout = 'junk\n---\ntitle: t\n---\nbody', stderr = '', code = 0, onStdin = null } = {}) {
+  const seen = {};
+  const fn = (cmd, args, opts) => {
+    Object.assign(seen, { cmd, args, opts });
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.stdin = {
+      end: (payload) => {
+        seen.prompt = payload;
+        if (onStdin) return onStdin(child, payload);
+        setImmediate(() => {
+          if (stderr) child.stderr.emit('data', stderr);
+          child.stdout.emit('data', stdout);
+          child.emit('close', code);
+        });
+      },
+    };
+    return child;
+  };
+  fn.seen = seen;
+  return fn;
+}
+
+test('dshBackend: prompt 走 stdin（不进命令行）+ headless 子命令 + 从首个 frontmatter 截取', async () => {
+  const spawnFn = fakeDshSpawn();
+  const b = dshBackend({ spawnFn, env: {} });
+  const text = await b.rewritePage({ page: { path: 'component/x.md', axis: 'component' }, repoRoot: '/r' });
+  const s = spawnFn.seen;
+  assert.equal(s.cmd, 'dsh');
+  // **prompt 必须在 stdin，不在命令行**：prompt 有换行和引号，进命令行要转义（Windows 还撞 32K 上限），
+  // 且 shell 模式下命令行参数是注入面。argv 里只应有固定的 'headless' + '-'。
+  assert.deepEqual(s.args, ['headless', '-']);
+  assert.ok(!s.args.some(a => typeof a === 'string' && a.includes('component/x.md')), 'prompt 不得出现在 argv');
+  assert.ok(s.prompt.includes('component/x.md'), 'prompt 内容应从 stdin 送出');
+  assert.equal(s.opts.cwd, '/r');
+  assert.equal(s.opts.shell, true);          // Windows 上 dsh 是 .cmd，execFile 跑不了
+  assert.equal(s.opts.timeout, 1_200_000);
+  assert.equal(text, '---\ntitle: t\n---\nbody');
+});
+
+test('dshBackend: 缺凭证 → auth 类（unavailable 可 failover）；普通非零退出 → 不可用类之外', async () => {
+  // dsh 缺 provider 凭证时报 MISSING_CREDENTIAL ... no API key → classify 命中 auth 规则 →
+  // 标 unavailable → runner 会 failover 到下一个后端（这正是想要的：dsh 没凭证不该让整轮重写陪葬）
+  const credFail = fakeDshSpawn({ stdout: '', stderr: 'dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"', code: 1 });
+  await assert.rejects(dshBackend({ spawnFn: credFail, env: {} }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
+    e => e instanceof BackendError && e.unavailable === true && /MISSING_CREDENTIAL/.test(e.message));
+  // 普通非零退出（非凭证类）→ 不可 failover（页/后端的问题，不是「后端没装」）
+  const plainFail = fakeDshSpawn({ stdout: '', stderr: 'dsh: boom', code: 2 });
+  await assert.rejects(dshBackend({ spawnFn: plainFail, env: {} }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
+    e => e instanceof BackendError && e.unavailable === false && /dsh exit/.test(e.message));
+  // spawn 报 ENOENT（dsh 没装）→ 不可用类 → runner 会 failover 到下一个后端
+  const enoent = () => { const c = new EventEmitter(); c.stdout = new EventEmitter(); c.stderr = new EventEmitter(); c.stdin = { end: () => {} };
+    setImmediate(() => { const e = new Error('spawn ENOENT'); e.code = 'ENOENT'; c.emit('error', e); }); return c; };
+  await assert.rejects(dshBackend({ spawnFn: enoent, env: {} }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' }),
+    e => e instanceof BackendError && e.unavailable === true && /dsh-cli-missing/.test(e.message));
+});
+
+test('dshBackend: 缺 DEEPSEEK_API_KEY 时从 ~/.dsh/.credentials.yaml 兜底读（refs 段明文）', async () => {
+  const spawnFn = fakeDshSpawn();
+  const env = { PATH: process.env.PATH };
+  await dshBackend({ spawnFn, env }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' });
+  const passed = spawnFn.seen.opts.env;
+  assert.ok(passed.DEEPSEEK_API_KEY, '应从 credentials.yaml 兜底注入 DEEPSEEK_API_KEY');
+  assert.ok(passed.DEEPSEEK_API_KEY.length >= 20, '注入的应是真实 key 而非空串');
+  // 已经在环境里时**不重复注入**（环境优先）
+  const spawnFn2 = fakeDshSpawn();
+  await dshBackend({ spawnFn: spawnFn2, env: { DEEPSEEK_API_KEY: 'already-set' } }).rewritePage({ page: { path: 'x' }, repoRoot: '/r' });
+  assert.equal(spawnFn2.seen.opts.env.DEEPSEEK_API_KEY, 'already-set');
+});
+
+test('detectAvailableBackends: dsh 探测用 shell（Windows 上 dsh 是 .cmd）', async () => {
+  const calls = [];
+  const exec = (cmd, args, opts, cb) => { calls.push({ cmd, args, opts }); cb(null, '0.2.1-rc.2', ''); };
+  const names = await detectAvailableBackends({ exec, order: ['dsh'] });
+  assert.deepEqual(names, ['dsh']);
+  assert.equal(calls[0].cmd, 'dsh');
+  assert.equal(calls[0].opts.shell, true);
 });
 
 test('resolveBackendChain: 配置指定短路；auto 按探测序', async () => {
@@ -104,7 +187,7 @@ test('resolveBackendChain: 配置指定短路；auto 按探测序', async () => 
   assert.equal(chain.length, 1);
   assert.equal(chain[0].name, 'codex');
   const auto = await resolveBackendChain('auto', { exec: okExec() });
-  assert.deepEqual(auto.map(b => b.name), ['claude', 'codex', 'opencode']);
+  assert.deepEqual(auto.map(b => b.name), ['dsh', 'claude', 'codex', 'opencode']);   // dsh 优先
   assert.equal(backendFor('vim'), null);
 });
 

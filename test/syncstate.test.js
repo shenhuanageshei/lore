@@ -213,3 +213,23 @@ test('writeSyncConfig: backend 合法写、非法 throw', () => {
     assert.equal(readSyncConfig(dir).backend, 'opencode');                   // 非法不落盘
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// dsh 后端接入后，白名单漏了它 → 「钉死 dsh」这条诉求被静默回落成 auto：
+// 读的时候不报错、照跑（探测链第一个恰好也是 dsh，看不出问题），
+// 写的时候直接 400（控制台「保存参数」选 dsh 存不进去）。
+test('readSyncConfig: backend=dsh 透传（不被静默回落成 auto）', () => {
+  const dir = tmp();
+  try {
+    writeFileSync(join(dir, 'sync.json'), JSON.stringify({ backend: 'dsh' }));
+    assert.equal(readSyncConfig(dir).backend, 'dsh');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('writeSyncConfig: backend=dsh 可写可读回（钉死入口存在）', () => {
+  const dir = tmp();
+  try {
+    writeSyncConfig(dir, { backend: 'dsh' });
+    assert.equal(readSyncConfig(dir).backend, 'dsh');
+    assert.throws(() => writeSyncConfig(dir, { backend: 'vim' }), /auto\|dsh\|claude\|codex\|opencode/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

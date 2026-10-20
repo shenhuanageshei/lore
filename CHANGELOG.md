@@ -47,6 +47,12 @@ All notable changes to **lore** are documented here. Format loosely follows
   文件级锚点 0 个——行号是零价值信息。`lib/resident.js` 的约定文案改成 `fn @ file`（这是约定的**唯一源头**，
   CLAUDE.md / AGENTS.md 同源渲染）、`lib/evidence.js` 的账本人读渲染只给文件级定位并显式标注
   「行号 N 为生成时记录，可能已漂移」、`test/resident.test.js` 加一条**行为**断言（不许再出现带行号形态）。
+- **`backend: dsh` 钉不死**（`lib/syncstate.js` `BACKENDS`）：白名单是 `auto|claude|codex|opencode`——**漏了 dsh**。
+  于是「钉死 dsh」这条诉求被**静默**吃掉两遍：读的时候 `readSyncConfig` 判非法 → 回落成 `auto`，
+  **不报错、照跑**（探测链第一个恰好也是 dsh → 看不出问题，只在 dsh 挂了、要 fallback 到 claude 时才暴露）；
+  写的时候 `writeSyncConfig` 直接 throw → 控制台「保存参数」选 dsh 存不进去（400）。
+  后端层其实完全支持（`resolveBackendChain('dsh')` → 单后端、无 fallback），只有这层白名单挡着。
+  已把 `dsh` 加进白名单，同步修错误文案与壳的后端下拉框（`site/index.html` 原先也没有 dsh 选项）。
 - **捕获闸门**（`.lore/config.yml`）：配 `capture_rate_min: 5` / `gap_days_max: 30`。此前闸门是
   「未配置阈值 → 不阻断」= 仪表没接——本机 post-commit hook 一直没装，捕获断了 38 天都没人知道。
 - **跨 root 同基名 deep 会丢掉一页的源范围**（`lib/lint.js` `componentScopes` + `lib/sync.js`
@@ -59,7 +65,7 @@ All notable changes to **lore** are documented here. Format loosely follows
   三处口径统一取**并集**；工单加 `sourceFiles` 字段并对同一页只产一条；后端 prompt 的「源码入口」
   改为直接列源文件（比「属于哪个目录」更能省掉 LLM 瞎找）。
 
-**测试**：`node --test` 866 项 / 866 通过 / 0 失败（此前 862 项 / 862 通过 / 0 失败，本轮 +4 条行为断言）。
+**测试**：`node --test` 868 项 / 868 通过 / 0 失败（此前 862 项 / 862 通过 / 0 失败，本轮 +6 条行为断言）。
 
 ## [0.12.0] — 2026-09-10
 

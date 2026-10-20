@@ -886,6 +886,7 @@ function renderConsolePage() {
         <label>后端 <select id="cfg-backend"
           style="background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:2px 6px" ${SYNC_API_OK ? '' : 'disabled'}>
           <option value="auto"${(SYNC_STATUS?.config?.backend ?? 'auto') === 'auto' ? ' selected' : ''}>auto（探测）</option>
+          <option value="dsh"${SYNC_STATUS?.config?.backend === 'dsh' ? ' selected' : ''}>dsh</option>
           <option value="claude"${SYNC_STATUS?.config?.backend === 'claude' ? ' selected' : ''}>claude</option>
           <option value="codex"${SYNC_STATUS?.config?.backend === 'codex' ? ' selected' : ''}>codex</option>
           <option value="opencode"${SYNC_STATUS?.config?.backend === 'opencode' ? ' selected' : ''}>opencode</option>
@@ -968,7 +969,7 @@ function renderConsolePage() {
           max_pages: Number(document.getElementById('cfg-maxpages').value),
           backend: document.getElementById('cfg-backend').value,
         }) });
-      msg.textContent = r.ok ? '✓ 已保存' : '✗ 参数不合法（静默 0-1440 / HH:MM / 1-50 页 / 后端 auto|claude|codex|opencode）';
+      msg.textContent = r.ok ? '✓ 已保存' : '✗ 参数不合法（静默 0-1440 / HH:MM / 1-50 页 / 后端 auto|dsh|claude|codex|opencode）';
     } catch { msg.textContent = '✗ 保存失败'; }
     cs.disabled = false;
     await fetchSyncStatus(); renderSyncLight();            // 读回真值（面板摘要同步刷新）

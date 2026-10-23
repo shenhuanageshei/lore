@@ -53,6 +53,19 @@ All notable changes to **lore** are documented here. Format loosely follows
   写的时候 `writeSyncConfig` 直接 throw → 控制台「保存参数」选 dsh 存不进去（400）。
   后端层其实完全支持（`resolveBackendChain('dsh')` → 单后端、无 fallback），只有这层白名单挡着。
   已把 `dsh` 加进白名单，同步修错误文案与壳的后端下拉框（`site/index.html` 原先也没有 dsh 选项）。
+- **auto 档把深度页的「机制档」削掉了**（`lib/backend.js` `axisPrompt` + `lib/runner.js` `qualityGate`）：
+  prompt 只说「机制档」，而 lint（`lintMissingMechanism`）认的是字面量 **`## 机制详解`**——两者对不上，
+  质量门又不管这一项 → auto 档每次重写深度页都把机制档削成别的标题（`## 机制档` / `## 架构图`）
+  → lint 报缺机制档 → 壳徽标提示排队 → auto 档再重写 → 还是缺。**这是第二个自我破坏循环**。
+  2026-10-23 实测：threat-intel 15 个深度页 + mal-analyze-cli 3 个被 auto 档重写后全丢了机制档——
+  **15 个不合规页 100% 都是被 auto 档动过的，没被动过的一个都没坏**（机制档内容 400–950 行还在，
+  只是标题名不对 → 修起来是改名，不是重写）。
+  这与 2026-10-19 修的「出图」是同一个缺陷的另一半：**图那半边修了，机制档这半边没修**。
+  修法：① prompt 给出字面量 `## 机制详解`，且绑在 `kind==='deep'` 上（与 lint 对「深度页」的定义同源，
+  鸟瞰页不要求）；② 质量门加一检——深度页缺 `## 机制详解` → 写盘前拒（坏页不许落盘，旧的好内容保住）；
+  ③ component 轴补上分层要求（`LAYOUT_NOTE` 原先只给 theme/flow）——实测有深度页被重写成
+  36KB 却只剩 1 个 `###` 的连续大段。
+  另：修 17 个被削页（改名）+ 1 个被削掉架构图的页（按真实状态机重画）。
 - **捕获闸门**（`.lore/config.yml`）：配 `capture_rate_min: 5` / `gap_days_max: 30`。此前闸门是
   「未配置阈值 → 不阻断」= 仪表没接——本机 post-commit hook 一直没装，捕获断了 38 天都没人知道。
 - **跨 root 同基名 deep 会丢掉一页的源范围**（`lib/lint.js` `componentScopes` + `lib/sync.js`
@@ -65,7 +78,7 @@ All notable changes to **lore** are documented here. Format loosely follows
   三处口径统一取**并集**；工单加 `sourceFiles` 字段并对同一页只产一条；后端 prompt 的「源码入口」
   改为直接列源文件（比「属于哪个目录」更能省掉 LLM 瞎找）。
 
-**测试**：`node --test` 868 项 / 868 通过 / 0 失败（此前 862 项 / 862 通过 / 0 失败，本轮 +6 条行为断言）。
+**测试**：`node --test` 871 项 / 871 通过 / 0 失败（此前 862 项 / 862 通过 / 0 失败，本轮 +9 条行为断言）。
 
 ## [0.12.0] — 2026-09-10
 

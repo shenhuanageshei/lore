@@ -113,6 +113,41 @@ test('axisPrompt: lint 判缺图的轴（component/flow）必须在 prompt 里�
   }
 });
 
+test('axisPrompt: 深度页（kind=deep）必须在 prompt 里给出「## 机制详解」字面量', () => {
+  // 与 lib/lint.js 的 lintMissingMechanism 同口径：深度页缺「## 机制详解」→ lint 报红。
+  //
+  // 钉这条是因为踩过：prompt 只说「机制档」而 lint 认字面量「## 机制详解」——两者对不上，
+  // 质量门又不管这一项 → auto 档每次重写深度页都把机制档削成别的标题（## 机制档 / ## 架构图）。
+  // 2026-10-23 实测：threat-intel 15 个深度页 + mal-analyze-cli 3 个，**全部**是 auto 档重写过的，
+  // 机制档内容（400–950 行）还在、只是标题名不对 → lint 报 missing-mechanism 18 条。
+  // 与 2026-10-19 修的「出图」是同一个缺陷的另一半：图那半边修了，机制档这半边没修。
+  for (const axis of ['component', 'theme']) {
+    const p = axisPrompt({ axis, path: `${axis}/x.md`, kind: 'deep' });
+    assert.match(p, /##\s*机制详解/, `${axis} 轴深度页 prompt 必须给出「## 机制详解」字面量`);
+  }
+  // 鸟瞰页不受此约束（lint 对非深度页不查机制档）——别让 prompt 要求一个 lint 不查的东西
+  const bird = axisPrompt({ axis: 'component', path: 'component/lib.md' });
+  assert.doesNotMatch(bird, /##\s*机制详解/);
+});
+
+test('axisPrompt: component 轴必须要求小标题分层（实测被重写成 1 个 H3 的 36KB 大段）', () => {
+  // theme/flow 早就有 LAYOUT_NOTE，component 轴没有 → auto 档把深度页写成连续大段密集文字。
+  // 2026-10-23 实测：threat-intel 的 main.md / metrics_api.md 各 36–38KB，### 小标题只剩 1 个。
+  const p = axisPrompt({ axis: 'component', path: 'component/x.md' });
+  assert.match(p, /小标题|分层|###/, 'component 轴 prompt 必须要求用 ### 小标题分层');
+});
+
+test('qualityGate: 深度页缺「## 机制详解」→ 判失败（坏页不许写盘）', () => {
+  // 质量门是「写盘前」的最后一道闸：机制档被削的页若放行，auto 档等于在持续劣化 wiki。
+  const bad = '---\ntitle: T\nsummary: s\n---\n# t\n\n## 概览\n\nx\n\n## 机制档\n\ny\n\n{{LORE_JOURNAL}}\n';
+  const r = qualityGate(bad, '', { path: 'component/a.md', kind: 'deep' });
+  assert.equal(r.ok, false, '深度页缺「## 机制详解」必须判失败');
+  assert.match(r.reason, /机制详解/);
+  // 非深度页（鸟瞰页）只要概览档 → 不受此门约束
+  const bird = '---\ntitle: T\nsummary: s\n---\n# t\n\n## 概览\n\nx\n\n{{LORE_JOURNAL}}\n';
+  assert.equal(qualityGate(bird, '', { path: 'component/lib.md' }).ok, true);
+});
+
 test('axisPrompt: page.instruction 注入「额外要求」段；无指令不变（重写带意图）', () => {
   const withInstr = axisPrompt({ axis: 'component', path: 'component/x.md', instruction: '精简概览段，加个调用例子' });
   assert.match(withInstr, /额外要求/);
